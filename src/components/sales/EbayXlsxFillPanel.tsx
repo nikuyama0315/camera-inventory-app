@@ -223,64 +223,68 @@ export default function EbayXlsxFillPanel() {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-            エクセルファイル(.xlsx)
-          </label>
-          <input
-            type="file"
-            accept=".xlsx"
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setResults(null);
-              setErrorMessage(null);
-            }}
-          />
-        </div>
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              エクセルファイル(.xlsx)
+            </label>
+            <input
+              type="file"
+              accept=".xlsx"
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setResults(null);
+                setErrorMessage(null);
+              }}
+            />
+          </div>
 
-        <div>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-            編集対象のシート名
-          </label>
-          <input
-            type="text"
-            value={sheetName}
-            onChange={(e) => setSheetName(e.target.value)}
-            placeholder="例: 2026.9(商品)"
-            style={{ width: 220 }}
-          />
-        </div>
-
-        <div>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-            Order No(eBay注文番号)
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {orderNos.map((v, i) => (
-              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="text"
-                  value={v}
-                  onChange={(e) => updateOrderNo(i, e.target.value)}
-                  placeholder="例: 08-15133-98164"
-                  style={{ width: 220 }}
-                />
-                {orderNos.length > 1 && (
-                  <button onClick={() => removeOrderNoField(i)} style={{ fontSize: 11, padding: "2px 8px" }}>
-                    −
-                  </button>
-                )}
-              </div>
-            ))}
-            <button onClick={addOrderNoField} style={{ fontSize: 12, padding: "2px 10px", width: "fit-content" }}>
-              + Order Noを追加
-            </button>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              編集対象のシート名
+            </label>
+            <input
+              type="text"
+              value={sheetName}
+              onChange={(e) => setSheetName(e.target.value)}
+              placeholder="例: 2026.9(商品)"
+              style={{ width: 220 }}
+            />
           </div>
         </div>
 
-        <button onClick={handleRun} disabled={busy} style={{ width: "fit-content" }}>
-          {busy ? "処理中..." : "実行してダウンロード"}
-        </button>
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              Order No(eBay注文番号)
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {orderNos.map((v, i) => (
+                <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={v}
+                    onChange={(e) => updateOrderNo(i, e.target.value)}
+                    placeholder="例: 08-15133-98164"
+                    style={{ width: 220 }}
+                  />
+                  {orderNos.length > 1 && (
+                    <button onClick={() => removeOrderNoField(i)} style={{ fontSize: 11, padding: "2px 8px" }}>
+                      −
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button onClick={addOrderNoField} style={{ fontSize: 12, padding: "2px 10px", width: "fit-content" }}>
+                + Order Noを追加
+              </button>
+            </div>
+          </div>
+
+          <button onClick={handleRun} disabled={busy} style={{ width: "fit-content" }}>
+            {busy ? "処理中..." : "実行してダウンロード"}
+          </button>
+        </div>
       </div>
 
       {errorMessage && (
