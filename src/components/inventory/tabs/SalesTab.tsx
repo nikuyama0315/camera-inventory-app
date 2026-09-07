@@ -16,6 +16,7 @@ interface EditForm {
   ebay_shipping_collected_usd: string;
   ebay_handling_fee_usd: string;
   ebay_ad_fee_usd: string;
+  shipping_cost_paid: string;
 }
 
 type SaleRow = ItemDetail["sales"][number];
@@ -82,6 +83,7 @@ export default function SalesTab({ item, onChanged }: Props) {
     ebay_shipping_collected_usd: "0",
     ebay_handling_fee_usd: "0",
     ebay_ad_fee_usd: "0",
+    shipping_cost_paid: "0",
   });
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -139,6 +141,7 @@ export default function SalesTab({ item, onChanged }: Props) {
       ebay_shipping_collected_usd: String(sale.ebay_shipping_collected_usd),
       ebay_handling_fee_usd: String(sale.ebay_handling_fee_usd),
       ebay_ad_fee_usd: String(sale.ebay_ad_fee_usd),
+      shipping_cost_paid: String(sale.shipping_cost_paid),
     });
   }
 
@@ -160,6 +163,7 @@ export default function SalesTab({ item, onChanged }: Props) {
         ebay_shipping_collected_usd: Number(editForm.ebay_shipping_collected_usd) || 0,
         ebay_handling_fee_usd: Number(editForm.ebay_handling_fee_usd) || 0,
         ebay_ad_fee_usd: Number(editForm.ebay_ad_fee_usd) || 0,
+        shipping_cost_paid: Number(editForm.shipping_cost_paid) || 0,
       });
       setEditingSaleId(null);
       onChanged();
@@ -277,7 +281,16 @@ export default function SalesTab({ item, onChanged }: Props) {
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>送料支払額(円)</span>
-              <span>{jpy(sale.shipping_cost_paid)}</span>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={editForm.shipping_cost_paid}
+                  onChange={(e) => updateEditField("shipping_cost_paid", e.target.value)}
+                  style={{ width: 140 }}
+                />
+              ) : (
+                <span>{jpy(sale.shipping_cost_paid)}</span>
+              )}
             </div>
 
             <div style={{ borderTop: "0.5px dashed var(--border)", margin: "10px 0" }} />
