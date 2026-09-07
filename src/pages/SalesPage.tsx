@@ -899,6 +899,8 @@ export default function SalesPage() {
         </div>
       )}
 
+      <EbayXlsxFillPanel />
+
       <div style={{ background: "var(--surface-2)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
@@ -1501,8 +1503,6 @@ export default function SalesPage() {
         </div>
       )}
       {!loading && list.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>該当する売上データがありません</p>}
-
-      <EbayXlsxFillPanel />
 
       <div
         style={{

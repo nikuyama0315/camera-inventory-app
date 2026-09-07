@@ -217,7 +217,7 @@ export default function EbayXlsxFillPanel() {
         borderRadius: 12,
       }}
     >
-      <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>eBay売上でXLSXを自動入力</p>
+      <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>利益管理票の更新</p>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
         エクセルファイルをアップロードし、シート名とOrder No(eBay注文番号)を指定すると、eBay(soulcameraアカウント)からその場でAPI取得した売上データを、指定シート内のまだ入力されていない行(C列が空欄の行)に上から順に自動入力し、ダウンロードを促します。
       </p>
