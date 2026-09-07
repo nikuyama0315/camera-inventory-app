@@ -35,6 +35,7 @@ import {
 } from "../lib/api/cpassImport";
 import { getSalesTabDataCounts, clearAllSalesTabData, type SalesTabDataCounts } from "../lib/api/ebaySync";
 import { EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS, EBAY_SYNC_SHOP_IDS } from "../lib/types";
+import EbayXlsxFillPanel from "../components/sales/EbayXlsxFillPanel";
 
 const CLEAR_SALES_TAB_CONFIRM_PHRASE = "売上データ削除";
 
@@ -1500,6 +1501,8 @@ export default function SalesPage() {
         </div>
       )}
       {!loading && list.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>該当する売上データがありません</p>}
+
+      <EbayXlsxFillPanel />
 
       <div
         style={{

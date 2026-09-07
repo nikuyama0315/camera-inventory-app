@@ -549,3 +549,35 @@ export async function fetchTransactionFeeForOrderItem(orderNumber: string, itemN
     }>);
   return rows.reduce((sum, row) => sum + Number(row.net_amount_usd ?? 0), 0);
 }
+
+/**
+ * Order Noを指定してeBay Sell Fulfillment/Finances APIをその場で(DB同期に依存せず)呼び出し、
+ * 売上データを取得する(2026-09-07追加、「売上・粗利」タブ「eBay売上でXLSXを自動入力」機能用)。
+ * ebay_transaction_linesには無いバイヤー居住国(taxAddress)と、正確なOrder Total(pricingSummary.total、
+ * item_subtotal+shippingからの再構成では非USD取引でVAT分がずれる問題を回避)を得るため、
+ * 既存の20分ごとcron同期とは別に、指定注文のみをその場でAPI照会する専用Edge Function。
+ */
+export interface EbayOrderLookupResult {
+  orderNo: string;
+  found: boolean;
+  error?: string;
+  soldDate?: string;
+  itemTitle?: string;
+  sku?: string;
+  subtotalUsd?: number;
+  shippingUsd?: number;
+  orderTotalUsd?: number;
+  adFeeUsd?: number;
+  buyerCountry?: string | null;
+}
+
+export async function lookupEbayOrdersLive(
+  orderNumbers: string[],
+  shopId: "soulcamera" | "soulmenjapan" = "soulcamera",
+): Promise<EbayOrderLookupResult[]> {
+  const { data, error } = await supabase.functions.invoke("ebay-order-lookup", {
+    body: { orderNumbers, shopId },
+  });
+  if (error) throw error;
+  return (data as { results: EbayOrderLookupResult[] }).results;
+}
