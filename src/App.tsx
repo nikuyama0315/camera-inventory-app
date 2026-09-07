@@ -190,6 +190,19 @@ export default function App() {
         {tab === "export" && <ExportPage />}
         {tab === "ledgerImport" && <LedgerImportPage />}
       </div>
+
+      <div
+        style={{
+          borderTop: "0.5px solid var(--border)",
+          padding: "8px 16px",
+          textAlign: "center",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          flexShrink: 0,
+        }}
+      >
+        Copyright © 2026 Soulmen, Inc.
+      </div>
     </div>
   );
 }
