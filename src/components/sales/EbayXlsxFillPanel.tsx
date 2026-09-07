@@ -155,10 +155,27 @@ export default function EbayXlsxFillPanel() {
         }
 
         ws.getCell(`F${row}`).value = 1;
-        if (lookup.subtotalUsd != null) ws.getCell(`G${row}`).value = lookup.subtotalUsd;
-        if (lookup.shippingUsd != null) ws.getCell(`H${row}`).value = lookup.shippingUsd;
-        if (lookup.orderTotalUsd != null) ws.getCell(`J${row}`).value = lookup.orderTotalUsd;
-        if (lookup.adFeeUsd != null) ws.getCell(`Q${row}`).value = lookup.adFeeUsd;
+        // 金額欄はテンプレート側の通貨記号付き書式([$$]#,##0.00等)を引き継がず、$を付けない数値表示にする
+        if (lookup.subtotalUsd != null) {
+          const cell = ws.getCell(`G${row}`);
+          cell.value = lookup.subtotalUsd;
+          cell.numFmt = "#,##0.00";
+        }
+        if (lookup.shippingUsd != null) {
+          const cell = ws.getCell(`H${row}`);
+          cell.value = lookup.shippingUsd;
+          cell.numFmt = "#,##0.00";
+        }
+        if (lookup.orderTotalUsd != null) {
+          const cell = ws.getCell(`J${row}`);
+          cell.value = lookup.orderTotalUsd;
+          cell.numFmt = "#,##0.00";
+        }
+        if (lookup.adFeeUsd != null) {
+          const cell = ws.getCell(`Q${row}`);
+          cell.value = lookup.adFeeUsd;
+          cell.numFmt = "#,##0.00";
+        }
 
         if (sku) {
           const purchasePrice = skuPurchasePrice(sku);
