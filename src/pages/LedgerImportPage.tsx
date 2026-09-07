@@ -15,7 +15,6 @@ import { COUNTERPARTY_TYPE_OPTIONS, getDeductionInfo, type CounterpartyType } fr
 import CameraStockImportPanel from "../components/ledgerImport/CameraStockImportPanel";
 import CameraManagementNoMatchPanel from "../components/ledgerImport/CameraManagementNoMatchPanel";
 import ZakkaStockImportPanel from "../components/ledgerImport/ZakkaStockImportPanel";
-import SoldCameraStockImportPanel from "../components/ledgerImport/SoldCameraStockImportPanel";
 
 const SHEET_NAME = "仕入・販売帳";
 const DEFAULT_START_ROW = 2;
@@ -629,12 +628,6 @@ export default function LedgerImportPage() {
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>雑貨在庫の一括取込</h3>
       <ZakkaStockImportPanel />
 
-      <hr style={{ margin: "32px 0", border: "none", borderTop: "1px solid var(--border)" }} />
-
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>
-        カメラ在庫(Sheet1・販売済み)の一括取込
-      </h3>
-      <SoldCameraStockImportPanel />
     </div>
   );
 }
