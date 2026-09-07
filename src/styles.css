@@ -1,0 +1,40 @@
+:root {
+  --border: #d9d7cd;
+  --border-strong: #b4b2a9;
+  --surface-1: #f1efe8;
+  --surface-2: #ffffff;
+  --text-primary: #2c2c2a;
+  --text-secondary: #5f5e5a;
+  --text-muted: #888780;
+  --accent: #185fa5;
+  --danger-bg: #fcebeb;
+  --danger-text: #791f1f;
+  font-family: -apple-system, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #fafaf7;
+  color: var(--text-primary);
+}
+
+button {
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--surface-1);
+}
+
+input, select, textarea {
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}

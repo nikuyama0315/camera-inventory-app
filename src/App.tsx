@@ -1,0 +1,195 @@
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "./lib/supabaseClient";
+import InventoryPage from "./pages/InventoryPage";
+import LoginPage from "./pages/LoginPage";
+import ExpensesPage from "./pages/ExpensesPage";
+import ImportPage from "./pages/ImportPage";
+import ExportPage from "./pages/ExportPage";
+import StockAlertsPage from "./pages/StockAlertsPage";
+import SkuLookupPage from "./pages/SkuLookupPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SalesPage from "./pages/SalesPage";
+import LedgerImportPage from "./pages/LedgerImportPage";
+import ExchangeRatePage from "./pages/ExchangeRatePage";
+import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
+import logo from "./assets/logo.png";
+
+type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "ledgerImport";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "inventory", label: "在庫・販売済" },
+  { key: "sales", label: "売上・粗利" },
+  { key: "skuLookup", label: "SKU検索" },
+  { key: "stockAlerts", label: "在庫アラート" },
+  { key: "expenses", label: "経費" },
+  { key: "exchangeRate", label: "為替" },
+  { key: "import", label: "レポート取込" },
+  { key: "export", label: "CSV出力" },
+  { key: "ledgerImport", label: "台帳一括取込" },
+];
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [tab, setTab] = useState<Tab>("inventory");
+  const [belowThresholdRows, setBelowThresholdRows] = useState<ModelStockRow[]>([]);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setChecked(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // パスワード再設定リンクからの遷移時、Supabaseがこのイベントを発火する。
+      // 通常ログインと区別し、新パスワード設定画面を強制的に表示する。
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+      }
+      setSession(newSession);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchModelStockOverview()
+      .then((rows) => setBelowThresholdRows(rows.filter((r) => r.belowThreshold)))
+      .catch(() => {
+        /* バナー表示のための取得失敗は致命的でないため無視 */
+      });
+    // ログイン中のセッションでアプリを開くたびに、しきい値割れをチェックしてGmail通知する
+    // (Gmail用シークレット未設定の場合はエラーになるが、画面上のバナー表示には影響しない)
+    checkStockAlertsAndNotify().catch(() => {
+      /* メール送信設定が未完了の場合は静かに失敗させる */
+    });
+  }, [session]);
+
+  if (!checked) {
+    return null;
+  }
+
+  if (passwordRecovery) {
+    return (
+      <ResetPasswordPage
+        onCompleted={() => {
+          setPasswordRecovery(false);
+        }}
+      />
+    );
+  }
+
+  if (!session) {
+    return <LoginPage onLoggedIn={() => {}} />;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 16px",
+          borderBottom: "0.5px solid var(--border)",
+        }}
+      >
+        <img src={logo} alt="" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0 }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+          Soulmen Japan Business Portal
+        </span>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 16px",
+          borderBottom: "0.5px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", gap: 4 }}>
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                border: "none",
+                borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
+                borderRadius: 0,
+                background: "transparent",
+                color: tab === t.key ? "var(--accent)" : "var(--text-secondary)",
+                fontSize: 13,
+                padding: "6px 10px",
+              }}
+            >
+              {t.label}
+              {t.key === "stockAlerts" && belowThresholdRows.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 11,
+                    padding: "1px 6px",
+                    borderRadius: 999,
+                    background: "var(--danger-bg)",
+                    color: "var(--danger-text)",
+                  }}
+                >
+                  {belowThresholdRows.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: "4px 10px" }}>
+          ログアウト
+        </button>
+      </div>
+
+      {belowThresholdRows.length > 0 && tab !== "stockAlerts" && !alertDismissed && (
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "var(--danger-bg)",
+            borderBottom: "0.5px solid var(--danger-text)",
+            fontSize: 12,
+            color: "var(--danger-text)",
+          }}
+        >
+          在庫アラート: {belowThresholdRows.map((r) => `${r.model_folder_name}(${r.in_stock_count}個)`).join("、")}
+          がしきい値を下回っています。
+          <button
+            onClick={() => setTab("stockAlerts")}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
+          >
+            確認する
+          </button>
+          <button
+            onClick={() => setAlertDismissed(true)}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
+          >
+            隠す
+          </button>
+        </div>
+      )}
+
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+        {tab === "inventory" && <InventoryPage />}
+        {tab === "sales" && <SalesPage />}
+        {tab === "stockAlerts" && <StockAlertsPage />}
+        {tab === "expenses" && <ExpensesPage />}
+        {tab === "exchangeRate" && <ExchangeRatePage />}
+        {tab === "skuLookup" && <SkuLookupPage />}
+        {tab === "import" && <ImportPage />}
+        {tab === "export" && <ExportPage />}
+        {tab === "ledgerImport" && <LedgerImportPage />}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,687 @@
+import { supabase } from "../supabaseClient";
+import { pickField, toDateOrNull, toNumberOrNull, type ParsedCsv } from "../csvUtils";
+
+export type Platform =
+  | "ebay_financial_statement"
+  | "ebay_tax_invoice"
+  | "ebay_transaction_report"
+  | "payoneer_transaction_report";
+
+export interface PlatformImport {
+  id: string;
+  platform: Platform;
+  ebay_account: string | null;
+  period_start: string;
+  period_end: string;
+  imported_at: string;
+  raw_file_reference: string | null;
+}
+
+async function createImportRow(
+  platform: Platform,
+  ebayAccount: string | null,
+  periodStart: string,
+  periodEnd: string,
+  rawFileReference?: string,
+): Promise<PlatformImport> {
+  const { data, error } = await supabase
+    .from("platform_settlement_imports")
+    .insert({
+      platform,
+      ebay_account: ebayAccount,
+      period_start: periodStart,
+      period_end: periodEnd,
+      raw_file_reference: rawFileReference ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as PlatformImport;
+}
+
+// SKU(Custom Label)の最初の"-"より前の部分(大文字化)をitems.management_noの同部分と突合する。
+// ebay-sync-orders Edge Functionのロジックと同じ考え方(参考候補程度の緩いヒューリスティック)。
+function skuMatchKey(sku: string | null | undefined): string | null {
+  if (!sku) return null;
+  const trimmed = sku.trim();
+  if (!trimmed) return null;
+  return trimmed.split("-")[0].trim().toUpperCase();
+}
+
+async function buildItemMatchIndex(): Promise<Map<string, string[]>> {
+  const { data, error } = await supabase.from("items").select("id, management_no");
+  if (error) throw error;
+  const map = new Map<string, string[]>();
+  for (const it of data ?? []) {
+    const key = skuMatchKey(it.management_no as string);
+    if (!key) continue;
+    const arr = map.get(key) ?? [];
+    arr.push(it.id as string);
+    map.set(key, arr);
+  }
+  return map;
+}
+
+// 指定した年月(YYYY-MM-01)の月次TTMレート(monthly_exchange_rates)を取得する。無ければnull。
+async function fetchTtmRate(yearMonth: string): Promise<number | null> {
+  const { data } = await supabase
+    .from("monthly_exchange_rates")
+    .select("rate")
+    .eq("year_month", yearMonth)
+    .maybeSingle();
+  return (data?.rate as number | undefined) ?? null;
+}
+
+// 対象年月を「取引日として最も多く登場する年月(最頻値)」で決定する。
+// 単純にperiodStart(最古の日付)を使うと、レポート期間が月境界をまたいで前月末の
+// 1行だけを含むケース(例: 4月分レポートの最古行が3/31付になる)で、レポート全体が
+// 誤って前月分として集計されてしまう不具合があったための対策。
+function modalYearMonth(dates: string[]): string {
+  const counts = new Map<string, number>();
+  for (const d of dates) {
+    const ym = d.slice(0, 7);
+    counts.set(ym, (counts.get(ym) ?? 0) + 1);
+  }
+  let bestYm = dates[dates.length - 1].slice(0, 7);
+  let bestCount = -1;
+  for (const [ym, count] of counts) {
+    if (count > bestCount || (count === bestCount && ym > bestYm)) {
+      bestCount = count;
+      bestYm = ym;
+    }
+  }
+  return `${bestYm}-01`;
+}
+
+// ---------------------------------------------------------------
+// eBay Transaction Report
+// ---------------------------------------------------------------
+export interface EbayTransactionImportResult {
+  importId: string;
+  rowCount: number;
+  periodStart: string;
+  periodEnd: string;
+  skippedCount?: number;
+}
+
+export async function importEbayTransactionReport(
+  csv: ParsedCsv,
+  ebayAccount: string,
+  fileName: string,
+): Promise<EbayTransactionImportResult> {
+  // Custom Label(SKU)からitems.management_noへの参考突合(クロスチェック用途、情報付与のみ)。
+  // このCSV由来の行はライブ同期由来のtype='SALE'行とは異なり、「売上・粗利」タブのレビュー
+  // キュー(match_status IN ('unmatched','matched_pending'))には出さないため、match_status は
+  // 常に 'ignored' に固定する(下記参照)。
+  const itemMatchIndex = await buildItemMatchIndex();
+
+  const parsedRows = csv.rows.map((row) => {
+    const transactionDate = toDateOrNull(
+      pickField(row, ["Transaction creation date", "Transaction Date", "Date"]),
+    );
+    const customLabel = pickField(row, ["Custom label", "Custom Label", "SKU"]);
+    const matchKey = skuMatchKey(customLabel);
+    const candidates = matchKey ? itemMatchIndex.get(matchKey) ?? [] : [];
+    const matchedItemId = candidates.length === 1 ? candidates[0] : null;
+    return {
+      transaction_date: transactionDate,
+      type: pickField(row, ["Type"]) ?? "",
+      order_number: pickField(row, ["Order number", "Order Number"]),
+      item_id: pickField(row, ["Item ID", "Item Id"]),
+      custom_label: customLabel,
+      matched_item_id: matchedItemId,
+      // レビューキューに出さない(上記コメント参照)。ライブ同期(type='SALE')行のみが
+      // unmatched/matched_pendingを使う。
+      match_status: "ignored" as const,
+      item_title: pickField(row, ["Item title", "Item Title"]),
+      quantity: toNumberOrNull(pickField(row, ["Quantity"])),
+      item_subtotal: toNumberOrNull(pickField(row, ["Item subtotal", "Item Subtotal"])),
+      shipping_and_handling: toNumberOrNull(pickField(row, ["Shipping and handling", "Shipping And Handling"])),
+      final_value_fee: (() => {
+        const fixed = toNumberOrNull(
+          pickField(row, ["Final Value Fee - fixed", "Final value fee", "Final Value Fee"]),
+        );
+        const variable = toNumberOrNull(pickField(row, ["Final Value Fee - variable"]));
+        if (fixed === null && variable === null) return null;
+        return (fixed ?? 0) + (variable ?? 0);
+      })(),
+      regulatory_operating_fee: toNumberOrNull(pickField(row, ["Regulatory Operating Fee", "Regulatory operating fee"])),
+      international_fee: toNumberOrNull(pickField(row, ["International Fee", "International fee"])),
+      gross_transaction_amount: toNumberOrNull(
+        pickField(row, ["Gross transaction amount", "Gross Transaction Amount"]),
+      ),
+      transaction_currency: pickField(row, ["Transaction currency", "Transaction Currency"]),
+      exchange_rate: toNumberOrNull(pickField(row, ["Exchange rate", "Exchange Rate"])),
+      net_amount: toNumberOrNull(pickField(row, ["Net amount", "Net Amount"])),
+      payout_currency: pickField(row, ["Payout currency", "Payout Currency"]),
+      payout_date: toDateOrNull(pickField(row, ["Payout date", "Payout Date"])),
+      payout_id: pickField(row, ["Payout ID", "Payout Id"]),
+      description: pickField(row, ["Description"]),
+    };
+  });
+
+  const validRows = parsedRows.filter((r) => r.transaction_date && r.type);
+  if (validRows.length === 0) {
+    throw new Error(
+      "取引日・Typeが取得できる行が1件もありませんでした。CSVの列名が想定と異なる可能性があります。",
+    );
+  }
+
+  const dates = validRows.map((r) => r.transaction_date as string).sort();
+  const periodStart = dates[0];
+  const periodEnd = dates[dates.length - 1];
+
+  const importRow = await createImportRow("ebay_transaction_report", ebayAccount, periodStart, periodEnd, fileName);
+
+  // Transaction Report CSVは同一注文・同一商品に対して複数行(Order/Refund/Hold placed・released等)
+  // を持つことがあり、ebay_transaction_lines側の(order_number, item_id, type)一意制約に稀に抵触する。
+  // 一括insertだと1行の抵触で全体が失敗するため、1行ずつinsertして抵触した行のみスキップする。
+  let insertedCount = 0;
+  let skippedCount = 0;
+  for (const r of validRows) {
+    const { error: rowError } = await supabase
+      .from("ebay_transaction_lines")
+      .insert({ ...r, import_id: importRow.id });
+    if (rowError) {
+      skippedCount++;
+    } else {
+      insertedCount++;
+    }
+  }
+  if (insertedCount === 0) {
+    throw new Error("全行の取込に失敗しました(重複データの可能性があります)。");
+  }
+
+  // Order/Refund行のGross transaction amountをUSD建てで集計し、月次照合テーブルに反映する
+  // (通貨がUSD以外の行はExchange rateで換算。要件定義書§3.7bis参照)
+  const grossUsdTotal = validRows
+    .filter((r) => r.type === "Order" || r.type === "Refund")
+    .reduce((sum, r) => {
+      const amount = r.gross_transaction_amount ?? 0;
+      const isUsd = (r.transaction_currency ?? "USD").toUpperCase() === "USD";
+      const converted = isUsd ? amount : amount * (r.exchange_rate ?? 1);
+      return sum + converted;
+    }, 0);
+
+  // Payout行のNet amount(既に入金通貨=USD建て)を合計する。eBay Financial Statement PDFの
+  // 「Payouts」欄と一致することを実データで確認済み(claude/report-import-proposal.md参照)。
+  const payoutUsdTotal = validRows
+    .filter((r) => r.type === "Payout")
+    .reduce((sum, r) => sum + (r.net_amount ?? 0), 0);
+
+  const yearMonth = modalYearMonth(dates);
+  const ttmRate = await fetchTtmRate(yearMonth);
+
+  const { error: reconError } = await supabase.from("monthly_settlement_reconciliations").upsert(
+    {
+      year_month: yearMonth,
+      ebay_account: ebayAccount,
+      transaction_report_gross_usd: grossUsdTotal,
+      transaction_report_gross_jpy: ttmRate != null ? grossUsdTotal * ttmRate : undefined,
+      ebay_payout_usd: payoutUsdTotal,
+      ebay_payout_jpy: ttmRate != null ? payoutUsdTotal * ttmRate : undefined,
+      ttm_rate: ttmRate ?? undefined,
+    },
+    { onConflict: "year_month,ebay_account" },
+  );
+  if (reconError) throw reconError;
+
+  return {
+    importId: importRow.id,
+    rowCount: insertedCount,
+    periodStart,
+    periodEnd,
+    skippedCount: skippedCount > 0 ? skippedCount : undefined,
+  };
+}
+
+// ---------------------------------------------------------------
+// eBay Tax Invoices
+// ---------------------------------------------------------------
+function classifyFeeCategory(feeType: string | null, feeGroup: string | null): "fvf_international" | "ad_fee" | "other" {
+  const text = `${feeType ?? ""} ${feeGroup ?? ""}`.toLowerCase();
+  if (text.includes("ad fee") || text.includes("advertising") || text.includes("promoted")) return "ad_fee";
+  if (text.includes("final value") || text.includes("international")) return "fvf_international";
+  return "other";
+}
+
+interface TaxInvoiceRawRow {
+  line_date: string | null;
+  description: string | null;
+  memo: string | null;
+  order_number: string | null;
+  item_number: string | null;
+  fee_group: string | null;
+  fee_type: string | null;
+  fee_category: "fvf_international" | "ad_fee" | "other";
+  currency: string;
+  net_amount: number;
+  jct_rate: number | null;
+  jct_amount: number | null;
+  total_amount: number | null;
+  charged_by_entity: string | null;
+}
+
+function parseTaxInvoiceRows(csv: ParsedCsv): TaxInvoiceRawRow[] {
+  return csv.rows.map((row) => {
+    const feeType = pickField(row, ["Fee Type", "Fee type"]);
+    const feeGroup = pickField(row, ["Fee Group", "Fee group"]);
+    return {
+      line_date: toDateOrNull(pickField(row, ["Transaction Date", "Date", "Line Date"])),
+      description: pickField(row, ["Description"]),
+      memo: pickField(row, ["Memo"]),
+      order_number: pickField(row, ["Order Number", "Order number"]),
+      item_number: pickField(row, ["Item Number", "Item number"]),
+      fee_group: feeGroup,
+      fee_type: feeType,
+      fee_category: classifyFeeCategory(feeType, feeGroup),
+      currency: pickField(row, ["Currency"]) ?? "USD",
+      net_amount: toNumberOrNull(pickField(row, ["Net Amount", "Net amount"])) ?? 0,
+      jct_rate: toNumberOrNull(pickField(row, ["JCT (%)", "JCT Rate", "JCT Rate(%)"])),
+      jct_amount: toNumberOrNull(pickField(row, ["JCT amount", "JCT Amount"])),
+      total_amount: toNumberOrNull(pickField(row, ["Total amount", "Total Amount"])),
+      charged_by_entity: pickField(row, ["Charged By", "Charged by entity"]),
+    };
+  });
+}
+
+/**
+ * 非USD行の実際のUSD換算レートを、同一注文番号・同一通貨のebay_transaction_lines
+ * (Transaction Report CSV取込、またはeBay受注同期のどちらかで、eBay自身が算出した
+ * レートとして既に保存されている)から自動取得する。2026-09-03修正: 以前はここで
+ * 「USD以外の通貨行に使うTTMレート」(実際は円/USDのレート)を誤って乗算しており、
+ * GBP/EUR/AUD等の金額が不正なUSD換算値になっていた不具合の修正。
+ */
+async function lookupFxRatesFromTransactionLines(orderNumbers: string[]): Promise<Map<string, number>> {
+  const uniqueOrderNumbers = Array.from(new Set(orderNumbers.filter((v): v is string => Boolean(v))));
+  const rateMap = new Map<string, number>();
+  if (uniqueOrderNumbers.length === 0) return rateMap;
+  const CHUNK = 200;
+  for (let i = 0; i < uniqueOrderNumbers.length; i += CHUNK) {
+    const chunk = uniqueOrderNumbers.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from("ebay_transaction_lines")
+      .select("order_number, transaction_currency, exchange_rate")
+      .in("order_number", chunk);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const r = row as { order_number: string | null; transaction_currency: string | null; exchange_rate: number | null };
+      if (!r.order_number || !r.transaction_currency || r.exchange_rate == null) continue;
+      const key = `${r.order_number}::${r.transaction_currency.toUpperCase()}`;
+      if (!rateMap.has(key)) rateMap.set(key, r.exchange_rate);
+    }
+  }
+  return rateMap;
+}
+
+export interface TaxInvoiceAnalysis {
+  rows: TaxInvoiceRawRow[];
+  /** 通貨コードごとの非USD行数(自動取得できたかどうかに関わらず、内訳表示用) */
+  currencyCounts: Record<string, number>;
+  /** 自動取得できなかった通貨の一覧(手動レート入力が必要) */
+  unresolvedCurrencies: string[];
+  /** 自動取得できたレート("注文番号::通貨" -> レート)。取込実行時にそのまま再利用する。 */
+  resolvedRates: Record<string, number>;
+}
+
+/**
+ * ドライラン: CSVを解析し、非USD行についてebay_transaction_linesから自動でUSD換算レートを
+ * 取得できるか判定する(DBへの書き込みは行わない)。取得できなかった通貨があれば、
+ * 呼び出し側(UI)は該当通貨の手動レート入力欄を表示し、importEbayTaxInvoiceRowsに渡す。
+ */
+export async function analyzeEbayTaxInvoiceCsv(csv: ParsedCsv): Promise<TaxInvoiceAnalysis> {
+  const rows = parseTaxInvoiceRows(csv);
+  const validRows = rows.filter((r) => r.line_date);
+  if (validRows.length === 0) {
+    throw new Error("日付が取得できる行が1件もありませんでした。CSVの列名が想定と異なる可能性があります。");
+  }
+
+  const nonUsdRows = validRows.filter((r) => r.currency.toUpperCase() !== "USD");
+  const rateMap = await lookupFxRatesFromTransactionLines(nonUsdRows.map((r) => r.order_number ?? ""));
+
+  const currencyCounts: Record<string, number> = {};
+  const unresolvedCurrencies = new Set<string>();
+  for (const r of nonUsdRows) {
+    const currency = r.currency.toUpperCase();
+    currencyCounts[currency] = (currencyCounts[currency] ?? 0) + 1;
+    const key = `${r.order_number ?? ""}::${currency}`;
+    if (!rateMap.has(key)) unresolvedCurrencies.add(currency);
+  }
+
+  return {
+    rows: validRows,
+    currencyCounts,
+    unresolvedCurrencies: Array.from(unresolvedCurrencies).sort(),
+    resolvedRates: Object.fromEntries(rateMap),
+  };
+}
+
+/**
+ * analyzeEbayTaxInvoiceCsvの結果を実際に取り込む。非USD行のUSD換算レートは、
+ * ①ebay_transaction_linesから自動取得できたレート(resolvedRates)を最優先、
+ * ②取得できなかった通貨についてはmanualRatesByCurrency(UIで手動入力された、
+ *   その通貨からUSDへの実際のレート)をフォールバックとして使用する。
+ * どちらも無い場合は換算せず原数値のまま保存し、警告として返す(要目視確認)。
+ */
+export async function importEbayTaxInvoiceRows(
+  analysis: TaxInvoiceAnalysis,
+  ebayAccount: string,
+  fileName: string,
+  manualRatesByCurrency: Record<string, number>,
+): Promise<EbayTransactionImportResult & { unconvertedWarnings: string[] }> {
+  const resolvedRates = new Map(Object.entries(analysis.resolvedRates));
+  const unconvertedWarnings: string[] = [];
+
+  const validRows = analysis.rows.map((r) => {
+    const currency = r.currency.toUpperCase();
+    const isUsd = currency === "USD";
+    let rateUsed: number | null = null;
+    let netAmountUsd = r.net_amount;
+    if (!isUsd) {
+      const autoKey = `${r.order_number ?? ""}::${currency}`;
+      rateUsed = resolvedRates.get(autoKey) ?? manualRatesByCurrency[currency] ?? null;
+      if (rateUsed != null) {
+        netAmountUsd = r.net_amount * rateUsed;
+      } else {
+        unconvertedWarnings.push(
+          `${r.order_number ?? "(注文番号不明)"} / ${currency} ${r.net_amount}: 換算レートが見つからず、USD換算されていません(要手動確認)`,
+        );
+      }
+    }
+    return { ...r, currency, ttm_rate_used: rateUsed, net_amount_usd: netAmountUsd };
+  });
+
+  const dates = validRows.map((r) => r.line_date as string).sort();
+  const periodStart = dates[0];
+  const periodEnd = dates[dates.length - 1];
+
+  const importRow = await createImportRow("ebay_tax_invoice", ebayAccount, periodStart, periodEnd, fileName);
+
+  const { error } = await supabase
+    .from("ebay_tax_invoice_lines")
+    .insert(validRows.map((r) => ({ ...r, import_id: importRow.id })));
+  if (error) throw error;
+
+  // fee_category別にUSD建てで集計し、月次照合テーブルに反映する
+  const fvfIntlTotal = validRows
+    .filter((r) => r.fee_category === "fvf_international")
+    .reduce((sum, r) => sum + r.net_amount_usd, 0);
+  const adFeeTotal = validRows
+    .filter((r) => r.fee_category === "ad_fee")
+    .reduce((sum, r) => sum + r.net_amount_usd, 0);
+
+  const yearMonth = modalYearMonth(dates);
+  const { error: reconError } = await supabase.from("monthly_settlement_reconciliations").upsert(
+    {
+      year_month: yearMonth,
+      ebay_account: ebayAccount,
+      tax_invoice_fvf_intl_fee_usd: fvfIntlTotal,
+      tax_invoice_ad_fee_usd: adFeeTotal,
+    },
+    { onConflict: "year_month,ebay_account" },
+  );
+  if (reconError) throw reconError;
+
+  return { importId: importRow.id, rowCount: validRows.length, periodStart, periodEnd, unconvertedWarnings };
+}
+
+// ---------------------------------------------------------------
+// Payoneer Transaction Report(2アカウント統合)
+// ---------------------------------------------------------------
+export async function importPayoneerReport(csv: ParsedCsv, fileName: string): Promise<EbayTransactionImportResult> {
+  const parsedRows = csv.rows.map((row) => ({
+    transaction_date: toDateOrNull(pickField(row, ["Date", "Transaction Date"])),
+    transaction_time: pickField(row, ["Time"]),
+    credit_amount: toNumberOrNull(pickField(row, ["Credit Amount", "Credit amount"])),
+    debit_amount: toNumberOrNull(pickField(row, ["Debit Amount", "Debit amount"])),
+    status: pickField(row, ["Status"]),
+    running_balance: toNumberOrNull(pickField(row, ["Running Balance", "Balance"])),
+    description: pickField(row, ["Description"]),
+  }));
+
+  const validRows = parsedRows.filter((r) => r.transaction_date);
+  if (validRows.length === 0) {
+    throw new Error("日付が取得できる行が1件もありませんでした。CSVの列名が想定と異なる可能性があります。");
+  }
+
+  const dates = validRows.map((r) => r.transaction_date as string).sort();
+  const periodStart = dates[0];
+  const periodEnd = dates[dates.length - 1];
+
+  const importRow = await createImportRow("payoneer_transaction_report", null, periodStart, periodEnd, fileName);
+
+  const { error } = await supabase
+    .from("payoneer_transactions")
+    .insert(validRows.map((r) => ({ ...r, import_id: importRow.id })));
+  if (error) throw error;
+
+  // 月次サマリーを自動計算(Credit amount合計 + 月初のRunning balance)
+  const creditTotal = validRows.reduce((sum, r) => sum + (r.credit_amount ?? 0), 0);
+  const firstRow = [...validRows].sort((a, b) => (a.transaction_date! < b.transaction_date! ? -1 : 1))[0];
+  const yearMonth = modalYearMonth(dates);
+  const ttmRate = await fetchTtmRate(yearMonth);
+  const runningBalanceStart = firstRow?.running_balance ?? 0;
+
+  const { error: summaryError } = await supabase.from("monthly_payoneer_summary").upsert(
+    {
+      year_month: yearMonth,
+      import_id: importRow.id,
+      credit_amount_total: creditTotal,
+      running_balance_start: runningBalanceStart,
+      running_balance_start_jpy: ttmRate != null ? runningBalanceStart * ttmRate : undefined,
+      ttm_rate: ttmRate ?? undefined,
+    },
+    { onConflict: "year_month" },
+  );
+  if (summaryError) throw summaryError;
+
+  return { importId: importRow.id, rowCount: validRows.length, periodStart, periodEnd };
+}
+
+// ---------------------------------------------------------------
+// eBay Financial Statement(PDF・手動入力)
+// ---------------------------------------------------------------
+export interface FinancialStatementManualInput {
+  ebayAccount: string;
+  yearMonth: string; // YYYY-MM
+  payoutUsd: number;
+  closingFundsUsd: number;
+}
+
+export async function saveFinancialStatementManualEntry(input: FinancialStatementManualInput): Promise<void> {
+  const yearMonthDate = `${input.yearMonth}-01`;
+
+  const { error } = await supabase.from("monthly_settlement_reconciliations").upsert(
+    {
+      year_month: yearMonthDate,
+      ebay_account: input.ebayAccount,
+      ebay_payout_usd: input.payoutUsd,
+      ebay_closing_funds_usd: input.closingFundsUsd,
+    },
+    { onConflict: "year_month,ebay_account" },
+  );
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------
+// 月次照合サマリー(eBay Payout合算 vs Payoneer入金額)
+// ---------------------------------------------------------------
+export interface MonthlyReconciliationSummary {
+  yearMonth: string; // YYYY-MM-01
+  ebayPayoutUsdTotal: number | null; // 2アカウント合算
+  ebayPayoutJpyTotal: number | null; // 2アカウント合算(TTM未設定の月はnull)
+  payoneerCreditUsd: number | null;
+  payoneerCreditJpy: number | null;
+  // eBay Payout(JPY、マイナス)+ Payoneer入金額(JPY、プラス)の残差。
+  // ユーザーの手動集計シート「Payoneer Fee(JPY)」と同じ算出式(実データで一致確認済み)。
+  // 実際の手数料(為替スプレッド)だけでなく、月またぎの入金タイミング差も含まれる点に注意。
+  payoneerFeeJpy: number | null;
+}
+
+export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconciliationSummary[]> {
+  const { data: reconRows, error: reconErr } = await supabase
+    .from("monthly_settlement_reconciliations")
+    .select("year_month, ebay_payout_usd, ebay_payout_jpy");
+  if (reconErr) throw reconErr;
+
+  const { data: payoneerRows, error: payoneerErr } = await supabase
+    .from("monthly_payoneer_summary")
+    .select("year_month, credit_amount_total, ttm_rate");
+  if (payoneerErr) throw payoneerErr;
+
+  const byMonth = new Map<string, { payoutUsd: number; payoutJpy: number; anyJpy: boolean }>();
+  for (const r of reconRows ?? []) {
+    const ym = r.year_month as string;
+    const entry = byMonth.get(ym) ?? { payoutUsd: 0, payoutJpy: 0, anyJpy: false };
+    entry.payoutUsd += (r.ebay_payout_usd as number | null) ?? 0;
+    if (r.ebay_payout_jpy != null) {
+      entry.payoutJpy += r.ebay_payout_jpy as number;
+      entry.anyJpy = true;
+    }
+    byMonth.set(ym, entry);
+  }
+
+  const payoneerByMonth = new Map<string, { creditUsd: number; ttmRate: number | null }>();
+  for (const r of payoneerRows ?? []) {
+    payoneerByMonth.set(r.year_month as string, {
+      creditUsd: (r.credit_amount_total as number | null) ?? 0,
+      ttmRate: (r.ttm_rate as number | null) ?? null,
+    });
+  }
+
+  const months = new Set<string>([...byMonth.keys(), ...payoneerByMonth.keys()]);
+  return [...months]
+    .sort()
+    .reverse()
+    .map((ym) => {
+      const recon = byMonth.get(ym);
+      const payoneer = payoneerByMonth.get(ym);
+      const payoutUsdTotal = recon ? recon.payoutUsd : null;
+      const payoutJpyTotal = recon && recon.anyJpy ? recon.payoutJpy : null;
+      const creditUsd = payoneer ? payoneer.creditUsd : null;
+      const creditJpy = payoneer && payoneer.ttmRate != null ? payoneer.creditUsd * payoneer.ttmRate : null;
+      const feeJpy = payoutJpyTotal != null && creditJpy != null ? payoutJpyTotal + creditJpy : null;
+      return {
+        yearMonth: ym,
+        ebayPayoutUsdTotal: payoutUsdTotal,
+        ebayPayoutJpyTotal: payoutJpyTotal,
+        payoneerCreditUsd: creditUsd,
+        payoneerCreditJpy: creditJpy,
+        payoneerFeeJpy: feeJpy,
+      };
+    });
+}
+
+// ---------------------------------------------------------------
+// 取込履歴
+// ---------------------------------------------------------------
+export async function fetchImportHistory(): Promise<PlatformImport[]> {
+  const { data, error } = await supabase
+    .from("platform_settlement_imports")
+    .select("*")
+    .order("imported_at", { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return data as PlatformImport[];
+}
+
+// ---------------------------------------------------------------
+// 危険な操作: レポート取込データ全クリア(2026-08-31追加)
+// ---------------------------------------------------------------
+
+const REPORT_IMPORT_PLATFORMS: Platform[] = [
+  "ebay_financial_statement",
+  "ebay_tax_invoice",
+  "ebay_transaction_report",
+  "payoneer_transaction_report",
+];
+
+const ZERO_UUID_REPORT = "00000000-0000-0000-0000-000000000000";
+
+export interface ReportImportDataCounts {
+  platformSettlementImports: number;
+  ebayTransactionLines: number;
+  ebayTaxInvoiceLines: number;
+  payoneerTransactions: number;
+  monthlySettlementReconciliations: number;
+  monthlyPayoneerSummary: number;
+}
+
+/**
+ * 「レポート取込」画面(ImportPage.tsx)経由で登録されたデータの件数をまとめて取得する。
+ * 危険な操作(全クリア)の確認表示用。
+ *
+ * 注意: ebay_transaction_lines・ebay_tax_invoice_lines・platform_settlement_importsは、
+ * 「売上・粗利」タブのeBayライブ同期機能(ebay-sync-orders Edge Function、
+ * platform_settlement_imports.platform='ebay')とも共有しているテーブルのため、
+ * レポート取込由来の行(platform IN ebay_financial_statement/ebay_tax_invoice/
+ * ebay_transaction_report/payoneer_transaction_report のimport_idを持つ行)のみを対象に
+ * カウントする。ライブ同期由来の行(platform='ebay')は対象外(売上・粗利タブ側の機能)。
+ * monthly_settlement_reconciliations・monthly_payoneer_summaryはレポート取込専用テーブルの
+ * ため全件が対象。
+ */
+export async function getReportImportDataCounts(): Promise<ReportImportDataCounts> {
+  const importsRes = await supabase
+    .from("platform_settlement_imports")
+    .select("id")
+    .in("platform", REPORT_IMPORT_PLATFORMS);
+  if (importsRes.error) throw importsRes.error;
+  const importIds = (importsRes.data ?? []).map((r) => r.id as string);
+
+  const zeroCount = { count: 0, error: null as null };
+  const [ebayTransactionLines, ebayTaxInvoiceLines, payoneerTransactions, monthlySettlementReconciliations, monthlyPayoneerSummary] =
+    await Promise.all([
+      importIds.length
+        ? supabase.from("ebay_transaction_lines").select("id", { count: "exact", head: true }).in("import_id", importIds)
+        : Promise.resolve(zeroCount),
+      importIds.length
+        ? supabase.from("ebay_tax_invoice_lines").select("id", { count: "exact", head: true }).in("import_id", importIds)
+        : Promise.resolve(zeroCount),
+      importIds.length
+        ? supabase.from("payoneer_transactions").select("id", { count: "exact", head: true }).in("import_id", importIds)
+        : Promise.resolve(zeroCount),
+      supabase.from("monthly_settlement_reconciliations").select("id", { count: "exact", head: true }),
+      supabase.from("monthly_payoneer_summary").select("id", { count: "exact", head: true }),
+    ]);
+  for (const r of [ebayTransactionLines, ebayTaxInvoiceLines, payoneerTransactions, monthlySettlementReconciliations, monthlyPayoneerSummary]) {
+    if (r.error) throw r.error;
+  }
+  return {
+    platformSettlementImports: importIds.length,
+    ebayTransactionLines: ebayTransactionLines.count ?? 0,
+    ebayTaxInvoiceLines: ebayTaxInvoiceLines.count ?? 0,
+    payoneerTransactions: payoneerTransactions.count ?? 0,
+    monthlySettlementReconciliations: monthlySettlementReconciliations.count ?? 0,
+    monthlyPayoneerSummary: monthlyPayoneerSummary.count ?? 0,
+  };
+}
+
+/**
+ * 「レポート取込」画面経由で登録されたデータを全件削除する(2026-08-31追加)。
+ * 対象: platform_settlement_imports(レポート取込由来のplatformのみ)・ebay_transaction_lines・
+ * ebay_tax_invoice_lines・payoneer_transactions(いずれもレポート取込由来のimport_idの行のみ、
+ * platform_settlement_importsの削除にON DELETE CASCADEで連動)・monthly_settlement_reconciliations・
+ * monthly_payoneer_summary(全件、レポート取込専用テーブル)。
+ *
+ * 「売上・粗利」タブのeBayライブ同期データ(platform='ebay'、type='SALE'の行)・売上登録(sales)・
+ * CPaSS配送実績(cpass_shipments)には一切影響しない(別スコープ、あちらは「危険な操作: 売上・粗利
+ * データ全クリア」機能を参照)。
+ *
+ * 削除順序に注意: monthly_payoneer_summary.import_id が platform_settlement_imports を参照して
+ * おり(削除ルールNO ACTION)、先にmonthly_payoneer_summaryを削除する必要がある。
+ * ebay_transaction_lines/ebay_tax_invoice_lines/payoneer_transactionsはON DELETE CASCADEのため、
+ * platform_settlement_imports側(レポート取込由来分のみ)を削除すれば自動的に連動削除される。
+ */
+export async function clearAllReportImportData(): Promise<void> {
+  const summaryDel = await supabase.from("monthly_payoneer_summary").delete().neq("id", ZERO_UUID_REPORT);
+  if (summaryDel.error) throw summaryDel.error;
+
+  const reconDel = await supabase.from("monthly_settlement_reconciliations").delete().neq("id", ZERO_UUID_REPORT);
+  if (reconDel.error) throw reconDel.error;
+
+  const importsDel = await supabase
+    .from("platform_settlement_imports")
+    .delete()
+    .in("platform", REPORT_IMPORT_PLATFORMS);
+  if (importsDel.error) throw importsDel.error;
+}
