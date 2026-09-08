@@ -19,7 +19,7 @@ import logo from "./assets/logo.png";
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "ledgerImport";
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "inventory", label: "在庫・販売済" },
+  { key: "inventory", label: "在庫・販売" },
   { key: "sales", label: "売上・粗利" },
   { key: "skuLookup", label: "SKU検索" },
   { key: "stockAlerts", label: "在庫アラート" },
@@ -30,15 +30,63 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "ledgerImport", label: "台帳一括取込" },
 ];
 
+// 2026-09-09追加: ポータル統合(ebay-automationと同一オリジン)で「マーケティング →」
+// 「← 販売管理」を行き来した際、それぞれ前に見ていた画面へ戻れるようにする。
+// このアプリはSPAで単一URLのため、直前のタブをlocalStorageに保存・復元する
+// (ebay-automation側はページ遷移そのものなので、直前のURLをlocalStorageに保存し、
+// こちらの「マーケティング →」リンクがその値を読んで遷移先にする)。
+const SALES_LAST_TAB_KEY = "soulmen_portal_sales_last_tab";
+const MARKETING_LAST_PATH_KEY = "soulmen_portal_marketing_last_path";
+const TAB_KEYS = TABS.map((t) => t.key);
+
+function loadInitialTab(): Tab {
+  try {
+    const saved = localStorage.getItem(SALES_LAST_TAB_KEY);
+    if (saved && (TAB_KEYS as string[]).includes(saved)) return saved as Tab;
+  } catch {
+    /* localStorageが使えない環境では既定値にフォールバック */
+  }
+  return "inventory";
+}
+
+function loadMarketingHref(): string {
+  try {
+    return localStorage.getItem(MARKETING_LAST_PATH_KEY) || "/marketing/";
+  } catch {
+    return "/marketing/";
+  }
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
-  const [tab, setTab] = useState<Tab>("inventory");
+  const [tab, setTab] = useState<Tab>(loadInitialTab);
   const [belowThresholdRows, setBelowThresholdRows] = useState<ModelStockRow[]>([]);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
   const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
   const [showAccountSecurity, setShowAccountSecurity] = useState(false);
+  const [marketingHref, setMarketingHref] = useState(loadMarketingHref);
+
+  // タブを切り替えるたびに保存し、次回このアプリを開いたとき(マーケティング側から
+  // 戻ってきたときを含む)に復元できるようにする。
+  useEffect(() => {
+    try {
+      localStorage.setItem(SALES_LAST_TAB_KEY, tab);
+    } catch {
+      /* localStorageが使えない環境では保存を諦める(タブ切替自体は継続) */
+    }
+  }, [tab]);
+
+  // マーケティング側で最後に見ていたページを、ウィンドウにフォーカスが戻るたびに
+  // 読み直す(このタブで「マーケティング →」を押して戻ってきた直後に反映するため)。
+  useEffect(() => {
+    function refreshMarketingHref() {
+      setMarketingHref(loadMarketingHref());
+    }
+    window.addEventListener("focus", refreshMarketingHref);
+    return () => window.removeEventListener("focus", refreshMarketingHref);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -152,7 +200,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a
-            href="/marketing/"
+            href={marketingHref}
             style={{
               fontSize: 12,
               padding: "4px 10px",
