@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { EbayTransactionLineDetail, ItemDetail } from "../../../lib/types";
-import { updateSale, type Sale } from "../../../lib/api/sales";
+import { deleteSale, updateSale, type Sale } from "../../../lib/api/sales";
 import { fetchAdFeeForOrderItem, fetchTransactionFeeForOrderItem } from "../../../lib/api/ebaySync";
 
 interface Props {
@@ -86,6 +86,7 @@ export default function SalesTab({ item, onChanged }: Props) {
     shipping_cost_paid: "0",
   });
   const [busy, setBusy] = useState(false);
+  const [resettingSaleId, setResettingSaleId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -174,6 +175,35 @@ export default function SalesTab({ item, onChanged }: Props) {
     }
   }
 
+  /**
+   * 「販売データリセット」ボタン(2026-09-08追加)。販売済みの商品が返品・キャンセルとなり、
+   * ステータスを出品中・検品済(出品待ち)等へ差し戻す運用があるため、この売上(sales)1件分を
+   * まるごと削除して「販売時にセットされたデータ」を無かった状態に戻す。フィールドを個別に0/空へ
+   * 書き換えるのではなくレコード自体を削除する方式にしたのは、値だけ空にすると「売上・粗利」タブの
+   * 一覧・集計に$0のみの実体の無い行が残ってしまうため(deleteSale()は同タブの削除機能で既に使用)。
+   * items.statusの変更は行わない(ステータス変更は既存の「ステータス(修正用)」等の操作に委ねる)。
+   */
+  async function resetSaleData(sale: SaleRow) {
+    if (
+      !window.confirm(
+        `${sale.sale_date}の売上データを削除します(この操作は取り消せません)。\n返品・キャンセル等でこの商品の販売記録を取り消す場合に実行してください。よろしいですか?`,
+      )
+    ) {
+      return;
+    }
+    setResettingSaleId(sale.id);
+    setErrorMessage(null);
+    try {
+      await deleteSale(sale.id);
+      if (editingSaleId === sale.id) setEditingSaleId(null);
+      onChanged();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "販売データのリセットに失敗しました");
+    } finally {
+      setResettingSaleId(null);
+    }
+  }
+
   if (sales.length === 0) {
     return (
       <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
@@ -224,14 +254,25 @@ export default function SalesTab({ item, onChanged }: Props) {
                 {sale.sale_date}の売上{line ? "(eBay同期データ)" : "(eBay取引明細未紐付け)"}
               </p>
               {!isEditing && (
-                <button
-                  type="button"
-                  onClick={() => startEdit(sale)}
-                  style={{ fontSize: 12, padding: "4px 10px" }}
-                  title="この売上の登録金額(subtotal/shipping/transaction fees/Ad fee general)を修正します"
-                >
-                  編集
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(sale)}
+                    style={{ fontSize: 12, padding: "4px 10px" }}
+                    title="この売上の登録金額(subtotal/shipping/transaction fees/Ad fee general)を修正します"
+                  >
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void resetSaleData(sale)}
+                    disabled={resettingSaleId === sale.id}
+                    style={{ fontSize: 12, padding: "4px 10px", color: "var(--danger-text)" }}
+                    title="返品・キャンセル等でステータスを差し戻す際に、この売上記録を削除して販売時のデータをリセットします"
+                  >
+                    {resettingSaleId === sale.id ? "処理中..." : "販売データリセット"}
+                  </button>
+                </div>
               )}
             </div>
 
