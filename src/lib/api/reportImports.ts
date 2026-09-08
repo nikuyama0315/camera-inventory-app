@@ -606,51 +606,95 @@ export async function fetchImportHistory(): Promise<PlatformImport[]> {
 }
 
 // ---------------------------------------------------------------
-// レポート種別・アカウントごとの最新取込済み期間(2026-09-08追加)。
-// 「レポート取込」画面に「◯◯年◯◯月分まで取込済み」を表示するための集計。
-// fetchImportHistory()は「直近30件」表示用に件数を絞っているため、取込頻度が低い
-// レポート種別のデータが古い記録に埋もれて漏れる可能性がある。ここでは絞り込まずに
-// platform_settlement_imports全件からplatform×ebay_accountごとのMAX(period_end)を求める。
-// eBay Financial StatementはPDF手動入力(saveFinancialStatementManualEntry)であり
-// platform_settlement_importsには記録されないため、代わりにmonthly_settlement_reconciliations
-// (year_month, ebay_account)から同様に最新分を求めて合流させる。
+// レポート種別・アカウントごとの月別取込状況(2026-09-08追加、当初のMAX(period_end)表示から
+// 「直近6か月を月ごとに表示」へユーザー指示により変更)。
 // ---------------------------------------------------------------
-export interface LatestImportedPeriod {
-  platform: Platform;
-  ebayAccount: string | null;
-  /** YYYY-MM-DD(financial statementのみYYYY-MM-01) */
-  periodEnd: string;
+export interface MonthlyImportStatusCell {
+  yearMonth: string; // "YYYY-MM"
+  imported: boolean;
 }
 
-export async function fetchLatestImportedPeriods(): Promise<LatestImportedPeriod[]> {
-  const latestByKey = new Map<string, LatestImportedPeriod>();
+export interface MonthlyImportStatusRow {
+  platform: Platform;
+  account: string | null;
+  /** 古い月→新しい月の順。最後の要素が当月。 */
+  months: MonthlyImportStatusCell[];
+}
+
+// 「取込状況」表の行順序。Payoneerのみ2アカウント統合のためaccount=null。
+const IMPORT_STATUS_ROW_DEFS: Array<{ platform: Platform; account: string | null }> = [
+  { platform: "ebay_transaction_report", account: "soulcamera" },
+  { platform: "ebay_transaction_report", account: "soulmenjapan" },
+  { platform: "ebay_tax_invoice", account: "soulcamera" },
+  { platform: "ebay_tax_invoice", account: "soulmenjapan" },
+  { platform: "ebay_financial_statement", account: "soulcamera" },
+  { platform: "ebay_financial_statement", account: "soulmenjapan" },
+  { platform: "payoneer_transaction_report", account: null },
+];
+
+function lastDayOfMonthNum(year: number, month1based: number): number {
+  return new Date(year, month1based, 0).getDate();
+}
+
+/**
+ * 「取込状況」画面向けに、直近monthsCountヶ月(当月を含む)について、レポート種別・アカウントごとに
+ * その月のデータが取込済みかどうかを判定する。
+ * CSV取込3種は、platform_settlement_imports(レポート取込由来のplatformのみ)の中に、対象月の
+ * 1日〜末日と期間が重なる(period_start<=月末 && period_end>=月初)行が1つでもあれば「取込済み」と
+ * みなす(1回のCSVが月境界をまたぐ実データがあるため、月初=period_startの完全一致ではなく期間の
+ * 重なりで判定する)。eBay Financial Statement(PDF手動入力)のみ、対象年月そのものが
+ * monthly_settlement_reconciliationsに存在するかで判定する。
+ */
+export async function fetchMonthlyImportStatus(monthsCount = 6): Promise<MonthlyImportStatusRow[]> {
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = monthsCount - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
 
   const { data: importRows, error: importErr } = await supabase
     .from("platform_settlement_imports")
-    .select("platform, ebay_account, period_end");
+    .select("platform, ebay_account, period_start, period_end")
+    .in("platform", REPORT_IMPORT_PLATFORMS);
   if (importErr) throw importErr;
-  for (const row of (importRows ?? []) as Array<{ platform: Platform; ebay_account: string | null; period_end: string }>) {
-    const key = `${row.platform}|${row.ebay_account ?? ""}`;
-    const existing = latestByKey.get(key);
-    if (!existing || row.period_end > existing.periodEnd) {
-      latestByKey.set(key, { platform: row.platform, ebayAccount: row.ebay_account, periodEnd: row.period_end });
-    }
-  }
 
   const { data: reconRows, error: reconErr } = await supabase
     .from("monthly_settlement_reconciliations")
     .select("year_month, ebay_account");
   if (reconErr) throw reconErr;
-  for (const row of (reconRows ?? []) as Array<{ year_month: string; ebay_account: string | null }>) {
-    if (!row.ebay_account) continue;
-    const key = `ebay_financial_statement|${row.ebay_account}`;
-    const existing = latestByKey.get(key);
-    if (!existing || row.year_month > existing.periodEnd) {
-      latestByKey.set(key, { platform: "ebay_financial_statement", ebayAccount: row.ebay_account, periodEnd: row.year_month });
-    }
+
+  const typedImportRows = (importRows ?? []) as Array<{
+    platform: Platform;
+    ebay_account: string | null;
+    period_start: string;
+    period_end: string;
+  }>;
+  const typedReconRows = (reconRows ?? []) as Array<{ year_month: string; ebay_account: string | null }>;
+
+  function monthBounds(ym: string): { start: string; end: string } {
+    const [y, m] = ym.split("-").map(Number);
+    return { start: `${ym}-01`, end: `${ym}-${String(lastDayOfMonthNum(y, m)).padStart(2, "0")}` };
   }
 
-  return Array.from(latestByKey.values());
+  return IMPORT_STATUS_ROW_DEFS.map(({ platform, account }) => ({
+    platform,
+    account,
+    months: months.map((ym) => {
+      const { start, end } = monthBounds(ym);
+      const imported =
+        platform === "ebay_financial_statement"
+          ? typedReconRows.some((r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym)
+          : typedImportRows.some(
+              (r) =>
+                r.platform === platform &&
+                (account === null || r.ebay_account === account) &&
+                r.period_start <= end &&
+                r.period_end >= start,
+            );
+      return { yearMonth: ym, imported };
+    }),
+  }));
 }
 
 // ---------------------------------------------------------------

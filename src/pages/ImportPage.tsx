@@ -5,7 +5,7 @@ import { fetchLatestMufgTtm } from "../lib/api/mufgRate";
 import {
   clearAllReportImportData,
   fetchImportHistory,
-  fetchLatestImportedPeriods,
+  fetchMonthlyImportStatus,
   fetchMonthlyReconciliationSummary,
   fetchReportImportClearLog,
   getReportImportDataCounts,
@@ -14,9 +14,8 @@ import {
   importEbayTransactionReport,
   importPayoneerReport,
   saveFinancialStatementManualEntry,
-  type LatestImportedPeriod,
+  type MonthlyImportStatusRow,
   type MonthlyReconciliationSummary,
-  type Platform,
   type PlatformImport,
   type ReportImportClearLogEntry,
   type ReportImportDataCounts,
@@ -34,27 +33,10 @@ const PLATFORM_LABELS: Record<string, string> = {
   payoneer_transaction_report: "Payoneer Transaction Report",
 };
 
-// 「取込状況」サマリー表の行定義(2026-09-08追加)。Payoneerのみ2アカウント統合のためaccount=null。
-const IMPORT_STATUS_ROWS: Array<{ platform: Platform; account: string | null }> = [
-  { platform: "ebay_transaction_report", account: "soulcamera" },
-  { platform: "ebay_transaction_report", account: "soulmenjapan" },
-  { platform: "ebay_tax_invoice", account: "soulcamera" },
-  { platform: "ebay_tax_invoice", account: "soulmenjapan" },
-  { platform: "ebay_financial_statement", account: "soulcamera" },
-  { platform: "ebay_financial_statement", account: "soulmenjapan" },
-  { platform: "payoneer_transaction_report", account: null },
-];
-
-/** "YYYY-MM-DD"(または"YYYY-MM-01")を"YYYY年M月"表記に変換する */
-function formatYearMonthJp(dateStr: string): string {
-  const [y, m] = dateStr.split("-");
-  return `${y}年${Number(m)}月`;
-}
-
 export default function ImportPage() {
   const [history, setHistory] = useState<PlatformImport[]>([]);
   const [reconSummary, setReconSummary] = useState<MonthlyReconciliationSummary[]>([]);
-  const [latestImportedPeriods, setLatestImportedPeriods] = useState<LatestImportedPeriod[]>([]);
+  const [monthlyImportStatus, setMonthlyImportStatus] = useState<MonthlyImportStatusRow[]>([]);
   const [reportImportCounts, setReportImportCounts] = useState<ReportImportDataCounts | null>(null);
   const [reportImportCountsLoading, setReportImportCountsLoading] = useState(false);
   const [reportImportCountsError, setReportImportCountsError] = useState<string | null>(null);
@@ -76,7 +58,7 @@ export default function ImportPage() {
       // 月次照合サマリー取得の失敗は致命的ではないため無視
     }
     try {
-      setLatestImportedPeriods(await fetchLatestImportedPeriods());
+      setMonthlyImportStatus(await fetchMonthlyImportStatus());
     } catch {
       // 取込状況サマリー取得の失敗は致命的ではないため無視
     }
@@ -145,6 +127,8 @@ export default function ImportPage() {
   function fmtJpy(v: number | null): string {
     return v == null ? "-" : Math.round(v).toLocaleString("ja-JP");
   }
+  // 「当月6日経過後、当月分未取込なら警告」の判定に使う当日の日付(1-31)。
+  const todayDate = new Date().getDate();
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "1.5rem", paddingBottom: "3rem", boxSizing: "border-box" }}>
@@ -152,30 +136,62 @@ export default function ImportPage() {
         各レポートのCSVは実データで列名・ヘッダー行の位置(先頭の請求書番号等のメタデータ行を自動で読み飛ばします)を確認済みです。それでも取込件数が0件、または想定と異なる場合はCSVの列名をご確認ください。
       </p>
 
-      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況</h3>
+      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(直近6か月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        各レポート・アカウントについて、これまでに取込んだデータの最終日(period_end)が属する年月を表示します。eBay Financial Statementのみ入力対象年月そのものです。
+        各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial Statementのみ入力対象年月そのもの)。
+        当月について、7日を過ぎても取込が無い場合は行に警告(⚠)を表示します。
       </p>
       <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
         <thead>
           <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>レポート種別</th>
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>アカウント</th>
-            <th style={{ padding: "6px 4px", fontWeight: 500 }}>取込状況</th>
+            {(monthlyImportStatus[0]?.months ?? []).map((cell) => (
+              <th key={cell.yearMonth} style={{ padding: "6px 4px", fontWeight: 500, textAlign: "center" }}>
+                {cell.yearMonth}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {IMPORT_STATUS_ROWS.map((row) => {
-            const latest = latestImportedPeriods.find(
-              (p) => p.platform === row.platform && p.ebayAccount === row.account,
-            );
+          {monthlyImportStatus.map((row) => {
+            const currentMonthCell = row.months[row.months.length - 1];
+            // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す。
+            const rowAlert = todayDate > 6 && currentMonthCell != null && !currentMonthCell.imported;
             return (
-              <tr key={`${row.platform}-${row.account ?? "all"}`} style={{ borderTop: "0.5px solid var(--border)" }}>
-                <td style={{ padding: "6px 4px" }}>{PLATFORM_LABELS[row.platform]}</td>
-                <td style={{ padding: "6px 4px" }}>{row.account ?? "(2アカウント統合)"}</td>
-                <td style={{ padding: "6px 4px", color: latest ? undefined : "var(--text-muted)" }}>
-                  {latest ? `${formatYearMonthJp(latest.periodEnd)}分まで取込済み` : "未取込"}
+              <tr
+                key={`${row.platform}-${row.account ?? "all"}`}
+                style={{ borderTop: "0.5px solid var(--border)", background: rowAlert ? "var(--danger-bg)" : undefined }}
+              >
+                <td style={{ padding: "6px 4px" }}>
+                  {PLATFORM_LABELS[row.platform]}
+                  {rowAlert && (
+                    <span
+                      style={{ marginLeft: 6, color: "var(--danger-text)" }}
+                      title="当月分が、当月7日を過ぎても取込まれていません"
+                    >
+                      ⚠
+                    </span>
+                  )}
                 </td>
+                <td style={{ padding: "6px 4px" }}>{row.account ?? "(2アカウント統合)"}</td>
+                {row.months.map((cell, idx) => {
+                  const isCurrent = idx === row.months.length - 1;
+                  const cellAlert = isCurrent && rowAlert;
+                  return (
+                    <td
+                      key={cell.yearMonth}
+                      style={{
+                        padding: "6px 4px",
+                        textAlign: "center",
+                        color: cellAlert ? "var(--danger-text)" : cell.imported ? undefined : "var(--text-muted)",
+                        fontWeight: cellAlert ? 700 : undefined,
+                      }}
+                    >
+                      {cell.imported ? "済" : cellAlert ? "⚠ 未" : "未"}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
