@@ -189,7 +189,7 @@ export default function App() {
             color: "var(--danger-text)",
           }}
         >
-          {belowThresholdRows.length}機種がしきい値を下回っています
+          {belowThresholdRows.length}機種の在庫数がしきい値を下回っています
           <button
             onClick={() => setTab("stockAlerts")}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
@@ -215,7 +215,7 @@ export default function App() {
             color: "var(--danger-text)",
           }}
         >
-          未取込みのレポートがあります
+          未取込みの月次レポートがあります
           <button
             onClick={() => setTab("import")}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
