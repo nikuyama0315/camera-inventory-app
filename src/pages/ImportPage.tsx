@@ -7,6 +7,7 @@ import {
   fetchImportHistory,
   fetchLatestImportedPeriods,
   fetchMonthlyReconciliationSummary,
+  fetchReportImportClearLog,
   getReportImportDataCounts,
   analyzeEbayTaxInvoiceCsv,
   importEbayTaxInvoiceRows,
@@ -17,6 +18,7 @@ import {
   type MonthlyReconciliationSummary,
   type Platform,
   type PlatformImport,
+  type ReportImportClearLogEntry,
   type ReportImportDataCounts,
   type TaxInvoiceAnalysis,
 } from "../lib/api/reportImports";
@@ -60,6 +62,7 @@ export default function ImportPage() {
   const [clearingReportImport, setClearingReportImport] = useState(false);
   const [clearReportImportMessage, setClearReportImportMessage] = useState<string | null>(null);
   const [clearReportImportError, setClearReportImportError] = useState<string | null>(null);
+  const [clearLog, setClearLog] = useState<ReportImportClearLogEntry[]>([]);
 
   async function reloadHistory() {
     try {
@@ -91,9 +94,18 @@ export default function ImportPage() {
     }
   }
 
+  async function reloadClearLog() {
+    try {
+      setClearLog(await fetchReportImportClearLog());
+    } catch {
+      // 全クリア実行履歴の取得失敗は致命的ではないため無視
+    }
+  }
+
   useEffect(() => {
     void reloadHistory();
     void reloadReportImportCounts();
+    void reloadClearLog();
   }, []);
 
   async function handleClearReportImportData() {
@@ -119,6 +131,7 @@ export default function ImportPage() {
       setClearReportImportConfirmText("");
       await reloadReportImportCounts();
       await reloadHistory();
+      await reloadClearLog();
     } catch (err) {
       setClearReportImportError(err instanceof Error ? err.message : "削除に失敗しました");
     } finally {
@@ -233,6 +246,16 @@ export default function ImportPage() {
         </tbody>
       </table>
       {history.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>取込履歴はまだありません</p>}
+      {clearLog.length > 0 && (
+        <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+          {clearLog.map((c) => (
+            <span key={c.id} style={{ display: "block" }}>
+              {new Date(c.cleared_at).toLocaleString("ja-JP")} に「レポート取込データ全クリア」を実行し、
+              {c.records_deleted}件のデータを削除しました。
+            </span>
+          ))}
+        </p>
+      )}
 
       <div
         style={{

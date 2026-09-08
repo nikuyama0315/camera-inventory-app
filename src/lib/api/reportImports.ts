@@ -7,6 +7,16 @@ export type Platform =
   | "ebay_transaction_report"
   | "payoneer_transaction_report";
 
+// レポート取込(CSV/PDF手動入力)由来のplatform一覧。platform_settlement_importsは「売上・粗利」タブの
+// eBayライブ同期(ebay-sync-orders Edge Function、platform='ebay')とも共有しているため、レポート取込
+// 画面の集計・履歴・削除操作は必ずこれで絞り込む(ライブ同期由来の行を誤って混在・削除しないため)。
+const REPORT_IMPORT_PLATFORMS: Platform[] = [
+  "ebay_financial_statement",
+  "ebay_tax_invoice",
+  "ebay_transaction_report",
+  "payoneer_transaction_report",
+];
+
 export interface PlatformImport {
   id: string;
   platform: Platform;
@@ -575,10 +585,20 @@ export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconc
 // ---------------------------------------------------------------
 // 取込履歴
 // ---------------------------------------------------------------
+/**
+ * 2026-09-08修正: platform_settlement_importsは「売上・粗利」タブのeBayライブ同期機能
+ * (ebay-sync-orders Edge Function、platform='ebay')とも共有しているテーブルのため、
+ * 絞り込み無しで全件表示すると、このレポート取込画面とは無関係なライブ同期のログ行が
+ * 「レポート種別: ebay」として大量に混在してしまい、上部の「取込状況」(レポート取込由来の
+ * 4種別のみを集計)と矛盾しているように見える不具合があった(ユーザー指摘により発覚)。
+ * getReportImportDataCounts()/clearAllReportImportData()と同じREPORT_IMPORT_PLATFORMSで
+ * 絞り込み、レポート取込由来の行のみを対象にする。
+ */
 export async function fetchImportHistory(): Promise<PlatformImport[]> {
   const { data, error } = await supabase
     .from("platform_settlement_imports")
     .select("*")
+    .in("platform", REPORT_IMPORT_PLATFORMS)
     .order("imported_at", { ascending: false })
     .limit(30);
   if (error) throw error;
@@ -636,13 +656,6 @@ export async function fetchLatestImportedPeriods(): Promise<LatestImportedPeriod
 // ---------------------------------------------------------------
 // 危険な操作: レポート取込データ全クリア(2026-08-31追加)
 // ---------------------------------------------------------------
-
-const REPORT_IMPORT_PLATFORMS: Platform[] = [
-  "ebay_financial_statement",
-  "ebay_tax_invoice",
-  "ebay_transaction_report",
-  "payoneer_transaction_report",
-];
 
 const ZERO_UUID_REPORT = "00000000-0000-0000-0000-000000000000";
 
@@ -721,6 +734,18 @@ export async function getReportImportDataCounts(): Promise<ReportImportDataCount
  * platform_settlement_imports側(レポート取込由来分のみ)を削除すれば自動的に連動削除される。
  */
 export async function clearAllReportImportData(): Promise<void> {
+  // 2026-09-08追加: 削除前に対象件数を数えておき、削除後にreport_import_clear_logへ1件記録する。
+  // 全クリア後は取込履歴が空になり「一度も取込んでいない」のか「取込んだが全クリアした」のか
+  // 画面から区別できなくなってしまうため(ユーザー指摘)、実行日時と削除件数を残す。
+  const counts = await getReportImportDataCounts();
+  const totalDeleted =
+    counts.platformSettlementImports +
+    counts.ebayTransactionLines +
+    counts.ebayTaxInvoiceLines +
+    counts.payoneerTransactions +
+    counts.monthlySettlementReconciliations +
+    counts.monthlyPayoneerSummary;
+
   const summaryDel = await supabase.from("monthly_payoneer_summary").delete().neq("id", ZERO_UUID_REPORT);
   if (summaryDel.error) throw summaryDel.error;
 
@@ -732,4 +757,27 @@ export async function clearAllReportImportData(): Promise<void> {
     .delete()
     .in("platform", REPORT_IMPORT_PLATFORMS);
   if (importsDel.error) throw importsDel.error;
+
+  const logErr = (await supabase.from("report_import_clear_log").insert({ records_deleted: totalDeleted })).error;
+  if (logErr) {
+    // 全クリア自体は既に成功しているため、記録の失敗でユーザー操作を失敗扱いにはしない。
+    console.warn("report_import_clear_logへの記録に失敗しました:", logErr);
+  }
+}
+
+export interface ReportImportClearLogEntry {
+  id: string;
+  cleared_at: string;
+  records_deleted: number;
+}
+
+/** 「レポート取込データ全クリア」の実行履歴(直近10件)を取得する(2026-09-08追加)。 */
+export async function fetchReportImportClearLog(): Promise<ReportImportClearLogEntry[]> {
+  const { data, error } = await supabase
+    .from("report_import_clear_log")
+    .select("*")
+    .order("cleared_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data as ReportImportClearLogEntry[];
 }
