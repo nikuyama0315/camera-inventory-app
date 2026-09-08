@@ -7,6 +7,7 @@ import {
   fetchImportHistory,
   fetchMonthlyImportStatus,
   fetchMonthlyReconciliationSummary,
+  reportImportRowHasAlert,
   fetchReportImportClearLog,
   getReportImportDataCounts,
   analyzeEbayTaxInvoiceCsv,
@@ -127,8 +128,7 @@ export default function ImportPage() {
   function fmtJpy(v: number | null): string {
     return v == null ? "-" : Math.round(v).toLocaleString("ja-JP");
   }
-  // 「当月6日経過後、当月分未取込なら警告」の判定に使う当日の日付(1-31)。
-  const todayDate = new Date().getDate();
+
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "1.5rem", paddingBottom: "3rem", boxSizing: "border-box" }}>
@@ -162,9 +162,9 @@ export default function ImportPage() {
               if (!platformOrder.includes(row.platform)) platformOrder.push(row.platform);
             }
             return monthlyImportStatus.map((row) => {
-              const currentMonthCell = row.months[row.months.length - 1];
-              // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す。
-              const rowAlert = todayDate > 6 && currentMonthCell != null && !currentMonthCell.imported;
+              // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す(App.tsxの
+              // 全ページ共通バナーと同じ判定基準をreportImportRowHasAlert()で共有する)。
+              const rowAlert = reportImportRowHasAlert(row);
               const groupIndex = platformOrder.indexOf(row.platform);
               const zebraBackground = groupIndex % 2 === 1 ? "var(--surface-1)" : undefined;
               return (

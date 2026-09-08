@@ -13,6 +13,7 @@ import SalesPage from "./pages/SalesPage";
 import LedgerImportPage from "./pages/LedgerImportPage";
 import ExchangeRatePage from "./pages/ExchangeRatePage";
 import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
+import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import logo from "./assets/logo.png";
 
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "ledgerImport";
@@ -35,6 +36,8 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("inventory");
   const [belowThresholdRows, setBelowThresholdRows] = useState<ModelStockRow[]>([]);
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
+  const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
@@ -69,6 +72,13 @@ export default function App() {
     checkStockAlertsAndNotify().catch(() => {
       /* メール送信設定が未完了の場合は静かに失敗させる */
     });
+    // レポート取込(ImportPage.tsxの「取込状況」)で、当月分が7日を過ぎても未取込のレポートが
+    // 1件でもあれば全ページ共通バナーで知らせる(2026-09-08追加、在庫アラートバナーと同じ方式)。
+    fetchMonthlyImportStatus()
+      .then((rows) => setReportImportAlertCount(rows.filter((r) => reportImportRowHasAlert(r)).length))
+      .catch(() => {
+        /* バナー表示のための取得失敗は致命的でないため無視 */
+      });
   }, [session]);
 
   if (!checked) {
@@ -162,8 +172,7 @@ export default function App() {
             color: "var(--danger-text)",
           }}
         >
-          在庫アラート: {belowThresholdRows.map((r) => `${r.model_folder_name}(${r.in_stock_count}個)`).join("、")}
-          がしきい値を下回っています。
+          {belowThresholdRows.length}機種がしきい値を下回っています
           <button
             onClick={() => setTab("stockAlerts")}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
@@ -172,6 +181,32 @@ export default function App() {
           </button>
           <button
             onClick={() => setAlertDismissed(true)}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
+          >
+            隠す
+          </button>
+        </div>
+      )}
+
+      {reportImportAlertCount > 0 && tab !== "import" && !reportImportAlertDismissed && (
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "var(--danger-bg)",
+            borderBottom: "0.5px solid var(--danger-text)",
+            fontSize: 12,
+            color: "var(--danger-text)",
+          }}
+        >
+          未取込みのレポートがあります
+          <button
+            onClick={() => setTab("import")}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
+          >
+            確認する
+          </button>
+          <button
+            onClick={() => setReportImportAlertDismissed(true)}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
           >
             隠す

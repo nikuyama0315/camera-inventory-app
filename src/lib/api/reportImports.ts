@@ -699,6 +699,16 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
   }));
 }
 
+/**
+ * 「取込状況」の1行(レポート種別×アカウント)が警告対象かどうかを判定する(2026-09-08追加)。
+ * 当月の7日を過ぎても当月分が未取込の場合に警告とする。ImportPage.tsx(行ごとの⚠表示)と
+ * App.tsx(ヘッダー直下の全ページ共通バナー)の両方で同じ基準を使うための共有ロジック。
+ */
+export function reportImportRowHasAlert(row: MonthlyImportStatusRow, today: Date = new Date()): boolean {
+  const currentMonthCell = row.months[row.months.length - 1];
+  return today.getDate() > 6 && currentMonthCell != null && !currentMonthCell.imported;
+}
+
 // ---------------------------------------------------------------
 // 危険な操作: レポート取込データ全クリア(2026-08-31追加)
 // ---------------------------------------------------------------
