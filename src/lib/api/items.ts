@@ -375,6 +375,13 @@ export async function completeInspectionToReturnRequest(
   if (error) throw error;
 }
 
+/** 「検品済・返品済」への遷移(2026-09-08追加)。「着荷・検品待ち」「検品済・返品依頼中」の両方から
+ *  実行できる、ステータスガード無しの単純な更新(purchase_returns等の副作用は無い)。 */
+export async function completeInspectionToReturned(itemId: string): Promise<void> {
+  const { error } = await supabase.rpc("complete_inspection_to_returned", { p_item_id: itemId });
+  if (error) throw error;
+}
+
 /**
  * 商品(items)を関連データごと削除する(在庫タブ「詳細編集」「一覧表示」のレコード削除機能、2026-09-06追加)。
  * 取り返しがつかないため、呼び出し元(画面側)で必ず確認を取ってから呼ぶこと。

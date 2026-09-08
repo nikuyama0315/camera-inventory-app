@@ -1,6 +1,6 @@
 import { ITEM_STATUS_LABELS, EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS } from "../../../lib/types";
 import type { ItemDetail, ItemStatus, EbayAccount } from "../../../lib/types";
-import { markItemArrived, completeInspectionToListing, markItemListed, updateItemBasicInfo } from "../../../lib/api/items";
+import { markItemArrived, updateItemBasicInfo } from "../../../lib/api/items";
 import { updatePurchase } from "../../../lib/api/purchases";
 import { updateSale } from "../../../lib/api/sales";
 import { upsertItemDriveFolder, fetchDriveFolderInfo } from "../../../lib/api/driveFolders";
@@ -26,18 +26,11 @@ interface Props {
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 8, fontSize: 13 };
 const LABEL_STYLE: React.CSSProperties = { color: "var(--text-secondary)", width: 140, flexShrink: 0 };
 
-/** 2026-09-05追加: 「入荷待ち→着荷・検品待ち→検品済・出品待ち→出品中」という主要な流れの中で、
- *  現在のステータスから次に進める1段階を定義する。旧「到着済みにする」ボタンをここで汎用化した
- *  「次のステータスへ進める」ボタンが参照する。定義の無いステータス(出品中より先の販売済み・
- *  返品系の分岐など)はこのボタンでは進められない(ボタンを無効化する)。 */
+/** 2026-09-08変更: ステータス進行ボタンを「検品」タブに一本化し、このタブの汎用ボタンは
+ *  「入荷待ち→着荷・検品待ち」の1段階のみに絞った(検品完了・出品待ち以降の各遷移は検品タブの
+ *  専用ボタン群を参照)。定義の無いステータスではボタン自体を表示しない(handleAdvanceStatus参照)。 */
 const ADVANCE_STEPS: Partial<Record<ItemStatus, { next: ItemStatus; actionLabel: string; run: (itemId: string) => Promise<void> }>> = {
-  awaiting_arrival: { next: "awaiting_inspection", actionLabel: "到着済みにする", run: markItemArrived },
-  awaiting_inspection: {
-    next: "inspected_awaiting_listing",
-    actionLabel: "検品完了・出品待ちにする",
-    run: completeInspectionToListing,
-  },
-  inspected_awaiting_listing: { next: "listed", actionLabel: "出品中にする", run: markItemListed },
+  awaiting_arrival: { next: "awaiting_inspection", actionLabel: "着荷・検品待ちにする", run: markItemArrived },
 };
 
 interface EditForm {
@@ -687,7 +680,10 @@ export default function BasicInfoTab({ item, onChanged }: Props) {
             ))}
           </select>
           <p style={{ fontSize: 11, color: "var(--danger-text)", margin: "6px 0 0" }}>
-            ⚠️ ここでの変更は入力ミスの訂正専用です。通常のステータス遷移は各タブの専用ボタン(「到着済みにする」「検品完了・出品待ちにする」等)から行ってください。ここで直接変更しても、返品記録の作成やGoogle Driveフォルダ移動などの連動処理は一切実行されません。
+            ⚠️ ここでの変更は入力ミスの訂正や、専用ボタンの無い遷移(例: 販売済み→出品中に戻す)専用です。
+            通常のステータス遷移は各タブの専用ボタン(「着荷・検品待ちにする」「検品済・出品待ちにする」等)
+            から行うことを推奨します。保存するとGoogle Driveフォルダの自動移動は実行されますが、
+            返品依頼時の記録作成(purchase_returns)などステータス専用ボタンに付随する副作用は実行されません。
           </p>
         </div>
 
@@ -841,25 +837,22 @@ export default function BasicInfoTab({ item, onChanged }: Props) {
         </div>
       )}
 
-      {/* 2026-09-04: ユーザー指示により、「編集する」を上・ステータス進行ボタンを下の縦並びに変更。
-          2026-09-05バグ修正: 以前はこのボタンが常に「到着済みにする」(mark_item_arrived)を実行して
-          いたため、検品済・出品待ち以降の商品で押すと「着荷・検品待ち」まで巻き戻ってしまう不具合が
-          あった(ユーザー報告)。ADVANCE_STEPS(ファイル冒頭)を参照し、現在のステータスに応じた
-          「次の1段階に進める」処理を実行するよう汎用化。次の段階が定義されていないステータス
-          (出品中・販売済み・返品系の分岐等)ではボタンを無効化し、現在のステータス名のみを表示する
-          (押しても何も起きない状態を明示するため、注記も出さない)。 */}
+      {/* 2026-09-08変更: ステータス進行ボタンは「検品」タブに一本化したため、このタブでは
+          「入荷待ち→着荷・検品待ち」の専用ボタンのみを表示する。それ以外のステータスでは
+          advanceStepが未定義になり、ボタン自体を表示しない(以前は無効化してステータス名を
+          表示していたが、検品タブ側のボタン群と役割が重複するため非表示に変更)。 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16, alignItems: "flex-start" }}>
         <button onClick={startEditing}>編集する</button>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={handleAdvanceStatus} disabled={busy || !advanceStep}>
-            {advanceStep ? advanceStep.actionLabel : ITEM_STATUS_LABELS[item.status]}
-          </button>
-          {advanceStep && (
+        {advanceStep && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={handleAdvanceStatus} disabled={busy}>
+              {advanceStep.actionLabel}
+            </button>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
               (現在のステータス:「{ITEM_STATUS_LABELS[item.status]}」。押すと「{ITEM_STATUS_LABELS[advanceStep.next]}」に変更されます)
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 8 }}>{errorMessage}</p>}
     </div>

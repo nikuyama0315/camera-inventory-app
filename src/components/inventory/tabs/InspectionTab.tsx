@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { ItemDetail } from "../../../lib/types";
-import { ITEM_STATUS_LABELS } from "../../../lib/types";
 import {
   saveInspection,
   translateInspectionField,
@@ -9,6 +8,7 @@ import {
 import {
   completeInspectionToListing,
   completeInspectionToReturnRequest,
+  completeInspectionToReturned,
   markItemListed,
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
@@ -186,14 +186,27 @@ export default function InspectionTab({ detail, onChanged }: Props) {
     }
   }
 
-  // 2026-09-04: 「着荷・検品待ち」以外のステータスからでもボタンを表示するよう変更(ユーザー指示「どのステータス
-  // 状態にあっても、ステータス変更できるようにしたら不整合が起きますか?」への回答を踏まえた対応)。
-  // 「検品完了・出品待ちにする」はステータスを1つ設定するだけの単純な更新なので常時実行可能にした
-  // (complete_inspection_to_listing側のガードも撤廃済み)。一方「検品完了・返品依頼する」は実行のたびに
-  // purchase_returnsへ新規行を挿入する副作用を持つため、二重登録を防ぐ目的で awaiting_inspection ステータス
-  // からのみ実行できる制約をDB側(complete_inspection_to_return_request)に意図的に残している。
-  const canCompleteInspection = true;
-  const canRequestReturn = detail.status === "awaiting_inspection";
+  /** 「検品済・返品済」への遷移(2026-09-08追加)。「着荷・検品待ち」「検品済・返品依頼中」の
+   *  両方から実行できる。 */
+  async function handleCompleteToReturned() {
+    setSaving(true);
+    setErrorMessage(null);
+    try {
+      await completeInspectionToReturned(detail.id);
+      await triggerDriveFolderMove(detail.id);
+      onChanged();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "更新に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // 2026-09-08変更: ステータス進行ボタンをこの検品タブに一本化し、常時表示(2026-09-04方式)から
+  // 現在のステータスに応じた表示へ戻した(BasicInfoTab.tsxの汎用ボタンは入荷待ち→着荷・検品待ちの
+  // 1段階のみに縮小)。「着荷・検品待ち」のときは3ボタン(返品依頼中にする/返品済にする/出品待ちにする)、
+  // 「検品済・返品依頼中」のときは1ボタン(返品済にする)、「検品済・出品待ち」のときは1ボタン
+  // (出品中にする)を表示し、それ以外のステータスでは何も表示しない。
 
   return (
     <div>
@@ -246,48 +259,22 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </button>
       </div>
 
-      {canCompleteInspection && (
+      {detail.status === "awaiting_inspection" && (
         <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12 }}>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
             検品完了後の対応を選択してください
           </p>
           <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {/* 2026-09-04バグ修正(ユーザー指摘、3段階で修正、BasicInfoTabの「到着済みにする」ボタンと
-                同じ経緯): 「現在のステータスが遷移先(inspected_awaiting_listing)と一致する場合のみ」
-                →「awaiting_inspectionのときだけ行動を促す文言、それ以外は常にステータス名」の順で
-                修正したが、後者だと「入荷待ち(awaiting_arrival)」の商品でもステータス名(「入荷待ち」)
-                が表示されてしまい、実際には押せば検品済・出品待ちまで一気に進められる(スキップして
-                進める設計を維持している)にもかかわらず行動を促す文言が消えてしまっていた
-                (ユーザー指摘「出品中にすべきでは？」は、逆に出品中の商品でこのボタンが「検品完了・
-                出品待ちにする」のままだった旧不具合を指しており、両方の指摘を踏まえて最終的なルールを
-                「遷移先(inspected_awaiting_listing)より前の状態(awaiting_arrival・awaiting_inspection)
-                のときだけ行動を促す文言、それ以外(検品済・出品待ち以降、または返品系の分岐)は常に
-                現在のステータス名を表示する」に一般化した。 */}
             <button onClick={handleCompleteToListing} disabled={saving}>
-              {detail.status === "awaiting_arrival" || detail.status === "awaiting_inspection"
-                ? "検品完了・出品待ちにする"
-                : ITEM_STATUS_LABELS[detail.status]}
+              検品済・出品待ちにする
             </button>
             <button onClick={() => setShowReturnForm((v) => !v)} disabled={saving}>
-              検品完了・返品依頼する
+              検品済・返品依頼中にする
+            </button>
+            <button onClick={handleCompleteToReturned} disabled={saving}>
+              検品済・返品済にする
             </button>
           </div>
-          {/* 2026-09-04: ボタンを常時表示にしたことで、押した後も同じボタンが表示され続け「反映されて
-              いないのでは」と誤解される不具合が発生したため(ユーザー報告、BasicInfoTabの「到着済みに
-              する」ボタンと同じ事象)、現在のステータスと、押すと何が起きるかを明示する注記を追加した。
-              遷移先(inspected_awaiting_listing)と現在のステータスが同じ場合は、上のボタン表記で既に
-              現在のステータスがわかるため、この注記自体を表示しないよう条件を修正した。 */}
-          {detail.status !== "awaiting_inspection" && detail.status !== "inspected_awaiting_listing" && (
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-              (現在のステータス:「{ITEM_STATUS_LABELS[detail.status]}」。「検品完了・出品待ちにする」を押すと「
-              {ITEM_STATUS_LABELS.inspected_awaiting_listing}」に変更されます)
-            </p>
-          )}
-          {!canRequestReturn && (
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>
-              (「返品依頼する」は「着荷・検品待ち」ステータスのときのみ実行できます)
-            </p>
-          )}
           {showReturnForm && (
             <div style={{ display: "flex", gap: 8 }}>
               <input
@@ -305,33 +292,26 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </div>
       )}
 
-      {/* 2026-09-04追加: ユーザー指示「その後のステータスも順々に次のステータスがボタンに表示されて
-          適用できるようにしてください」に対応し、「検品済・出品待ち」の次のステータスである「出品中」への
-          専用ボタンを追加。「出品」専用のタブがまだ無いため(将来Phase3/4で追加予定、ItemDetailPane.tsxの
-          TABS配列コメント参照)、暫定的に検品タブの末尾に配置している。他の専用ボタンと同じく、現在の
-          ステータスによらず実行可能(mark_item_listed側にステータスガード無し)。 */}
-      {/* 2026-09-04バグ修正(ユーザー指摘「ボタン表記を「出品中にする」であるべきでは？」、上の
-          「検品完了・出品待ちにする」ボタンと同じ最終ルール): 遷移先(listed)より前の状態
-          (awaiting_arrival・awaiting_inspection・inspected_awaiting_listing、いずれもスキップして
-          「出品中」まで一気に進められる)のときは行動を促す文言「出品中にする」を表示し、それ以外
-          (listed以降、または返品系の分岐)は常に現在のステータス名を表示する。 */}
-      <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>出品状況</p>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={handleMarkListed} disabled={saving}>
-            {detail.status === "awaiting_arrival" ||
-            detail.status === "awaiting_inspection" ||
-            detail.status === "inspected_awaiting_listing"
-              ? "出品中にする"
-              : ITEM_STATUS_LABELS[detail.status]}
-          </button>
-          {detail.status !== "inspected_awaiting_listing" && detail.status !== "listed" && (
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              (現在のステータス:「{ITEM_STATUS_LABELS[detail.status]}」。押すと「{ITEM_STATUS_LABELS.listed}」に変更されます)
-            </span>
-          )}
+      {detail.status === "inspected_return_requested" && (
+        <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={handleCompleteToReturned} disabled={saving}>
+              検品済・返品済にする
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {detail.status === "inspected_awaiting_listing" && (
+        <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12 }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>出品状況</p>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={handleMarkListed} disabled={saving}>
+              出品中にする
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
