@@ -154,15 +154,27 @@ export default function ImportPage() {
           </tr>
         </thead>
         <tbody>
-          {monthlyImportStatus.map((row) => {
-            const currentMonthCell = row.months[row.months.length - 1];
-            // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す。
-            const rowAlert = todayDate > 6 && currentMonthCell != null && !currentMonthCell.imported;
-            return (
-              <tr
-                key={`${row.platform}-${row.account ?? "all"}`}
-                style={{ borderTop: "0.5px solid var(--border)", background: rowAlert ? "var(--danger-bg)" : undefined }}
-              >
+          {(() => {
+            // レポート種別ごとにゼブラ背景色を付ける(アカウント違いは同じ色にする)ため、
+            // 出現順のレポート種別一覧から偶数/奇数のグループ番号を求める。
+            const platformOrder: typeof monthlyImportStatus[number]["platform"][] = [];
+            for (const row of monthlyImportStatus) {
+              if (!platformOrder.includes(row.platform)) platformOrder.push(row.platform);
+            }
+            return monthlyImportStatus.map((row) => {
+              const currentMonthCell = row.months[row.months.length - 1];
+              // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す。
+              const rowAlert = todayDate > 6 && currentMonthCell != null && !currentMonthCell.imported;
+              const groupIndex = platformOrder.indexOf(row.platform);
+              const zebraBackground = groupIndex % 2 === 1 ? "var(--surface-1)" : undefined;
+              return (
+                <tr
+                  key={`${row.platform}-${row.account ?? "all"}`}
+                  style={{
+                    borderTop: "0.5px solid var(--border)",
+                    background: rowAlert ? "var(--danger-bg)" : zebraBackground,
+                  }}
+                >
                 <td style={{ padding: "6px 4px" }}>
                   {PLATFORM_LABELS[row.platform]}
                   {rowAlert && (
@@ -193,8 +205,9 @@ export default function ImportPage() {
                   );
                 })}
               </tr>
-            );
-          })}
+              );
+            });
+          })()}
         </tbody>
       </table>
 
