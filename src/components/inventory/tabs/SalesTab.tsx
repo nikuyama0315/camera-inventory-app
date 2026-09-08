@@ -17,6 +17,7 @@ interface EditForm {
   ebay_handling_fee_usd: string;
   ebay_ad_fee_usd: string;
   shipping_cost_paid: string;
+  tracking_info: string;
 }
 
 type SaleRow = ItemDetail["sales"][number];
@@ -84,6 +85,7 @@ export default function SalesTab({ item, onChanged }: Props) {
     ebay_handling_fee_usd: "0",
     ebay_ad_fee_usd: "0",
     shipping_cost_paid: "0",
+    tracking_info: "",
   });
   const [busy, setBusy] = useState(false);
   const [resettingSaleId, setResettingSaleId] = useState<string | null>(null);
@@ -143,6 +145,7 @@ export default function SalesTab({ item, onChanged }: Props) {
       ebay_handling_fee_usd: String(sale.ebay_handling_fee_usd),
       ebay_ad_fee_usd: String(sale.ebay_ad_fee_usd),
       shipping_cost_paid: String(sale.shipping_cost_paid),
+      tracking_info: sale.tracking_info ?? "",
     });
   }
 
@@ -165,6 +168,7 @@ export default function SalesTab({ item, onChanged }: Props) {
         ebay_handling_fee_usd: Number(editForm.ebay_handling_fee_usd) || 0,
         ebay_ad_fee_usd: Number(editForm.ebay_ad_fee_usd) || 0,
         shipping_cost_paid: Number(editForm.shipping_cost_paid) || 0,
+        tracking_info: editForm.tracking_info.trim() || null,
       });
       setEditingSaleId(null);
       onChanged();
@@ -310,7 +314,16 @@ export default function SalesTab({ item, onChanged }: Props) {
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>追跡番号</span>
-              <span>{sale.tracking_info ?? "-"}</span>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editForm.tracking_info}
+                  onChange={(e) => updateEditField("tracking_info", e.target.value)}
+                  style={{ width: 220 }}
+                />
+              ) : (
+                <span>{sale.tracking_info ?? "-"}</span>
+              )}
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>邦プラットフォーム販売価格(円)</span>
