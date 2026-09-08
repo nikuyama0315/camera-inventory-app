@@ -8,7 +8,7 @@ import ImportPage from "./pages/ImportPage";
 import ExportPage from "./pages/ExportPage";
 import StockAlertsPage from "./pages/StockAlertsPage";
 import SkuLookupPage from "./pages/SkuLookupPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AccountSecurityPage from "./pages/AccountSecurityPage";
 import SalesPage from "./pages/SalesPage";
 import LedgerImportPage from "./pages/LedgerImportPage";
 import ExchangeRatePage from "./pages/ExchangeRatePage";
@@ -38,7 +38,7 @@ export default function App() {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
   const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
-  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [showAccountSecurity, setShowAccountSecurity] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -46,13 +46,11 @@ export default function App() {
       setChecked(true);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      // パスワード再設定リンクからの遷移時、Supabaseがこのイベントを発火する。
-      // 通常ログインと区別し、新パスワード設定画面を強制的に表示する。
-      if (event === "PASSWORD_RECOVERY") {
-        setPasswordRecovery(true);
-      }
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      // ログアウト時、次回ログイン後に前回開いていた画面(ログイン情報再設定)が
+      // そのまま残らないようリセットする(実機テストで発見)。
+      if (!newSession) setShowAccountSecurity(false);
     });
 
     return () => {
@@ -83,16 +81,6 @@ export default function App() {
 
   if (!checked) {
     return null;
-  }
-
-  if (passwordRecovery) {
-    return (
-      <ResetPasswordPage
-        onCompleted={() => {
-          setPasswordRecovery(false);
-        }}
-      />
-    );
   }
 
   if (!session) {
@@ -128,7 +116,10 @@ export default function App() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => {
+                setShowAccountSecurity(false);
+                setTab(t.key);
+              }}
               style={{
                 border: "none",
                 borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
@@ -157,9 +148,17 @@ export default function App() {
             </button>
           ))}
         </div>
-        <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: "4px 10px" }}>
-          ログアウト
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowAccountSecurity(true)}
+            style={{ fontSize: 12, padding: "4px 10px" }}
+          >
+            ログイン情報再設定
+          </button>
+          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: "4px 10px" }}>
+            ログアウト
+          </button>
+        </div>
       </div>
 
       {belowThresholdRows.length > 0 && tab !== "stockAlerts" && !alertDismissed && (
@@ -215,15 +214,21 @@ export default function App() {
       )}
 
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {tab === "inventory" && <InventoryPage />}
-        {tab === "sales" && <SalesPage />}
-        {tab === "stockAlerts" && <StockAlertsPage />}
-        {tab === "expenses" && <ExpensesPage />}
-        {tab === "exchangeRate" && <ExchangeRatePage />}
-        {tab === "skuLookup" && <SkuLookupPage />}
-        {tab === "import" && <ImportPage />}
-        {tab === "export" && <ExportPage />}
-        {tab === "ledgerImport" && <LedgerImportPage />}
+        {showAccountSecurity ? (
+          <AccountSecurityPage onBack={() => setShowAccountSecurity(false)} />
+        ) : (
+          <>
+            {tab === "inventory" && <InventoryPage />}
+            {tab === "sales" && <SalesPage />}
+            {tab === "stockAlerts" && <StockAlertsPage />}
+            {tab === "expenses" && <ExpensesPage />}
+            {tab === "exchangeRate" && <ExchangeRatePage />}
+            {tab === "skuLookup" && <SkuLookupPage />}
+            {tab === "import" && <ImportPage />}
+            {tab === "export" && <ExportPage />}
+            {tab === "ledgerImport" && <LedgerImportPage />}
+          </>
+        )}
       </div>
 
       <div
