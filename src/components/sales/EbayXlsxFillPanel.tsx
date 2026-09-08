@@ -28,6 +28,34 @@ const STATUS_COLORS: Record<RowFillStatus, string> = {
   no_empty_row: "var(--danger-text)",
 };
 
+// 2026-09-09追加: 「実行してダウンロード」の結果として、eBayから取得・シートへ書き込んだ値を
+// 画面上にも一覧表示する(ダウンロード自体の挙動は変更しない)。取得できた項目(lookup.found)に
+// ついてのみ行を作る(シート側に空き行が無く書き込めなかった場合も、値は取得できているので表示する)。
+interface RowValuesResult {
+  orderNo: string;
+  soldDate: string | null;
+  itemTitle: string | null;
+  managementNo: string | null;
+  salePriceUsd: number | null;
+  shippingUsd: number | null;
+  feesBasedOnUsd: number | null;
+  plFeeUsd: number | null;
+  purchasePriceJpy: number | null;
+  listingStartDate: Date | null;
+  purchaseDate: Date | null;
+  buyerCountry: string | null;
+}
+
+function fmtNum(value: number | null, digits: number): string {
+  if (value == null) return "-";
+  return value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function fmtDate(value: Date | null): string {
+  if (!value) return "-";
+  return value.toISOString().slice(0, 10);
+}
+
 /** SKU(Custom Label)の先頭9文字(管理番号部分)を取り出す */
 function skuManagementNo(sku: string): string {
   return sku.trim().slice(0, 9);
@@ -63,6 +91,7 @@ export default function EbayXlsxFillPanel() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [results, setResults] = useState<RowFillResult[] | null>(null);
+  const [valueResults, setValueResults] = useState<RowValuesResult[] | null>(null);
 
   function updateOrderNo(index: number, value: string) {
     setOrderNos((prev) => prev.map((v, i) => (i === index ? value : v)));
@@ -77,6 +106,7 @@ export default function EbayXlsxFillPanel() {
   async function handleRun() {
     setErrorMessage(null);
     setResults(null);
+    setValueResults(null);
 
     if (!file) {
       setErrorMessage("エクセルファイルを選択してください");
@@ -117,6 +147,7 @@ export default function EbayXlsxFillPanel() {
       const lookupByOrderNo = new Map(lookups.map((l) => [l.orderNo, l]));
 
       const rowResults: RowFillResult[] = [];
+      const rowValues: RowValuesResult[] = [];
       let cursor = 0;
       let filledAny = false;
 
@@ -130,15 +161,33 @@ export default function EbayXlsxFillPanel() {
           });
           continue;
         }
+
+        const sku = lookup.sku ?? "";
+        const warnings: string[] = [];
+
+        // 2026-09-09追加: 値プレビュー表示用に、シートへの書き込み可否(空き行の有無)に
+        // 関わらず、eBayから取得できた値そのものを記録しておく。
+        rowValues.push({
+          orderNo,
+          soldDate: lookup.soldDate ?? null,
+          itemTitle: lookup.itemTitle ?? null,
+          managementNo: sku ? skuManagementNo(sku) : null,
+          salePriceUsd: lookup.subtotalUsd ?? null,
+          shippingUsd: lookup.shippingUsd ?? null,
+          feesBasedOnUsd: lookup.orderTotalUsd ?? null,
+          plFeeUsd: lookup.adFeeUsd ?? null,
+          purchasePriceJpy: sku ? skuPurchasePrice(sku) : null,
+          listingStartDate: sku ? parseSkuDate(sku, 10) : null,
+          purchaseDate: sku ? parseSkuDate(sku, 0) : null,
+          buyerCountry: lookup.buyerCountry ?? null,
+        });
+
         if (cursor >= emptyRows.length) {
           rowResults.push({ orderNo, status: "no_empty_row", message: "空いている行がありませんでした" });
           continue;
         }
         const row = emptyRows[cursor];
         cursor++;
-
-        const sku = lookup.sku ?? "";
-        const warnings: string[] = [];
 
         if (lookup.soldDate) {
           const [y, m, d] = lookup.soldDate.split("-").map(Number);
@@ -205,6 +254,7 @@ export default function EbayXlsxFillPanel() {
       }
 
       setResults(rowResults);
+      setValueResults(rowValues);
 
       if (filledAny) {
         const outBuffer = await workbook.xlsx.writeBuffer();
@@ -306,6 +356,47 @@ export default function EbayXlsxFillPanel() {
 
       {errorMessage && (
         <p style={{ fontSize: 13, color: "var(--danger-text)", marginTop: 12 }}>{errorMessage}</p>
+      )}
+
+      {valueResults && valueResults.length > 0 && (
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                <th style={{ padding: "4px" }}>Order No</th>
+                <th style={{ padding: "4px" }}>落札日</th>
+                <th style={{ padding: "4px" }}>商品名</th>
+                <th style={{ padding: "4px" }}>管理番号</th>
+                <th style={{ padding: "4px" }}>販売価格</th>
+                <th style={{ padding: "4px" }}>送料</th>
+                <th style={{ padding: "4px" }}>Fees Based on</th>
+                <th style={{ padding: "4px" }}>PL手数料</th>
+                <th style={{ padding: "4px" }}>仕入値(税込)</th>
+                <th style={{ padding: "4px" }}>出品Start日</th>
+                <th style={{ padding: "4px" }}>仕入日</th>
+                <th style={{ padding: "4px" }}>発送先</th>
+              </tr>
+            </thead>
+            <tbody>
+              {valueResults.map((v, i) => (
+                <tr key={i} style={{ borderTop: "0.5px solid var(--border)" }}>
+                  <td style={{ padding: "4px" }}>{v.orderNo}</td>
+                  <td style={{ padding: "4px" }}>{v.soldDate ?? "-"}</td>
+                  <td style={{ padding: "4px", whiteSpace: "normal", minWidth: 200 }}>{v.itemTitle ?? "-"}</td>
+                  <td style={{ padding: "4px" }}>{v.managementNo ?? "-"}</td>
+                  <td style={{ padding: "4px" }}>{fmtNum(v.salePriceUsd, 2)}</td>
+                  <td style={{ padding: "4px" }}>{fmtNum(v.shippingUsd, 2)}</td>
+                  <td style={{ padding: "4px" }}>{fmtNum(v.feesBasedOnUsd, 2)}</td>
+                  <td style={{ padding: "4px" }}>{fmtNum(v.plFeeUsd, 2)}</td>
+                  <td style={{ padding: "4px" }}>{fmtNum(v.purchasePriceJpy, 0)}</td>
+                  <td style={{ padding: "4px" }}>{fmtDate(v.listingStartDate)}</td>
+                  <td style={{ padding: "4px" }}>{fmtDate(v.purchaseDate)}</td>
+                  <td style={{ padding: "4px" }}>{v.buyerCountry ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {results && results.length > 0 && (
