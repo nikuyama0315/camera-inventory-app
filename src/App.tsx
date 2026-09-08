@@ -96,6 +96,7 @@ export default function App() {
           gap: 10,
           padding: "10px 16px",
           borderBottom: "0.5px solid var(--border)",
+          background: "var(--surface-2)",
         }}
       >
         <img src={logo} alt="" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0 }} />
@@ -110,6 +111,7 @@ export default function App() {
           alignItems: "center",
           padding: "8px 16px",
           borderBottom: "0.5px solid var(--border)",
+          background: "var(--surface-2)",
         }}
       >
         <div style={{ display: "flex", gap: 4 }}>
