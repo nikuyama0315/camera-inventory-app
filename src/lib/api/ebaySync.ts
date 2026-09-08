@@ -581,3 +581,40 @@ export async function lookupEbayOrdersLive(
   if (error) throw error;
   return (data as { results: EbayOrderLookupResult[] }).results;
 }
+
+/** 「出品チェック」機能(2026-09-08追加)。システム上「出品中」の商品と、eBay(米国サイト・
+ *  ストック1以上)の実際のアクティブ出品を突合し、過不足を検出する。Trading APIの
+ *  GetMyeBaySellingを使うため、DB同期(ebay_transaction_lines等)には依存しない。 */
+export interface ListingCheckShortageRow {
+  managementNo: string;
+  title: string | null;
+}
+
+export interface ListingCheckExcessRow {
+  itemId: string;
+  sku: string | null;
+  title: string | null;
+  quantityAvailable: number;
+  matchedManagementNo: string | null;
+  matchedStatus: string | null;
+  matchedAccount: string | null;
+}
+
+export interface ListingCheckResult {
+  shopId: "soulcamera" | "soulmenjapan";
+  totalEbayActiveListings: number;
+  totalEbayActiveUsListings: number;
+  totalListedInSystem: number;
+  shortage: ListingCheckShortageRow[];
+  excess: ListingCheckExcessRow[];
+}
+
+export async function runEbayListingCheck(
+  shopId: "soulcamera" | "soulmenjapan",
+): Promise<ListingCheckResult> {
+  const { data, error } = await supabase.functions.invoke("ebay-listing-check", {
+    body: { shopId },
+  });
+  if (error) throw error;
+  return data as ListingCheckResult;
+}
