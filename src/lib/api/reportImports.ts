@@ -637,20 +637,22 @@ function lastDayOfMonthNum(year: number, month1based: number): number {
 }
 
 /**
- * 「取込状況」画面向けに、直近monthsCountヶ月(当月を含む)について、レポート種別・アカウントごとに
- * その月のデータが取込済みかどうかを判定する。
+ * 「取込状況」画面向けに、当年1月〜当月について、レポート種別・アカウントごとにその月のデータが
+ * 取込済みかどうかを判定する(2026-09-08、直近6か月→直近12か月を経てユーザー指示により変更。
+ * 年をまたいで固定N か月分表示すると前年分まで表示されてしまい分かりにくいため、当年1月始まりに
+ * 統一した)。
  * CSV取込3種は、platform_settlement_imports(レポート取込由来のplatformのみ)の中に、対象月の
  * 1日〜末日と期間が重なる(period_start<=月末 && period_end>=月初)行が1つでもあれば「取込済み」と
  * みなす(1回のCSVが月境界をまたぐ実データがあるため、月初=period_startの完全一致ではなく期間の
  * 重なりで判定する)。eBay Financial Statement(PDF手動入力)のみ、対象年月そのものが
  * monthly_settlement_reconciliationsに存在するかで判定する。
  */
-export async function fetchMonthlyImportStatus(monthsCount = 6): Promise<MonthlyImportStatusRow[]> {
+export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow[]> {
   const now = new Date();
+  const currentYear = now.getFullYear();
   const months: string[] = [];
-  for (let i = monthsCount - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  for (let m = 1; m <= now.getMonth() + 1; m++) {
+    months.push(`${currentYear}-${String(m).padStart(2, "0")}`);
   }
 
   const { data: importRows, error: importErr } = await supabase

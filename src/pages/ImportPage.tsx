@@ -136,7 +136,7 @@ export default function ImportPage() {
         各レポートのCSVは実データで列名・ヘッダー行の位置(先頭の請求書番号等のメタデータ行を自動で読み飛ばします)を確認済みです。それでも取込件数が0件、または想定と異なる場合はCSVの列名をご確認ください。
       </p>
 
-      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(直近6か月)</h3>
+      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜当月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
         各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial Statementのみ入力対象年月そのもの)。
         当月について、7日を過ぎても取込が無い場合は行に警告(⚠)を表示します。
