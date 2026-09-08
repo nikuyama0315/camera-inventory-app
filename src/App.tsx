@@ -151,8 +151,6 @@ export default function App() {
         <div style={{ display: "flex", gap: 8 }}>
           <a
             href="/marketing/"
-            target="soulmen-marketing"
-            rel="noopener noreferrer"
             style={{
               fontSize: 12,
               padding: "4px 10px",
