@@ -172,14 +172,14 @@ export default function ImportPage() {
                   key={`${row.platform}-${row.account ?? "all"}`}
                   style={{
                     borderTop: "0.5px solid var(--border)",
-                    background: rowAlert ? "var(--danger-bg)" : zebraBackground,
+                    background: zebraBackground,
                   }}
                 >
                 <td style={{ padding: "6px 4px" }}>
                   {PLATFORM_LABELS[row.platform]}
                   {rowAlert && (
                     <span
-                      style={{ marginLeft: 6, color: "var(--danger-text)" }}
+                      style={{ marginLeft: 6, color: "var(--danger-text)", fontWeight: 700 }}
                       title="当月分が、当月7日を過ぎても取込まれていません"
                     >
                       ⚠
