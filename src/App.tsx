@@ -149,6 +149,24 @@ export default function App() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a
+            href="/marketing/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 12,
+              padding: "4px 10px",
+              border: "0.5px solid var(--border-strong)",
+              borderRadius: 6,
+              background: "var(--surface-2)",
+              color: "var(--text-primary)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            マーケティング →
+          </a>
           <button
             onClick={() => setShowAccountSecurity(true)}
             style={{ fontSize: 12, padding: "4px 10px" }}
