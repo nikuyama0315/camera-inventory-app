@@ -593,11 +593,13 @@ export interface ListingCheckShortageRow {
 export interface ListingCheckExcessRow {
   itemId: string;
   sku: string | null;
+  soulcameraItemInfo: string | null;
   title: string | null;
   quantityAvailable: number;
   matchedManagementNo: string | null;
   matchedStatus: string | null;
   matchedAccount: string | null;
+  matchSource: "soulcamera_item_info" | "sku" | null;
 }
 
 export interface ListingCheckResult {

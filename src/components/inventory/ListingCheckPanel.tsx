@@ -114,7 +114,8 @@ export default function ListingCheckPanel() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>ITEM ID</th>
-                    <th style={{ padding: "4px" }}>SKU</th>
+                    <th style={{ padding: "4px" }}>Soulcamera Item Info</th>
+                    <th style={{ padding: "4px" }}>Custom Label(SKU)</th>
                     <th style={{ padding: "4px" }}>ITEM TITLE</th>
                     <th style={{ padding: "4px", textAlign: "right" }}>在庫数</th>
                     <th style={{ padding: "4px" }}>システム上の対応商品</th>
@@ -132,12 +133,15 @@ export default function ListingCheckPanel() {
                           {row.itemId}
                         </a>
                       </td>
+                      <td style={{ padding: "4px" }}>{row.soulcameraItemInfo ?? "-"}</td>
                       <td style={{ padding: "4px" }}>{row.sku ?? "-"}</td>
                       <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
                       <td style={{ padding: "4px", textAlign: "right" }}>{row.quantityAvailable}</td>
                       <td style={{ padding: "4px" }}>
                         {row.matchedManagementNo
-                          ? `${row.matchedManagementNo}(${row.matchedStatus ?? "-"}・${row.matchedAccount ?? "未設定"})`
+                          ? `${row.matchedManagementNo}(${row.matchedStatus ?? "-"}・${row.matchedAccount ?? "未設定"}・判定元: ${
+                              row.matchSource === "soulcamera_item_info" ? "Item Info" : "SKU"
+                            })`
                           : "該当商品なし"}
                       </td>
                     </tr>
