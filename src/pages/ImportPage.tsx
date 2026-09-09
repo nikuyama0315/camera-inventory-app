@@ -138,7 +138,7 @@ export default function ImportPage() {
 
       <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜当月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial Statementのみ入力対象年月そのもの)。
+        各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial StatementのみPayout/Closing fundsを実際に保存した月のみ「済」)。
         当月について、7日を過ぎても取込が無い場合は行に警告(⚠)を表示します。
       </p>
       <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>

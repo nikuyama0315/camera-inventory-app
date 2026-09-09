@@ -723,8 +723,12 @@ function lastDayOfMonthNum(year: number, month1based: number): number {
  * CSV取込3種は、platform_settlement_imports(レポート取込由来のplatformのみ)の中に、対象月の
  * 1日〜末日と期間が重なる(period_start<=月末 && period_end>=月初)行が1つでもあれば「取込済み」と
  * みなす(1回のCSVが月境界をまたぐ実データがあるため、月初=period_startの完全一致ではなく期間の
- * 重なりで判定する)。eBay Financial Statement(PDF手動入力)のみ、対象年月そのものが
- * monthly_settlement_reconciliationsに存在するかで判定する。
+ * 重なりで判定する)。eBay Financial Statement(PDF手動入力)のみ、monthly_settlement_reconciliations
+ * のebay_closing_funds_usdが入力済み(null以外)かで判定する(2026-09-09修正: 以前は対象年月の行が
+ * 存在するだけで「済」としていたが、同じ行はTransaction Report取込等でも作成・更新されるため、
+ * Financial Statementを一度も入力していない月まで誤って「済」表示になる不具合があった。
+ * ebay_closing_funds_usdはFinancial Statementの手動保存からしか書き込まれないカラムのため、
+ * これを実際に入力済みかどうかの判定に使う)。
  */
 export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow[]> {
   const now = new Date();
@@ -742,7 +746,7 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
 
   const { data: reconRows, error: reconErr } = await supabase
     .from("monthly_settlement_reconciliations")
-    .select("year_month, ebay_account");
+    .select("year_month, ebay_account, ebay_closing_funds_usd");
   if (reconErr) throw reconErr;
 
   const typedImportRows = (importRows ?? []) as Array<{
@@ -751,7 +755,18 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
     period_start: string;
     period_end: string;
   }>;
-  const typedReconRows = (reconRows ?? []) as Array<{ year_month: string; ebay_account: string | null }>;
+  // 2026-09-09修正: ebay_payout_usdはTransaction Report取込(importEbayTransactionReport)でも
+  // 書き込まれる共有カラムのため、これだけでFinancial Statementの入力有無を判定すると、
+  // Transaction Reportしか取り込んでいない月まで「済」と誤表示されてしまう不具合があった
+  // (ユーザー指摘により発覚: soulcamera/soulmenjapanの多くの月がFinancial Statement未実行にも
+  // 関わらず「済」表示になっていた)。ebay_closing_funds_usdはsaveFinancialStatementManualEntry
+  // (このセクション下部)からしか書き込まれないカラムのため、これがnullでないことをもって
+  // 「実際にFinancial Statementが入力された」と判定する。
+  const typedReconRows = (reconRows ?? []) as Array<{
+    year_month: string;
+    ebay_account: string | null;
+    ebay_closing_funds_usd: number | null;
+  }>;
 
   function monthBounds(ym: string): { start: string; end: string } {
     const [y, m] = ym.split("-").map(Number);
@@ -765,7 +780,9 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
       const { start, end } = monthBounds(ym);
       const imported =
         platform === "ebay_financial_statement"
-          ? typedReconRows.some((r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym)
+          ? typedReconRows.some(
+              (r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym && r.ebay_closing_funds_usd != null,
+            )
           : typedImportRows.some(
               (r) =>
                 r.platform === platform &&
