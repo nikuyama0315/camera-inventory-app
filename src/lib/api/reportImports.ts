@@ -239,6 +239,13 @@ export async function importEbayTransactionReport(
       transaction_report_gross_usd: grossUsdTotal,
       transaction_report_gross_jpy: ttmRate != null ? grossUsdTotal * ttmRate : undefined,
       ebay_payout_usd: payoutUsdTotal,
+      // 2026-09-10追加(ユーザー指示「Transaction Reportをクリアしたら月次照合サマリーのPayout表示も
+      // リセットしたい」対応): ebay_payout_usdはeBay Financial Statement保存(下記
+      // saveFinancialStatementManualEntry)とも書き込みを共有する列のため、直近にどちらが書いたかを
+      // この列で記録する。clearScopedImportData(scope='ebay_transaction_report')は、この値が
+      // 'transaction_report'の月のみebay_payout_usdをリセットし、Financial Statementが最後に
+      // 書き込んだ月(ebay_payout_usd_source='financial_statement')は保護する。
+      ebay_payout_usd_source: "transaction_report",
       ebay_payout_jpy: ttmRate != null ? payoutUsdTotal * ttmRate : undefined,
       ttm_rate: ttmRate ?? undefined,
     },
@@ -667,6 +674,9 @@ export async function saveFinancialStatementManualEntry(input: FinancialStatemen
       year_month: yearMonthDate,
       ebay_account: input.ebayAccount,
       ebay_payout_usd: input.payoutUsd,
+      // 上記importEbayTransactionReportのコメント参照。Financial Statement保存がこの共有列の
+      // 最新の書き手であることを記録する。
+      ebay_payout_usd_source: "financial_statement",
       ebay_closing_funds_usd: input.closingFundsUsd,
     },
     { onConflict: "year_month,ebay_account" },
@@ -1087,11 +1097,14 @@ export async function getScopedImportCounts(scope: ClearScope): Promise<ScopedCl
  * あわせてeLogi送料CSV・CPaSS請求明細取込も対象に追加(経費タブから本タブへ移設したのに合わせて、
  * 経費タブ「経費データ全クリア」側からは除外した。expenses.ts clearAllExpenses参照)。
  *
- * monthly_settlement_reconciliationsは意図的に対象外: この1テーブルをeBay Transaction Report・
- * eBay Tax Invoice・eBay Financial Statementの3種が列を共有しており(ebay_payout_usdは特に
- * Transaction ReportとFinancial Statementの両方が書き込む)、どの列がどの種別の最新値かを
- * 安全に切り分けられないため、他種別のデータまで巻き込んで消してしまう恐れがある。
- * 月次照合サマリーへの反映は再取込時の上書きに任せる。
+ * monthly_settlement_reconciliationsは、eBay Transaction Report・eBay Tax Invoice・eBay Financial
+ * Statementの3種が列を共有しているため、基本的には個別クリアの対象から意図的に除外している
+ * (他種別のデータまで巻き込んで消してしまう恐れがあるため)。
+ * 唯一の例外がeBay Transaction Reportで、ユーザー指示「Transaction Reportをクリアしたら月次照合
+ * サマリーのPayout表示もリセットしたい」への対応として、Transaction Report専用列
+ * (transaction_report_gross_usd/jpy・ebay_payout_jpy・ttm_rate)は無条件でリセットし、共有列
+ * ebay_payout_usdは直近の書き手がTransaction Report自身の月に限ってリセットする(下記参照)。
+ * eBay Tax Invoice・Payoneer・eLogi・CPaSSのその他4種はこのテーブルに一切触れない。
  */
 export async function clearScopedImportData(scope: ClearScope): Promise<void> {
   const counts = await getScopedImportCounts(scope);
@@ -1109,6 +1122,30 @@ export async function clearScopedImportData(scope: ClearScope): Promise<void> {
     if (scope === "payoneer_transaction_report") {
       const summaryDel = await supabase.from("monthly_payoneer_summary").delete().neq("id", ZERO_UUID_REPORT);
       if (summaryDel.error) throw summaryDel.error;
+    }
+    if (scope === "ebay_transaction_report") {
+      // ユーザー指示(2026-09-10): 「Transaction Reportをクリアしたら月次照合サマリーのPayout表示も
+      // リセットしたい」への対応。transaction_report_gross_usd/jpy・ebay_payout_jpy・ttm_rateは
+      // Transaction Report専用列のため無条件でリセットする。ebay_payout_usdのみeBay Financial
+      // Statementとの共有列のため、直近の書き手がTransaction Report自身の月
+      // (ebay_payout_usd_source='transaction_report')に限ってリセットし、Financial Statementが
+      // 最後に書き込んだ月は保護する(上記importEbayTransactionReportのコメント参照)。
+      const reconExclusiveDel = await supabase
+        .from("monthly_settlement_reconciliations")
+        .update({
+          transaction_report_gross_usd: null,
+          transaction_report_gross_jpy: null,
+          ebay_payout_jpy: null,
+          ttm_rate: null,
+        })
+        .neq("id", ZERO_UUID_REPORT);
+      if (reconExclusiveDel.error) throw reconExclusiveDel.error;
+
+      const reconPayoutDel = await supabase
+        .from("monthly_settlement_reconciliations")
+        .update({ ebay_payout_usd: null, ebay_payout_usd_source: null })
+        .eq("ebay_payout_usd_source", "transaction_report");
+      if (reconPayoutDel.error) throw reconPayoutDel.error;
     }
     const importsDel = await supabase.from("platform_settlement_imports").delete().eq("platform", scope as Platform);
     if (importsDel.error) throw importsDel.error;

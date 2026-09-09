@@ -41,8 +41,14 @@ const PLATFORM_LABELS: Record<string, string> = {
   cpass_invoice: "CPaSS請求明細",
 };
 
-const CLEAR_SCOPE_DEFS: Array<{ scope: ClearScope; lineLabel: string; extraLabel: string | null }> = [
-  { scope: "ebay_transaction_report", lineLabel: "eBay取引明細", extraLabel: null },
+const CLEAR_SCOPE_DEFS: Array<{ scope: ClearScope; lineLabel: string; extraLabel: string | null; note?: string }> = [
+  {
+    scope: "ebay_transaction_report",
+    lineLabel: "eBay取引明細",
+    extraLabel: null,
+    // 2026-09-10追加(ユーザー指示): あわせて月次照合サマリーのPayout表示もリセットされる旨を明示。
+    note: "あわせて月次照合サマリーの当該月のPayout表示もリセットします(eBay Financial Statementを保存済みの月は、その値を保護するためリセットしません)。",
+  },
   { scope: "ebay_tax_invoice", lineLabel: "手数料明細", extraLabel: null },
   { scope: "payoneer_transaction_report", lineLabel: "Payoneer明細", extraLabel: "月次サマリー" },
   { scope: "elogi_shipping", lineLabel: "eLogi発送明細", extraLabel: "経費データ(送料)" },
@@ -271,6 +277,7 @@ export default function ImportPage() {
             label={PLATFORM_LABELS[def.scope]}
             lineLabel={def.lineLabel}
             extraLabel={def.extraLabel}
+            note={def.note}
             onCleared={reloadAfterClear}
           />
         ))}
@@ -284,12 +291,14 @@ function ScopedClearSection({
   label,
   lineLabel,
   extraLabel,
+  note,
   onCleared,
 }: {
   scope: ClearScope;
   label: string;
   lineLabel: string;
   extraLabel: string | null;
+  note?: string;
   onCleared: () => void;
 }) {
   const confirmPhrase = `${label}削除`;
@@ -363,6 +372,7 @@ function ScopedClearSection({
         </button>
       </p>
       {countsError && <p style={{ fontSize: 12, color: "var(--danger-text)", margin: "0 0 8px" }}>{countsError}</p>}
+      {note && <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>{note}</p>}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           確認のため「{confirmPhrase}」と入力してください:
