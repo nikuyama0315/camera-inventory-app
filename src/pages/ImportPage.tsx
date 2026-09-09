@@ -955,14 +955,34 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
         {parsingXlsx && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>解析中...</span>}
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <select value={account} onChange={(e) => setAccount(e.target.value)}>
+        <select
+          value={account}
+          onChange={(e) => {
+            // 2026-09-09修正(バグ調査により判明): アカウント・対象年月を変更してもPayout・
+            // Closing fundsが残ったままだったため、Closing fundsだけ入力し直してPayoutは
+            // 前の月の値のまま「保存」してしまい、月次照合サマリーのPayoutが複数月で同じ値に
+            // なる不具合が実際に発生していた。変更時に両方クリアし、必ず解析または再入力を
+            // 促すようにする。
+            setAccount(e.target.value);
+            setPayout("");
+            setClosingFunds("");
+          }}
+        >
           {EBAY_ACCOUNTS.map((a) => (
             <option key={a} value={a}>
               {a}
             </option>
           ))}
         </select>
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} />
+        <input
+          type="month"
+          value={yearMonth}
+          onChange={(e) => {
+            setYearMonth(e.target.value);
+            setPayout("");
+            setClosingFunds("");
+          }}
+        />
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Payout(USD):</label>
         <input type="number" value={payout} onChange={(e) => setPayout(e.target.value)} style={{ width: 100 }} />
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Closing funds(USD):</label>
