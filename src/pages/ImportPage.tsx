@@ -140,7 +140,7 @@ export default function ImportPage() {
         各レポートのCSVは実データで列名・ヘッダー行の位置(先頭の請求書番号等のメタデータ行を自動で読み飛ばします)を確認済みです。それでも取込件数が0件、または想定と異なる場合はCSVの列名をご確認ください。
       </p>
 
-      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜当月)</h3>
+      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜前月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
         各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial StatementのみPayout/Closing fundsを実際に保存した月のみ「済」)。
         当月について、7日を過ぎても取込が無い場合は行に警告(⚠)を表示します。
@@ -191,23 +191,18 @@ export default function ImportPage() {
                   )}
                 </td>
                 <td style={{ padding: "6px 4px" }}>{row.account ?? "(2アカウント統合)"}</td>
-                {row.months.map((cell, idx) => {
-                  const isCurrent = idx === row.months.length - 1;
-                  const cellAlert = isCurrent && rowAlert;
-                  return (
-                    <td
-                      key={cell.yearMonth}
-                      style={{
-                        padding: "6px 4px",
-                        textAlign: "center",
-                        color: cellAlert ? "var(--danger-text)" : cell.imported ? undefined : "var(--text-muted)",
-                        fontWeight: cellAlert ? 700 : undefined,
-                      }}
-                    >
-                      {cell.imported ? "済" : cellAlert ? "⚠ 未" : "未"}
-                    </td>
-                  );
-                })}
+                {row.months.map((cell) => (
+                  <td
+                    key={cell.yearMonth}
+                    style={{
+                      padding: "6px 4px",
+                      textAlign: "center",
+                      color: cell.imported ? undefined : "var(--text-muted)",
+                    }}
+                  >
+                    {cell.imported ? "済" : "未"}
+                  </td>
+                ))}
               </tr>
               );
             });

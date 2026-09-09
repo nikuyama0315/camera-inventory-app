@@ -825,8 +825,13 @@ export interface MonthlyImportStatusCell {
 export interface MonthlyImportStatusRow {
   platform: Platform;
   account: string | null;
-  /** 古い月→新しい月の順。最後の要素が当月。 */
+  /** 古い月→新しい月の順(2026-09-09修正: 表示上は当年1月〜前月まで。当月は含まない)。 */
   months: MonthlyImportStatusCell[];
+  /**
+   * 2026-09-09追加: 表(months)には表示しない当月分の状況。reportImportRowHasAlert
+   * (当月分未取込の警告判定)専用に保持する。
+   */
+  currentMonthCell: MonthlyImportStatusCell;
 }
 
 // 「取込状況」表の行順序。Payoneerのみ2アカウント統合のためaccount=null。
@@ -863,7 +868,11 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
   const now = new Date();
   const currentYear = now.getFullYear();
   const months: string[] = [];
-  for (let m = 1; m <= now.getMonth() + 1; m++) {
+  // 2026-09-09修正(ユーザー指示): 「取込状況(当年1月〜当月)」を「当年1月〜前月」に変更。
+  // now.getMonth()は0始まりのため、この値がそのまま「前月」の1始まり月番号になる
+  // (例: 9月ならgetMonth()=8で、これが前月=8月を表す)。1月時点では前月が前年12月に
+  // なり「当年」の範囲外のため、ループ上限が0になり表は空になる(意図した挙動)。
+  for (let m = 1; m <= now.getMonth(); m++) {
     months.push(`${currentYear}-${String(m).padStart(2, "0")}`);
   }
 
@@ -902,25 +911,28 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
     return { start: `${ym}-01`, end: `${ym}-${String(lastDayOfMonthNum(y, m)).padStart(2, "0")}` };
   }
 
+  function isImported(platform: Platform, account: string | null, ym: string): boolean {
+    const { start, end } = monthBounds(ym);
+    return platform === "ebay_financial_statement"
+      ? typedReconRows.some(
+          (r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym && r.ebay_closing_funds_usd != null,
+        )
+      : typedImportRows.some(
+          (r) =>
+            r.platform === platform &&
+            (account === null || r.ebay_account === account) &&
+            r.period_start <= end &&
+            r.period_end >= start,
+        );
+  }
+
+  const currentYearMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   return IMPORT_STATUS_ROW_DEFS.map(({ platform, account }) => ({
     platform,
     account,
-    months: months.map((ym) => {
-      const { start, end } = monthBounds(ym);
-      const imported =
-        platform === "ebay_financial_statement"
-          ? typedReconRows.some(
-              (r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym && r.ebay_closing_funds_usd != null,
-            )
-          : typedImportRows.some(
-              (r) =>
-                r.platform === platform &&
-                (account === null || r.ebay_account === account) &&
-                r.period_start <= end &&
-                r.period_end >= start,
-            );
-      return { yearMonth: ym, imported };
-    }),
+    months: months.map((ym) => ({ yearMonth: ym, imported: isImported(platform, account, ym) })),
+    currentMonthCell: { yearMonth: currentYearMonth, imported: isImported(platform, account, currentYearMonth) },
   }));
 }
 
@@ -930,8 +942,7 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
  * App.tsx(ヘッダー直下の全ページ共通バナー)の両方で同じ基準を使うための共有ロジック。
  */
 export function reportImportRowHasAlert(row: MonthlyImportStatusRow, today: Date = new Date()): boolean {
-  const currentMonthCell = row.months[row.months.length - 1];
-  return today.getDate() > 6 && currentMonthCell != null && !currentMonthCell.imported;
+  return today.getDate() > 6 && !row.currentMonthCell.imported;
 }
 
 // ---------------------------------------------------------------
