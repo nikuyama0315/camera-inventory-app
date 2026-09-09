@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
-import { detectUnfilledMonths, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
+import { detectUnfilledMonths, fillMissingLedgerRates, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -815,8 +815,20 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
         if (result.ebayAccount && (EBAY_ACCOUNTS as string[]).includes(result.ebayAccount)) {
           setAccount(result.ebayAccount);
         }
-        setIsError(false);
-        setMessage("解析結果を入力欄に反映しました。内容を確認のうえ「保存」を押してください。");
+        // 2026-09-09修正(ユーザー報告): PayoutとClosing fundsの片方しか見つからなかった場合も
+        // 「解析結果を入力欄に反映しました」という一律の成功メッセージになっており、片方が
+        // 空欄のまま保存されてしまう事故につながっていた。片方だけ見つからなかった場合は
+        // どちらが欠けているか明示し、警告色で表示するようにする。
+        if (result.payoutUsd == null || result.closingFundsUsd == null) {
+          const missing = result.payoutUsd == null ? "Payout" : "Closing funds";
+          setIsError(true);
+          setMessage(
+            `${missing}の数値が見つからず、入力欄が空欄のままです。手動で入力してから「保存」を押してください(他の項目は反映済みです)。`,
+          );
+        } else {
+          setIsError(false);
+          setMessage("解析結果を入力欄に反映しました。内容を確認のうえ「保存」を押してください。");
+        }
       }
     } catch (err) {
       setIsError(true);
@@ -915,6 +927,14 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
         throw new Error(stoppedReason ?? "処理できる月がありませんでした。");
       }
 
+      // 2026-09-09追加(ユーザー報告: 「出力エクセルのK12(4月soulcameraの月末レート)に値が
+      // 入っていません」)。4月はB・G列が既に入力済みだったため上記の未入力月処理の対象に
+      // ならず、K列(レート)が空欄のまま残っていた。B・G列の入力有無に関わらず、レートが
+      // 保存されている月はK列だけ追加で埋める補完パスを、ダウンロード直前に一度実行する。
+      const savedRates = await fetchMonthlyExchangeRates();
+      const rateFillResult = await fillMissingLedgerRates(buffer, savedRates);
+      buffer = rateFillResult.buffer;
+
       onImported();
 
       const blob = new Blob([buffer as BlobPart], {
@@ -931,7 +951,10 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       setLedgerMessage(
         `${processedMonthLabels.join("、")}分を更新しました(直近の三菱UFJ公表レート: ${lastMufgText})。` +
           `更新行: ${allUpdatedRowLabels.join("、")}。` +
-          (stoppedReason ? ` ${stoppedReason}` : ""),
+          (stoppedReason ? ` ${stoppedReason}` : "") +
+          (rateFillResult.filledMonthLabels.length > 0
+            ? ` あわせて、空欄だったK列(レート)を補完しました: ${rateFillResult.filledMonthLabels.join("、")}。`
+            : ""),
       );
     } catch (err) {
       setLedgerIsError(true);

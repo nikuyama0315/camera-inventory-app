@@ -617,12 +617,17 @@ export async function parseFinancialStatementXlsx(buffer: ArrayBuffer): Promise<
     });
   }
 
-  const AMOUNT_RE = /(-?)\$\s*([\d,]+\.\d{2})\s*$/;
+  // 2026-09-09修正(ユーザー報告): 1月分のファイルでは「Payouts」等の項目が1セル1項目に
+  // 分かれていたため「セルの先頭が一致するか」で判定していたが、8月分のファイルではPDF→Excel
+  // 変換の結果、「Purchases」「Charges」「Payouts」が1つのセルに連結されており、「Payouts」が
+  // セルの先頭に来ないため検出できなかった(Closing fundsは単独セルのままだったため検出できて
+  // いた)。セル内の任意の位置に現れるラベルを許容し、そのラベル直後(同じセル内)に最初に
+  // 現れる金額を拾うよう変更(セルをまたいだ誤検出は避けるため、あくまで同一セル内に限定する)。
   function extractLabeledAmount(label: string): number | null {
+    const re = new RegExp(`\\b${label}\\b[^$]*?(-?)\\$\\s*([\\d,]+\\.\\d{2})`);
     for (const text of cellTexts) {
       const norm = text.replace(/\s+/g, " ").trim();
-      if (!norm.startsWith(label)) continue;
-      const m = norm.match(AMOUNT_RE);
+      const m = norm.match(re);
       if (!m) continue;
       const value = parseFloat(m[2].replace(/,/g, ""));
       return m[1] === "-" ? -value : value;

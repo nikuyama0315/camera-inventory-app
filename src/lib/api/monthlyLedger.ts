@@ -149,3 +149,38 @@ export async function updateMonthlyLedgerWorkbook(input: LedgerUpdateInput): Pro
     ],
   };
 }
+
+/**
+ * 2026-09-09追加(ユーザー報告: 「出力エクセルのK12に値が入っていません」)。B・G列(Payout・
+ * Closing Funds)は既に入力済みのためupdateMonthlyLedgerWorkbookの処理対象(未入力月)には
+ * ならないが、K列(月末レート)だけが元々空欄だった月が存在した(4月のSoulcamera行など)。
+ * この関数は、B・G列の入力有無に関わらず、シート内の全月についてK列が空欄かつ
+ * monthly_exchange_ratesにその月のレートが保存されていれば埋める、独立した補完パスとして
+ * 呼び出し側(handleUpdateLedger)の最後に実行する。
+ */
+export async function fillMissingLedgerRates(
+  ledgerBuffer: ArrayBuffer,
+  ratesByMonth: Record<string, number>, // "YYYY-MM" -> rate
+): Promise<{ buffer: ArrayBuffer; filledMonthLabels: string[] }> {
+  const worksheet = await loadWorksheet(ledgerBuffer);
+  const months = collectMonthRows(worksheet);
+  const filledMonthLabels: string[] = [];
+
+  for (const m of months) {
+    const rate = ratesByMonth[m.yearMonth];
+    if (rate == null) continue;
+    let filledThisMonth = false;
+    if (m.soulmenRow.getCell(11).value == null) {
+      m.soulmenRow.getCell(11).value = rate;
+      filledThisMonth = true;
+    }
+    if (m.soulcameraRow.getCell(11).value == null) {
+      m.soulcameraRow.getCell(11).value = rate;
+      filledThisMonth = true;
+    }
+    if (filledThisMonth) filledMonthLabels.push(m.monthLabel);
+  }
+
+  const buffer = await worksheet.workbook.xlsx.writeBuffer();
+  return { buffer: buffer as ArrayBuffer, filledMonthLabels };
+}
