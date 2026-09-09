@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
+import { parsePayoneerForLedger, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -778,6 +779,15 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   // 「保存」を押す必要がある。ユーザー指示: 「PDFをWord、Excelに変換したファイルでも解析できないか」)。
   const [parsingXlsx, setParsingXlsx] = useState(false);
 
+  // 2026-09-09追加(ユーザー指示): eBay Financial Statement(上記で解析したPayout・Closing funds)、
+  // Payoneer Transaction Report(CSV)、三菱UFJ公表の対象月末レートを、既存の月次売掛金Excel
+  // (仕入・販売帳)の該当セルに書き込み、更新後のファイルをダウンロードする機能。
+  const [ledgerFile, setLedgerFile] = useState<File | null>(null);
+  const [payoneerFile, setPayoneerFile] = useState<File | null>(null);
+  const [ledgerBusy, setLedgerBusy] = useState(false);
+  const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
+  const [ledgerIsError, setLedgerIsError] = useState(false);
+
   async function handleXlsxSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -831,6 +841,74 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
     }
   }
 
+  async function handleUpdateLedger() {
+    setLedgerIsError(false);
+    setLedgerMessage(null);
+    if (!ledgerFile) {
+      setLedgerIsError(true);
+      setLedgerMessage("月次売掛金Excelファイルを選択してください");
+      return;
+    }
+    if (!payoneerFile) {
+      setLedgerIsError(true);
+      setLedgerMessage("Payoneer Transaction Report(CSV)を選択してください");
+      return;
+    }
+    const payoutUsd = Number(payout);
+    const closingFundsUsd = Number(closingFunds);
+    if (!payout.trim() || !Number.isFinite(payoutUsd) || !closingFunds.trim() || !Number.isFinite(closingFundsUsd)) {
+      setLedgerIsError(true);
+      setLedgerMessage(
+        "Payout・Closing fundsが未入力です。上のPDF変換ファイルを解析するか、手動で入力してください。",
+      );
+      return;
+    }
+
+    setLedgerBusy(true);
+    try {
+      const payoneerCsv = await parseCsvFile(payoneerFile, ["Currency", "Payout method", "Running balance"]);
+      const { creditAmountSum, latestRunningBalance } = parsePayoneerForLedger(payoneerCsv);
+
+      const mufg = await fetchLatestMufgTtm(yearMonth);
+
+      const ledgerBuffer = await ledgerFile.arrayBuffer();
+      const { buffer, updatedRowLabels } = await updateMonthlyLedgerWorkbook({
+        ledgerBuffer,
+        ebayAccount: account,
+        yearMonth,
+        payoutUsd,
+        closingFundsUsd,
+        payoneerCreditAmountSum: creditAmountSum,
+        payoneerLatestRunningBalance: latestRunningBalance,
+        mufgRate: mufg.ttm,
+      });
+
+      // 月次売掛金Excelへの反映と合わせて、取込状況(済/未表示)用のDB保存も行う
+      await saveFinancialStatementManualEntry({ ebayAccount: account, yearMonth, payoutUsd, closingFundsUsd });
+      onImported();
+
+      const blob = new Blob([buffer as BlobPart], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = ledgerFile.name;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setLedgerIsError(false);
+      setLedgerMessage(
+        `更新して ${mufg.source_text}時点の三菱UFJ公表レート(${mufg.ttm})を反映し、ダウンロードしました(更新行: ${updatedRowLabels.join("、")})。`,
+      );
+    } catch (err) {
+      setLedgerIsError(true);
+      setLedgerMessage(err instanceof Error ? err.message : "月次売掛金Excelの更新に失敗しました");
+    } finally {
+      setLedgerBusy(false);
+    }
+  }
+
   return (
     <SectionCard title="eBay Financial Statement(PDF・手動入力)">
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
@@ -869,6 +947,50 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       {message && (
         <p style={{ fontSize: 12, color: isError ? "var(--danger-text)" : "var(--text-secondary)", marginTop: 8 }}>
           {message}
+        </p>
+      )}
+
+      <hr style={{ margin: "16px 0", border: "none", borderTop: "0.5px solid var(--border)" }} />
+
+      <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+        上記のPayout・Closing funds(アカウント・対象年月含む)と、Payoneer Transaction
+        Report(CSV)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の
+        該当行に書き込み、更新後のファイルをダウンロードします。対象月・アカウントの行があらかじめ
+        用意されているファイルを使用してください(新規行の自動追加はしません)。
+      </p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>月次売掛金Excel(.xlsx):</label>
+        <input
+          type="file"
+          accept=".xlsx"
+          onChange={(e) => setLedgerFile(e.target.files?.[0] ?? null)}
+          disabled={ledgerBusy}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          Payoneer Transaction Report(CSV):
+        </label>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => setPayoneerFile(e.target.files?.[0] ?? null)}
+          disabled={ledgerBusy}
+        />
+      </div>
+      <button onClick={handleUpdateLedger} disabled={ledgerBusy}>
+        {ledgerBusy ? "更新中..." : "月次売掛金Excelを更新してダウンロード"}
+      </button>
+      {ledgerMessage && (
+        <p
+          style={{
+            fontSize: 12,
+            color: ledgerIsError ? "var(--danger-text)" : "var(--text-secondary)",
+            marginTop: 8,
+          }}
+        >
+          {ledgerMessage}
         </p>
       )}
     </SectionCard>
