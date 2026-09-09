@@ -684,6 +684,29 @@ export interface MonthlyReconciliationSummary {
   payoneerFeeJpy: number | null;
 }
 
+/**
+ * 2026-09-09追加(ユーザー指示): 月次売掛金Excel更新機能で、Payoneer Transaction Reportを
+ * 都度アップロードし直すのではなく、既に取込済みのmonthly_payoneer_summary(Payoneer
+ * Transaction Report(CSV・2アカウント統合)取込時に自動集計されるテーブル)を再利用する。
+ * 対象年月のデータが無ければnullを返す(呼び出し側は「先にPayoneerレポートを取り込んでください」
+ * という趣旨のエラーにする)。
+ */
+export async function fetchPayoneerSummaryForMonth(
+  yearMonth: string, // "YYYY-MM"
+): Promise<{ creditAmountTotal: number; runningBalanceStart: number } | null> {
+  const { data, error } = await supabase
+    .from("monthly_payoneer_summary")
+    .select("credit_amount_total, running_balance_start")
+    .eq("year_month", `${yearMonth}-01`)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    creditAmountTotal: (data.credit_amount_total as number | null) ?? 0,
+    runningBalanceStart: (data.running_balance_start as number | null) ?? 0,
+  };
+}
+
 export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconciliationSummary[]> {
   const { data: reconRows, error: reconErr } = await supabase
     .from("monthly_settlement_reconciliations")

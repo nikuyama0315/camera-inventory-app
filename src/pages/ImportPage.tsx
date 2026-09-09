@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
-import { parsePayoneerForLedger, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
+import { updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -15,6 +15,7 @@ import {
   importEbayTaxInvoiceRows,
   importEbayTransactionReport,
   importPayoneerReport,
+  fetchPayoneerSummaryForMonth,
   parseFinancialStatementXlsx,
   saveFinancialStatementManualEntry,
   type MonthlyImportStatusRow,
@@ -780,10 +781,11 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   const [parsingXlsx, setParsingXlsx] = useState(false);
 
   // 2026-09-09追加(ユーザー指示): eBay Financial Statement(上記で解析したPayout・Closing funds)、
-  // Payoneer Transaction Report(CSV)、三菱UFJ公表の対象月末レートを、既存の月次売掛金Excel
-  // (仕入・販売帳)の該当セルに書き込み、更新後のファイルをダウンロードする機能。
+  // Payoneer Transaction Report取込済みデータ(monthly_payoneer_summary、CSVの再アップロードは
+  // 不要。ユーザー指示: 「Payoneer Transaction Report(CSV・2アカウント統合)で取り込んだデータを
+  // 使えないか」)、三菱UFJ公表の対象月末レートを、既存の月次売掛金Excel(仕入・販売帳)の該当セルに
+  // 書き込み、更新後のファイルをダウンロードする機能。
   const [ledgerFile, setLedgerFile] = useState<File | null>(null);
-  const [payoneerFile, setPayoneerFile] = useState<File | null>(null);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
   const [ledgerIsError, setLedgerIsError] = useState(false);
@@ -849,11 +851,6 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       setLedgerMessage("月次売掛金Excelファイルを選択してください");
       return;
     }
-    if (!payoneerFile) {
-      setLedgerIsError(true);
-      setLedgerMessage("Payoneer Transaction Report(CSV)を選択してください");
-      return;
-    }
     const payoutUsd = Number(payout);
     const closingFundsUsd = Number(closingFunds);
     if (!payout.trim() || !Number.isFinite(payoutUsd) || !closingFunds.trim() || !Number.isFinite(closingFundsUsd)) {
@@ -866,8 +863,12 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
     setLedgerBusy(true);
     try {
-      const payoneerCsv = await parseCsvFile(payoneerFile, ["Currency", "Payout method", "Running balance"]);
-      const { creditAmountSum, latestRunningBalance } = parsePayoneerForLedger(payoneerCsv);
+      const payoneerSummary = await fetchPayoneerSummaryForMonth(yearMonth);
+      if (!payoneerSummary) {
+        throw new Error(
+          `${yearMonth}分のPayoneer Transaction Report取込データが見つかりませんでした。先に上部の「Payoneer Transaction Report(CSV・2アカウント統合)」欄で取り込んでください。`,
+        );
+      }
 
       const mufg = await fetchLatestMufgTtm(yearMonth);
 
@@ -878,8 +879,8 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
         yearMonth,
         payoutUsd,
         closingFundsUsd,
-        payoneerCreditAmountSum: creditAmountSum,
-        payoneerLatestRunningBalance: latestRunningBalance,
+        payoneerCreditAmountSum: payoneerSummary.creditAmountTotal,
+        payoneerLatestRunningBalance: payoneerSummary.runningBalanceStart,
         mufgRate: mufg.ttm,
       });
 
@@ -954,8 +955,9 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        上記のPayout・Closing funds(アカウント・対象年月含む)と、Payoneer Transaction
-        Report(CSV)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の
+        上記のPayout・Closing funds(アカウント・対象年月含む)と、取込済みのPayoneer Transaction
+        Report(下部「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に取り込んでおいて
+        ください)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の
         該当行に書き込み、更新後のファイルをダウンロードします。対象月・アカウントの行があらかじめ
         用意されているファイルを使用してください(新規行の自動追加はしません)。
       </p>
@@ -965,17 +967,6 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
           type="file"
           accept=".xlsx"
           onChange={(e) => setLedgerFile(e.target.files?.[0] ?? null)}
-          disabled={ledgerBusy}
-        />
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          Payoneer Transaction Report(CSV):
-        </label>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => setPayoneerFile(e.target.files?.[0] ?? null)}
           disabled={ledgerBusy}
         />
       </div>

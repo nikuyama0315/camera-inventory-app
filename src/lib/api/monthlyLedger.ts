@@ -1,7 +1,8 @@
 // 月次売掛金Excel(仕入・販売帳)の更新ロジック。
-// eBay Financial Statement(PDFをExcelに変換したファイル)とPayoneer Transaction Report(CSV)、
-// 三菱UFJ公表レートから取得した値を、ユーザーがアップロードした既存の月次売掛金Excelファイルの
-// 該当セルに書き込み、更新後のファイルをダウンロードさせるための機能(2026-09-09追加、ユーザー指示)。
+// eBay Financial Statement(PDFをExcelに変換したファイル)、Payoneer Transaction Report取込済み
+// データ(monthly_payoneer_summary、CSVの再アップロードは不要)、三菱UFJ公表レートから取得した
+// 値を、ユーザーがアップロードした既存の月次売掛金Excelファイルの該当セルに書き込み、更新後の
+// ファイルをダウンロードさせるための機能(2026-09-09追加、ユーザー指示)。
 //
 // シート構成(ユーザー提供の実ファイルで確認済み): シート名「仕入・販売帳」。
 // ヘッダー行(1行目)の下、月ごとに3行1組(Soulmen行・Soulcamera行・SUM行)が並ぶ。
@@ -12,15 +13,14 @@
 // 列の対応:
 //   B列: eBay Financial Statementの Payout(USD) — 処理対象アカウントの行
 //   G列: eBay Financial Statementの Closing Funds(USD) — 処理対象アカウントの行
-//   D列: PayoneerのCredit Amount合計(F2〜F列最終行の合計) — 常にSoulmen行(ユーザー指示、
+//   D列: monthly_payoneer_summary.credit_amount_total(対象月) — 常にSoulmen行(ユーザー指示、
 //        Payoneerは2アカウント統合のため月に1回のみ記載する既存の慣例に合わせる)
-//   I列: PayoneerのRunning Balance(先頭データ行の値) — 常にSoulmen行(同上)
+//   I列: monthly_payoneer_summary.running_balance_start(対象月) — 常にSoulmen行(同上)
 //   K列: 三菱UFJ公表の対象月末営業日TTM — 同じ月のSoulmen行・Soulcamera行の両方(ユーザー指示、
 //        既存データが両行とも同じ値になっているため)
 //   C・E・F・H・J・M列は既存の数式(=B*K 等)のままにする(値を上書きしない)。
 
 import ExcelJS from "exceljs";
-import { pickField, toNumberOrNull, type ParsedCsv } from "../csvUtils";
 
 const LEDGER_SHEET_NAME = "仕入・販売帳";
 
@@ -28,24 +28,6 @@ const ACCOUNT_LABELS: Record<string, string> = {
   soulcamera: "Soulcamera",
   soulmenjapan: "Soulmen",
 };
-
-/** Payoneer Transaction Report(CSV)から、月次売掛金Excelに書き込む2つの値を取り出す。
- *  D列用: Credit Amount列の全データ行の合計(CSVのF2〜F列最終行に相当)。
- *  I列用: Running Balance列の先頭データ行の値(CSVのI2セルに相当。ユーザー指示により、
- *  ソート順に関わらず先頭行の値をそのまま使う)。 */
-export function parsePayoneerForLedger(csv: ParsedCsv): {
-  creditAmountSum: number;
-  latestRunningBalance: number | null;
-} {
-  let creditAmountSum = 0;
-  for (const row of csv.rows) {
-    const v = toNumberOrNull(pickField(row, ["Credit Amount", "Credit amount"]));
-    if (v != null) creditAmountSum += v;
-  }
-  const latestRunningBalance =
-    csv.rows.length > 0 ? toNumberOrNull(pickField(csv.rows[0], ["Running Balance", "Balance"])) : null;
-  return { creditAmountSum, latestRunningBalance };
-}
 
 export interface LedgerUpdateInput {
   ledgerBuffer: ArrayBuffer;
