@@ -86,6 +86,35 @@ function parseSkuDate(sku: string, startIndex0Based: number): Date | null {
   return new Date(Date.UTC(2000 + yy, mm - 1, dd));
 }
 
+/**
+ * 2026-09-10追加(ユーザー指示): 結果表示表の各値を、プレーンなセルではなくテキストボックス
+ * (readOnlyのinput)に入れて表示する。値が長い(商品名等)場合や桁が多い数値でも、クリック→
+ * Ctrl+A等で1項目分をきれいに選択・コピーしやすくするため。
+ */
+function ValueCell({ value, width, wrap }: { value: string; width: number; wrap?: boolean }) {
+  return (
+    <td style={{ padding: "2px 3px" }}>
+      <input
+        type="text"
+        value={value}
+        readOnly
+        onFocus={(e) => e.currentTarget.select()}
+        style={{
+          width,
+          border: "0.5px solid var(--border)",
+          borderRadius: 4,
+          padding: "3px 5px",
+          fontSize: 12,
+          fontFamily: "inherit",
+          color: "inherit",
+          background: "var(--surface-1, transparent)",
+          whiteSpace: wrap ? "normal" : "nowrap",
+        }}
+      />
+    </td>
+  );
+}
+
 export default function EbayXlsxFillPanel() {
   const [orderNos, setOrderNos] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
@@ -343,18 +372,18 @@ export default function EbayXlsxFillPanel() {
             <tbody>
               {valueResults.map((v, i) => (
                 <tr key={i} style={{ borderTop: "0.5px solid var(--border)" }}>
-                  <td style={{ padding: "4px" }}>{v.orderNo}</td>
-                  <td style={{ padding: "4px" }}>{v.soldDate ?? "-"}</td>
-                  <td style={{ padding: "4px", whiteSpace: "normal", minWidth: 200 }}>{v.itemTitle ?? "-"}</td>
-                  <td style={{ padding: "4px" }}>{v.managementNo ?? "-"}</td>
-                  <td style={{ padding: "4px" }}>{fmtNum(v.salePriceUsd, 2)}</td>
-                  <td style={{ padding: "4px" }}>{fmtNum(v.shippingUsd, 2)}</td>
-                  <td style={{ padding: "4px" }}>{fmtNum(v.feesBasedOnUsd, 2)}</td>
-                  <td style={{ padding: "4px" }}>{fmtNum(v.plFeeUsd, 2)}</td>
-                  <td style={{ padding: "4px" }}>{fmtNum(v.purchasePriceJpy, 0)}</td>
-                  <td style={{ padding: "4px" }}>{fmtDate(v.listingStartDate)}</td>
-                  <td style={{ padding: "4px" }}>{fmtDate(v.purchaseDate)}</td>
-                  <td style={{ padding: "4px" }}>{v.buyerCountry ?? "-"}</td>
+                  <ValueCell value={v.orderNo} width={130} />
+                  <ValueCell value={v.soldDate ?? "-"} width={90} />
+                  <ValueCell value={v.itemTitle ?? "-"} width={260} wrap />
+                  <ValueCell value={v.managementNo ?? "-"} width={90} />
+                  <ValueCell value={fmtNum(v.salePriceUsd, 2)} width={85} />
+                  <ValueCell value={fmtNum(v.shippingUsd, 2)} width={80} />
+                  <ValueCell value={fmtNum(v.feesBasedOnUsd, 2)} width={95} />
+                  <ValueCell value={fmtNum(v.plFeeUsd, 2)} width={85} />
+                  <ValueCell value={fmtNum(v.purchasePriceJpy, 0)} width={95} />
+                  <ValueCell value={fmtDate(v.listingStartDate)} width={90} />
+                  <ValueCell value={fmtDate(v.purchaseDate)} width={90} />
+                  <ValueCell value={v.buyerCountry ?? "-"} width={70} />
                 </tr>
               ))}
             </tbody>
