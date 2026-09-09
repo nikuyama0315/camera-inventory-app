@@ -3,14 +3,16 @@ import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
 import { detectUnfilledMonths, fillMissingLedgerRates, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
+import ElogiShippingImportPanel from "../components/expenses/ElogiShippingImportPanel";
+import CpassInvoiceImportPanel from "../components/expenses/CpassInvoiceImportPanel";
 import {
-  clearAllReportImportData,
+  clearScopedImportData,
   fetchImportHistory,
   fetchMonthlyImportStatus,
   fetchMonthlyReconciliationSummary,
   reportImportRowHasAlert,
   fetchReportImportClearLog,
-  getReportImportDataCounts,
+  getScopedImportCounts,
   analyzeEbayTaxInvoiceCsv,
   importEbayTaxInvoiceRows,
   importEbayTransactionReport,
@@ -19,36 +21,38 @@ import {
   fetchPayoneerSummaryForMonth,
   parseFinancialStatementXlsx,
   saveFinancialStatementManualEntry,
+  type ClearScope,
   type MonthlyImportStatusRow,
   type MonthlyReconciliationSummary,
   type PlatformImport,
   type ReportImportClearLogEntry,
-  type ReportImportDataCounts,
+  type ScopedClearCounts,
   type TaxInvoiceAnalysis,
 } from "../lib/api/reportImports";
 
 const EBAY_ACCOUNTS = ["soulcamera", "soulmenjapan"];
-
-const CLEAR_REPORT_IMPORT_CONFIRM_PHRASE = "レポート取込データ削除";
 
 const PLATFORM_LABELS: Record<string, string> = {
   ebay_financial_statement: "eBay Financial Statement",
   ebay_tax_invoice: "eBay Tax Invoices",
   ebay_transaction_report: "eBay Transaction Report",
   payoneer_transaction_report: "Payoneer Transaction Report",
+  elogi_shipping: "eLogi送料CSV",
+  cpass_invoice: "CPaSS請求明細",
 };
+
+const CLEAR_SCOPE_DEFS: Array<{ scope: ClearScope; lineLabel: string; extraLabel: string | null }> = [
+  { scope: "ebay_transaction_report", lineLabel: "eBay取引明細", extraLabel: null },
+  { scope: "ebay_tax_invoice", lineLabel: "手数料明細", extraLabel: null },
+  { scope: "payoneer_transaction_report", lineLabel: "Payoneer明細", extraLabel: "月次サマリー" },
+  { scope: "elogi_shipping", lineLabel: "eLogi発送明細", extraLabel: "経費データ(送料)" },
+  { scope: "cpass_invoice", lineLabel: "CPaSS請求明細行", extraLabel: "経費データ(送料)" },
+];
 
 export default function ImportPage() {
   const [history, setHistory] = useState<PlatformImport[]>([]);
   const [reconSummary, setReconSummary] = useState<MonthlyReconciliationSummary[]>([]);
   const [monthlyImportStatus, setMonthlyImportStatus] = useState<MonthlyImportStatusRow[]>([]);
-  const [reportImportCounts, setReportImportCounts] = useState<ReportImportDataCounts | null>(null);
-  const [reportImportCountsLoading, setReportImportCountsLoading] = useState(false);
-  const [reportImportCountsError, setReportImportCountsError] = useState<string | null>(null);
-  const [clearReportImportConfirmText, setClearReportImportConfirmText] = useState("");
-  const [clearingReportImport, setClearingReportImport] = useState(false);
-  const [clearReportImportMessage, setClearReportImportMessage] = useState<string | null>(null);
-  const [clearReportImportError, setClearReportImportError] = useState<string | null>(null);
   const [clearLog, setClearLog] = useState<ReportImportClearLogEntry[]>([]);
 
   async function reloadHistory() {
@@ -69,62 +73,23 @@ export default function ImportPage() {
     }
   }
 
-  async function reloadReportImportCounts() {
-    setReportImportCountsLoading(true);
-    setReportImportCountsError(null);
-    try {
-      setReportImportCounts(await getReportImportDataCounts());
-    } catch (err) {
-      setReportImportCountsError(err instanceof Error ? err.message : "件数の取得に失敗しました");
-    } finally {
-      setReportImportCountsLoading(false);
-    }
-  }
-
   async function reloadClearLog() {
     try {
       setClearLog(await fetchReportImportClearLog());
     } catch {
-      // 全クリア実行履歴の取得失敗は致命的ではないため無視
+      // クリア実行履歴の取得失敗は致命的ではないため無視
     }
+  }
+
+  async function reloadAfterClear() {
+    await reloadHistory();
+    await reloadClearLog();
   }
 
   useEffect(() => {
     void reloadHistory();
-    void reloadReportImportCounts();
     void reloadClearLog();
   }, []);
-
-  async function handleClearReportImportData() {
-    if (clearReportImportConfirmText !== CLEAR_REPORT_IMPORT_CONFIRM_PHRASE) return;
-    const totalCount = reportImportCounts
-      ? reportImportCounts.platformSettlementImports +
-        reportImportCounts.ebayTransactionLines +
-        reportImportCounts.ebayTaxInvoiceLines +
-        reportImportCounts.payoneerTransactions +
-        reportImportCounts.monthlySettlementReconciliations +
-        reportImportCounts.monthlyPayoneerSummary
-      : null;
-    const countText = totalCount != null ? `レポート取込タブのデータ計${totalCount}件` : "レポート取込タブのデータ";
-    if (!window.confirm(`${countText}を完全に削除します。この操作は取り消せません。本当によろしいですか?`)) {
-      return;
-    }
-    setClearingReportImport(true);
-    setClearReportImportError(null);
-    setClearReportImportMessage(null);
-    try {
-      await clearAllReportImportData();
-      setClearReportImportMessage("レポート取込タブのデータを全て削除しました");
-      setClearReportImportConfirmText("");
-      await reloadReportImportCounts();
-      await reloadHistory();
-      await reloadClearLog();
-    } catch (err) {
-      setClearReportImportError(err instanceof Error ? err.message : "削除に失敗しました");
-    } finally {
-      setClearingReportImport(false);
-    }
-  }
 
   function fmtUsd(v: number | null): string {
     return v == null ? "-" : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -253,6 +218,9 @@ export default function ImportPage() {
         </p>
       )}
 
+      <ElogiShippingImportPanel onDataChanged={reloadHistory} />
+      <CpassInvoiceImportPanel onDataChanged={reloadHistory} />
+
       <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 32 }}>取込履歴(直近30件)</h3>
       <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
         <thead>
@@ -281,69 +249,140 @@ export default function ImportPage() {
         <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
           {clearLog.map((c) => (
             <span key={c.id} style={{ display: "block" }}>
-              {new Date(c.cleared_at).toLocaleString("ja-JP")} に「レポート取込データ全クリア」を実行し、
-              {c.records_deleted}件のデータを削除しました。
+              {new Date(c.cleared_at).toLocaleString("ja-JP")} に「
+              {c.scope ? `${PLATFORM_LABELS[c.scope] ?? c.scope} 取込済データのクリア` : "レポート取込データ全クリア"}
+              」を実行し、{c.records_deleted}件のデータを削除しました。
             </span>
           ))}
         </p>
       )}
 
-      <div
-        style={{
-          marginTop: 24,
-          padding: "14px 16px",
-          border: "1px solid var(--danger-text)",
-          borderRadius: 12,
-        }}
-      >
-        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--danger-text)", margin: "0 0 8px" }}>
-          危険な操作: レポート取込データ全クリア
+      <div style={{ marginTop: 24 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--danger-text)", margin: "0 0 4px" }}>
+          危険な操作: 取込済データのクリア
         </p>
         <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          このタブから取込んだデータ(eBay Transaction Report・Tax Invoice・Payoneer明細・月次照合サマリー・取込履歴)を全件削除します。取り消せません。「売上・粗利」タブのeBay自動同期データ(ライブ同期)・売上登録・在庫・仕入・経費データには影響しません。
+          レポート種別ごとに取込済データを個別に削除できます。他の種別のデータ・「売上・粗利」タブのeBay自動同期データ(ライブ同期)・売上登録・在庫・仕入データには影響しません。
         </p>
-        <p style={{ fontSize: 13, margin: "0 0 8px" }}>
-          {reportImportCountsLoading
-            ? "件数を確認中..."
-            : reportImportCounts
-              ? `現在の件数: 取込履歴${reportImportCounts.platformSettlementImports}件 / eBay取引明細${reportImportCounts.ebayTransactionLines}件 / 手数料明細${reportImportCounts.ebayTaxInvoiceLines}件 / Payoneer明細${reportImportCounts.payoneerTransactions}件 / 月次照合${reportImportCounts.monthlySettlementReconciliations}件 / Payoneer月次サマリー${reportImportCounts.monthlyPayoneerSummary}件`
-              : "件数を取得できませんでした"}
-          <button
-            onClick={reloadReportImportCounts}
-            disabled={reportImportCountsLoading}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
-          >
-            再取得
-          </button>
-        </p>
-        {reportImportCountsError && (
-          <p style={{ fontSize: 12, color: "var(--danger-text)", margin: "0 0 8px" }}>{reportImportCountsError}</p>
-        )}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            確認のため「{CLEAR_REPORT_IMPORT_CONFIRM_PHRASE}」と入力してください:
-          </label>
-          <input
-            type="text"
-            value={clearReportImportConfirmText}
-            onChange={(e) => setClearReportImportConfirmText(e.target.value)}
-            style={{ width: 180 }}
+        {CLEAR_SCOPE_DEFS.map((def) => (
+          <ScopedClearSection
+            key={def.scope}
+            scope={def.scope}
+            label={PLATFORM_LABELS[def.scope]}
+            lineLabel={def.lineLabel}
+            extraLabel={def.extraLabel}
+            onCleared={reloadAfterClear}
           />
-          <button
-            onClick={handleClearReportImportData}
-            disabled={clearingReportImport || clearReportImportConfirmText !== CLEAR_REPORT_IMPORT_CONFIRM_PHRASE}
-            style={{ color: "var(--danger-text)", fontWeight: 700 }}
-          >
-            {clearingReportImport ? "削除中..." : "レポート取込データ全クリアを実行"}
-          </button>
-        </div>
-        {clearReportImportMessage && (
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>{clearReportImportMessage}</p>
-        )}
-        {clearReportImportError && (
-          <p style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 8 }}>{clearReportImportError}</p>
-        )}
+        ))}
       </div>
+    </div>
+  );
+}
+
+function ScopedClearSection({
+  scope,
+  label,
+  lineLabel,
+  extraLabel,
+  onCleared,
+}: {
+  scope: ClearScope;
+  label: string;
+  lineLabel: string;
+  extraLabel: string | null;
+  onCleared: () => void;
+}) {
+  const confirmPhrase = `${label}削除`;
+  const [counts, setCounts] = useState<ScopedClearCounts | null>(null);
+  const [countsLoading, setCountsLoading] = useState(false);
+  const [countsError, setCountsError] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [clearing, setClearing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function reloadCounts() {
+    setCountsLoading(true);
+    setCountsError(null);
+    try {
+      setCounts(await getScopedImportCounts(scope));
+    } catch (err) {
+      setCountsError(err instanceof Error ? err.message : "件数の取得に失敗しました");
+    } finally {
+      setCountsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void reloadCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleClear() {
+    if (confirmText !== confirmPhrase) return;
+    const total = counts ? counts.importCount + counts.lineCount + counts.extraCount : null;
+    const countText = total != null ? `${label}のデータ計${total}件` : `${label}のデータ`;
+    if (!window.confirm(`${countText}を完全に削除します。この操作は取り消せません。本当によろしいですか?`)) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await clearScopedImportData(scope);
+      setMessage(`${label}のデータを全て削除しました`);
+      setConfirmText("");
+      await reloadCounts();
+      onCleared();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました");
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--danger-text)", borderRadius: 10 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, color: "var(--danger-text)", margin: "0 0 6px" }}>
+        {label} 取込済データのクリア
+      </p>
+      <p style={{ fontSize: 12, margin: "0 0 8px" }}>
+        {countsLoading
+          ? "件数を確認中..."
+          : counts
+            ? `現在の件数: ${lineLabel}${counts.lineCount}件${counts.importCount ? ` / 取込履歴${counts.importCount}件` : ""}${
+                extraLabel && counts.extraCount ? ` / ${extraLabel}${counts.extraCount}件` : ""
+              }`
+            : "件数を取得できませんでした"}
+        <button
+          onClick={reloadCounts}
+          disabled={countsLoading}
+          style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
+        >
+          再取得
+        </button>
+      </p>
+      {countsError && <p style={{ fontSize: 12, color: "var(--danger-text)", margin: "0 0 8px" }}>{countsError}</p>}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          確認のため「{confirmPhrase}」と入力してください:
+        </label>
+        <input
+          type="text"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          style={{ width: 200 }}
+        />
+        <button
+          onClick={handleClear}
+          disabled={clearing || confirmText !== confirmPhrase}
+          style={{ color: "var(--danger-text)", fontWeight: 700 }}
+        >
+          {clearing ? "削除中..." : `${label}のデータを全クリア`}
+        </button>
+      </div>
+      {message && <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>{message}</p>}
+      {error && <p style={{ fontSize: 12, color: "var(--danger-text)", marginTop: 8 }}>{error}</p>}
     </div>
   );
 }

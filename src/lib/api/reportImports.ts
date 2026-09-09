@@ -829,8 +829,8 @@ export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconc
  * 絞り込み無しで全件表示すると、このレポート取込画面とは無関係なライブ同期のログ行が
  * 「レポート種別: ebay」として大量に混在してしまい、上部の「取込状況」(レポート取込由来の
  * 4種別のみを集計)と矛盾しているように見える不具合があった(ユーザー指摘により発覚)。
- * getReportImportDataCounts()/clearAllReportImportData()と同じREPORT_IMPORT_PLATFORMSで
- * 絞り込み、レポート取込由来の行のみを対象にする。
+ * getScopedImportCounts()/clearScopedImportData()の各platform個別指定とは異なりREPORT_IMPORT_PLATFORMS
+ * (4種別合算)で絞り込み、レポート取込由来の行のみを対象にする。
  */
 export async function fetchImportHistory(): Promise<PlatformImport[]> {
   const { data, error } = await supabase
@@ -852,8 +852,10 @@ export interface MonthlyImportStatusCell {
   imported: boolean;
 }
 
+export type ImportStatusPlatform = Platform | "elogi_shipping" | "cpass_invoice";
+
 export interface MonthlyImportStatusRow {
-  platform: Platform;
+  platform: ImportStatusPlatform;
   account: string | null;
   /**
    * 古い月→新しい月の順。当年1月〜前月まで(2026-09-09修正)。最後の要素が前月。
@@ -866,7 +868,7 @@ export interface MonthlyImportStatusRow {
 }
 
 // 「取込状況」表の行順序。Payoneerのみ2アカウント統合のためaccount=null。
-const IMPORT_STATUS_ROW_DEFS: Array<{ platform: Platform; account: string | null }> = [
+const IMPORT_STATUS_ROW_DEFS: Array<{ platform: ImportStatusPlatform; account: string | null }> = [
   { platform: "ebay_transaction_report", account: "soulcamera" },
   { platform: "ebay_transaction_report", account: "soulmenjapan" },
   { platform: "ebay_tax_invoice", account: "soulcamera" },
@@ -874,6 +876,10 @@ const IMPORT_STATUS_ROW_DEFS: Array<{ platform: Platform; account: string | null
   { platform: "ebay_financial_statement", account: "soulcamera" },
   { platform: "ebay_financial_statement", account: "soulmenjapan" },
   { platform: "payoneer_transaction_report", account: null },
+  // 2026-09-10追加(ユーザー指示): eLogi送料CSV・CPaSS請求明細取込を経費タブから本タブへ移設。
+  // どちらも2アカウント統合(account=null)。
+  { platform: "elogi_shipping", account: null },
+  { platform: "cpass_invoice", account: null },
 ];
 
 function lastDayOfMonthNum(year: number, month1based: number): number {
@@ -918,6 +924,24 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
     .select("year_month, ebay_account, ebay_closing_funds_usd");
   if (reconErr) throw reconErr;
 
+  // 2026-09-10追加(ユーザー指示): eLogi送料CSV・CPaSS請求明細取込は platform_settlement_imports を
+  // 使わない設計(経費として直接expensesに計上、下記各セクション参照)のため、明細テーブル自身の
+  // 日付列(elogi_shipments.label_print_date / cpass_invoice_charges.invoice_period_end)が対象月内に
+  // 1件でもあれば「済」とみなす。
+  const { data: elogiRows, error: elogiErr } = await supabase.from("elogi_shipments").select("label_print_date");
+  if (elogiErr) throw elogiErr;
+  const elogiDates = (elogiRows ?? [])
+    .map((r) => r.label_print_date as string | null)
+    .filter((d): d is string => !!d);
+
+  const { data: cpassRows, error: cpassErr } = await supabase
+    .from("cpass_invoice_charges")
+    .select("invoice_period_end");
+  if (cpassErr) throw cpassErr;
+  const cpassDates = (cpassRows ?? [])
+    .map((r) => r.invoice_period_end as string | null)
+    .filter((d): d is string => !!d);
+
   const typedImportRows = (importRows ?? []) as Array<{
     platform: Platform;
     ebay_account: string | null;
@@ -942,19 +966,26 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
     return { start: `${ym}-01`, end: `${ym}-${String(lastDayOfMonthNum(y, m)).padStart(2, "0")}` };
   }
 
-  function isImported(platform: Platform, account: string | null, ym: string): boolean {
+  function isImported(platform: ImportStatusPlatform, account: string | null, ym: string): boolean {
     const { start, end } = monthBounds(ym);
-    return platform === "ebay_financial_statement"
-      ? typedReconRows.some(
-          (r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym && r.ebay_closing_funds_usd != null,
-        )
-      : typedImportRows.some(
-          (r) =>
-            r.platform === platform &&
-            (account === null || r.ebay_account === account) &&
-            r.period_start <= end &&
-            r.period_end >= start,
-        );
+    if (platform === "ebay_financial_statement") {
+      return typedReconRows.some(
+        (r) => r.ebay_account === account && r.year_month.slice(0, 7) === ym && r.ebay_closing_funds_usd != null,
+      );
+    }
+    if (platform === "elogi_shipping") {
+      return elogiDates.some((d) => d >= start && d <= end);
+    }
+    if (platform === "cpass_invoice") {
+      return cpassDates.some((d) => d >= start && d <= end);
+    }
+    return typedImportRows.some(
+      (r) =>
+        r.platform === platform &&
+        (account === null || r.ebay_account === account) &&
+        r.period_start <= end &&
+        r.period_end >= start,
+    );
   }
 
   return IMPORT_STATUS_ROW_DEFS.map(({ platform, account }) => ({
@@ -983,108 +1014,109 @@ export function reportImportRowHasAlert(row: MonthlyImportStatusRow, today: Date
 
 const ZERO_UUID_REPORT = "00000000-0000-0000-0000-000000000000";
 
-export interface ReportImportDataCounts {
-  platformSettlementImports: number;
-  ebayTransactionLines: number;
-  ebayTaxInvoiceLines: number;
-  payoneerTransactions: number;
-  monthlySettlementReconciliations: number;
-  monthlyPayoneerSummary: number;
+export type ClearScope =
+  | "ebay_transaction_report"
+  | "ebay_tax_invoice"
+  | "payoneer_transaction_report"
+  | "elogi_shipping"
+  | "cpass_invoice";
+
+const CLEAR_SCOPE_LINE_TABLE: Record<ClearScope, string> = {
+  ebay_transaction_report: "ebay_transaction_lines",
+  ebay_tax_invoice: "ebay_tax_invoice_lines",
+  payoneer_transaction_report: "payoneer_transactions",
+  elogi_shipping: "elogi_shipments",
+  cpass_invoice: "cpass_invoice_charges",
+};
+
+const CLEAR_SCOPE_EXPENSE_SOURCE: Partial<Record<ClearScope, string>> = {
+  elogi_shipping: "elogi_import",
+  cpass_invoice: "cpass_invoice_import",
+};
+
+export interface ScopedClearCounts {
+  importCount: number;
+  lineCount: number;
+  extraCount: number;
 }
 
 /**
- * 「レポート取込」画面(ImportPage.tsx)経由で登録されたデータの件数をまとめて取得する。
- * 危険な操作(全クリア)の確認表示用。
+ * レポート種別ごとの取込済データ件数を取得する(危険な操作: 個別クリアの確認表示用、2026-09-10、
+ * 旧getReportImportDataCountsを分割)。
  *
- * 注意: ebay_transaction_lines・ebay_tax_invoice_lines・platform_settlement_importsは、
- * 「売上・粗利」タブのeBayライブ同期機能(ebay-sync-orders Edge Function、
- * platform_settlement_imports.platform='ebay')とも共有しているテーブルのため、
- * レポート取込由来の行(platform IN ebay_financial_statement/ebay_tax_invoice/
- * ebay_transaction_report/payoneer_transaction_report のimport_idを持つ行)のみを対象に
- * カウントする。ライブ同期由来の行(platform='ebay')は対象外(売上・粗利タブ側の機能)。
- * monthly_settlement_reconciliations・monthly_payoneer_summaryはレポート取込専用テーブルの
- * ため全件が対象。
+ * monthly_settlement_reconciliationsはeBay Transaction Report・eBay Tax Invoice・
+ * eBay Financial Statementの3種で列を共有しているため、個別クリアの対象からは意図的に除外している
+ * (他種別の値まで巻き込んで消してしまう事故を避けるため。詳細はclearScopedImportDataのコメント参照)。
  */
-export async function getReportImportDataCounts(): Promise<ReportImportDataCounts> {
-  const importsRes = await supabase
-    .from("platform_settlement_imports")
-    .select("id")
-    .in("platform", REPORT_IMPORT_PLATFORMS);
+export async function getScopedImportCounts(scope: ClearScope): Promise<ScopedClearCounts> {
+  const lineTable = CLEAR_SCOPE_LINE_TABLE[scope];
+  const expenseSource = CLEAR_SCOPE_EXPENSE_SOURCE[scope];
+
+  if (expenseSource) {
+    const [lineRes, expenseRes] = await Promise.all([
+      supabase.from(lineTable).select("id", { count: "exact", head: true }),
+      supabase.from("expenses").select("id", { count: "exact", head: true }).eq("source", expenseSource),
+    ]);
+    if (lineRes.error) throw lineRes.error;
+    if (expenseRes.error) throw expenseRes.error;
+    return { importCount: 0, lineCount: lineRes.count ?? 0, extraCount: expenseRes.count ?? 0 };
+  }
+
+  const importsRes = await supabase.from("platform_settlement_imports").select("id").eq("platform", scope as Platform);
   if (importsRes.error) throw importsRes.error;
   const importIds = (importsRes.data ?? []).map((r) => r.id as string);
 
-  const zeroCount = { count: 0, error: null as null };
-  const [ebayTransactionLines, ebayTaxInvoiceLines, payoneerTransactions, monthlySettlementReconciliations, monthlyPayoneerSummary] =
-    await Promise.all([
-      importIds.length
-        ? supabase.from("ebay_transaction_lines").select("id", { count: "exact", head: true }).in("import_id", importIds)
-        : Promise.resolve(zeroCount),
-      importIds.length
-        ? supabase.from("ebay_tax_invoice_lines").select("id", { count: "exact", head: true }).in("import_id", importIds)
-        : Promise.resolve(zeroCount),
-      importIds.length
-        ? supabase.from("payoneer_transactions").select("id", { count: "exact", head: true }).in("import_id", importIds)
-        : Promise.resolve(zeroCount),
-      supabase.from("monthly_settlement_reconciliations").select("id", { count: "exact", head: true }),
-      supabase.from("monthly_payoneer_summary").select("id", { count: "exact", head: true }),
-    ]);
-  for (const r of [ebayTransactionLines, ebayTaxInvoiceLines, payoneerTransactions, monthlySettlementReconciliations, monthlyPayoneerSummary]) {
-    if (r.error) throw r.error;
+  const lineRes = importIds.length
+    ? await supabase.from(lineTable).select("id", { count: "exact", head: true }).in("import_id", importIds)
+    : { count: 0, error: null as null };
+  if (lineRes.error) throw lineRes.error;
+
+  let extraCount = 0;
+  if (scope === "payoneer_transaction_report") {
+    const summaryRes = await supabase.from("monthly_payoneer_summary").select("id", { count: "exact", head: true });
+    if (summaryRes.error) throw summaryRes.error;
+    extraCount = summaryRes.count ?? 0;
   }
-  return {
-    platformSettlementImports: importIds.length,
-    ebayTransactionLines: ebayTransactionLines.count ?? 0,
-    ebayTaxInvoiceLines: ebayTaxInvoiceLines.count ?? 0,
-    payoneerTransactions: payoneerTransactions.count ?? 0,
-    monthlySettlementReconciliations: monthlySettlementReconciliations.count ?? 0,
-    monthlyPayoneerSummary: monthlyPayoneerSummary.count ?? 0,
-  };
+
+  return { importCount: importIds.length, lineCount: lineRes.count ?? 0, extraCount };
 }
 
 /**
- * 「レポート取込」画面経由で登録されたデータを全件削除する(2026-08-31追加)。
- * 対象: platform_settlement_imports(レポート取込由来のplatformのみ)・ebay_transaction_lines・
- * ebay_tax_invoice_lines・payoneer_transactions(いずれもレポート取込由来のimport_idの行のみ、
- * platform_settlement_importsの削除にON DELETE CASCADEで連動)・monthly_settlement_reconciliations・
- * monthly_payoneer_summary(全件、レポート取込専用テーブル)。
+ * レポート種別ごとに取込済データを削除する(2026-09-10、ユーザー指示により旧・単一の
+ * clearAllReportImportData(「レポート取込データ全クリア」1ボタン)を種別ごとの個別クリアへ分割。
+ * あわせてeLogi送料CSV・CPaSS請求明細取込も対象に追加(経費タブから本タブへ移設したのに合わせて、
+ * 経費タブ「経費データ全クリア」側からは除外した。expenses.ts clearAllExpenses参照)。
  *
- * 「売上・粗利」タブのeBayライブ同期データ(platform='ebay'、type='SALE'の行)・売上登録(sales)・
- * CPaSS配送実績(cpass_shipments)には一切影響しない(別スコープ、あちらは「危険な操作: 売上・粗利
- * データ全クリア」機能を参照)。
- *
- * 削除順序に注意: monthly_payoneer_summary.import_id が platform_settlement_imports を参照して
- * おり(削除ルールNO ACTION)、先にmonthly_payoneer_summaryを削除する必要がある。
- * ebay_transaction_lines/ebay_tax_invoice_lines/payoneer_transactionsはON DELETE CASCADEのため、
- * platform_settlement_imports側(レポート取込由来分のみ)を削除すれば自動的に連動削除される。
+ * monthly_settlement_reconciliationsは意図的に対象外: この1テーブルをeBay Transaction Report・
+ * eBay Tax Invoice・eBay Financial Statementの3種が列を共有しており(ebay_payout_usdは特に
+ * Transaction ReportとFinancial Statementの両方が書き込む)、どの列がどの種別の最新値かを
+ * 安全に切り分けられないため、他種別のデータまで巻き込んで消してしまう恐れがある。
+ * 月次照合サマリーへの反映は再取込時の上書きに任せる。
  */
-export async function clearAllReportImportData(): Promise<void> {
-  // 2026-09-08追加: 削除前に対象件数を数えておき、削除後にreport_import_clear_logへ1件記録する。
-  // 全クリア後は取込履歴が空になり「一度も取込んでいない」のか「取込んだが全クリアした」のか
-  // 画面から区別できなくなってしまうため(ユーザー指摘)、実行日時と削除件数を残す。
-  const counts = await getReportImportDataCounts();
-  const totalDeleted =
-    counts.platformSettlementImports +
-    counts.ebayTransactionLines +
-    counts.ebayTaxInvoiceLines +
-    counts.payoneerTransactions +
-    counts.monthlySettlementReconciliations +
-    counts.monthlyPayoneerSummary;
+export async function clearScopedImportData(scope: ClearScope): Promise<void> {
+  const counts = await getScopedImportCounts(scope);
+  const totalDeleted = counts.importCount + counts.lineCount + counts.extraCount;
 
-  const summaryDel = await supabase.from("monthly_payoneer_summary").delete().neq("id", ZERO_UUID_REPORT);
-  if (summaryDel.error) throw summaryDel.error;
+  const lineTable = CLEAR_SCOPE_LINE_TABLE[scope];
+  const expenseSource = CLEAR_SCOPE_EXPENSE_SOURCE[scope];
 
-  const reconDel = await supabase.from("monthly_settlement_reconciliations").delete().neq("id", ZERO_UUID_REPORT);
-  if (reconDel.error) throw reconDel.error;
+  if (expenseSource) {
+    const lineDel = await supabase.from(lineTable).delete().neq("id", ZERO_UUID_REPORT);
+    if (lineDel.error) throw lineDel.error;
+    const expenseDel = await supabase.from("expenses").delete().eq("source", expenseSource);
+    if (expenseDel.error) throw expenseDel.error;
+  } else {
+    if (scope === "payoneer_transaction_report") {
+      const summaryDel = await supabase.from("monthly_payoneer_summary").delete().neq("id", ZERO_UUID_REPORT);
+      if (summaryDel.error) throw summaryDel.error;
+    }
+    const importsDel = await supabase.from("platform_settlement_imports").delete().eq("platform", scope as Platform);
+    if (importsDel.error) throw importsDel.error;
+  }
 
-  const importsDel = await supabase
-    .from("platform_settlement_imports")
-    .delete()
-    .in("platform", REPORT_IMPORT_PLATFORMS);
-  if (importsDel.error) throw importsDel.error;
-
-  const logErr = (await supabase.from("report_import_clear_log").insert({ records_deleted: totalDeleted })).error;
+  const logErr = (await supabase.from("report_import_clear_log").insert({ records_deleted: totalDeleted, scope }))
+    .error;
   if (logErr) {
-    // 全クリア自体は既に成功しているため、記録の失敗でユーザー操作を失敗扱いにはしない。
     console.warn("report_import_clear_logへの記録に失敗しました:", logErr);
   }
 }
@@ -1093,9 +1125,10 @@ export interface ReportImportClearLogEntry {
   id: string;
   cleared_at: string;
   records_deleted: number;
+  scope: ClearScope | null;
 }
 
-/** 「レポート取込データ全クリア」の実行履歴(直近10件)を取得する(2026-09-08追加)。 */
+/** レポート種別ごとの「取込済データのクリア」実行履歴(直近10件、全種別合算)を取得する。 */
 export async function fetchReportImportClearLog(): Promise<ReportImportClearLogEntry[]> {
   const { data, error } = await supabase
     .from("report_import_clear_log")

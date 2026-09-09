@@ -113,16 +113,30 @@ export async function deleteExpense(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// 2026-09-10修正(ユーザー指示): eLogi送料CSV・CPaSS請求明細取込のデータは「経費」タブから
+// 「レポート取込」タブへ移設したため、そちらの個別クリア機能(reportImports.ts の
+// clearScopedImportData)の対象とし、この経費タブの件数・全クリアからは除外する
+// (source='elogi_import'/'cpass_invoice_import'の行は対象外)。
 export async function getExpensesCount(): Promise<number> {
-  const { count, error } = await supabase.from("expenses").select("id", { count: "exact", head: true });
+  const { count, error } = await supabase
+    .from("expenses")
+    .select("id", { count: "exact", head: true })
+    .neq("source", "elogi_import")
+    .neq("source", "cpass_invoice_import");
   if (error) throw error;
   return count ?? 0;
 }
 
 const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
-/** expensesテーブルの全レコードを削除する(在庫・仕入・売上データには影響しない)。 */
+/** expensesテーブルのレコードを削除する(在庫・仕入・売上データには影響しない)。
+ *  eLogi送料CSV・CPaSS請求明細取込由来の行は対象外(上記コメント参照。「レポート取込」タブから削除)。 */
 export async function clearAllExpenses(): Promise<void> {
-  const { error } = await supabase.from("expenses").delete().neq("id", ZERO_UUID);
+  const { error } = await supabase
+    .from("expenses")
+    .delete()
+    .neq("id", ZERO_UUID)
+    .neq("source", "elogi_import")
+    .neq("source", "cpass_invoice_import");
   if (error) throw error;
 }

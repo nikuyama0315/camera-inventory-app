@@ -19,8 +19,6 @@ import {
 } from "../../lib/api/expenseExcelImport";
 import { parseCsv, buildBackupRawRows, mapBackupRow } from "../../lib/api/expenseBackupRestore";
 import { TAX_CATEGORY_OPTIONS, type TaxCategory } from "../../lib/api/expenses";
-import ElogiShippingImportPanel from "./ElogiShippingImportPanel";
-import CpassInvoiceImportPanel from "./CpassInvoiceImportPanel";
 
 /**
  * 経費タブの「データ管理」サブタブ: エクセル一括取込・登録データバックアップ・
@@ -828,9 +826,6 @@ export default function ExpensesDataManagementPanel({ onDataChanged }: ExpensesD
           )}
         </div>
 
-        <ElogiShippingImportPanel onDataChanged={onDataChanged} />
-        <CpassInvoiceImportPanel onDataChanged={onDataChanged} />
-
         <div
           style={{
             marginTop: 24,
@@ -844,6 +839,7 @@ export default function ExpensesDataManagementPanel({ onDataChanged }: ExpensesD
           </p>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 8px" }}>
             経費データ(手動登録・エクセル取込を問わず全て)を全件削除します。取り消せません。在庫・仕入・売上データには影響しません。
+            eLogi送料CSV・CPaSS請求明細取込のデータは対象外です(「レポート取込」タブから削除してください)。
           </p>
           <p style={{ fontSize: 13, margin: "0 0 8px" }}>
             {expensesCountLoading
