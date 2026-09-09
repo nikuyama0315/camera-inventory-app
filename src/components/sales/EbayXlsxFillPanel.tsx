@@ -5,6 +5,8 @@ import { lookupEbayOrdersLive } from "../../lib/api/ebaySync";
 // テンプレート「利益管理表」の実データ範囲(既存の数式がF13:F302等を参照しているのに合わせる)
 const DATA_START_ROW = 13;
 const DATA_MAX_ROW = 1000;
+const TEMPLATE_URL = "/profit_management_template.xlsx";
+const TEMPLATE_SHEET_NAME = "Template";
 
 type RowFillStatus = "filled" | "warning" | "not_found" | "no_empty_row";
 
@@ -85,8 +87,6 @@ function parseSkuDate(sku: string, startIndex0Based: number): Date | null {
 }
 
 export default function EbayXlsxFillPanel() {
-  const [file, setFile] = useState<File | null>(null);
-  const [sheetName, setSheetName] = useState("");
   const [orderNos, setOrderNos] = useState<string[]>([""]);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -108,14 +108,6 @@ export default function EbayXlsxFillPanel() {
     setResults(null);
     setValueResults(null);
 
-    if (!file) {
-      setErrorMessage("エクセルファイルを選択してください");
-      return;
-    }
-    if (!sheetName.trim()) {
-      setErrorMessage("シート名を入力してください");
-      return;
-    }
     const targetOrderNos = orderNos.map((v) => v.trim()).filter((v) => v.length > 0);
     if (targetOrderNos.length === 0) {
       setErrorMessage("Order Noを1件以上入力してください");
@@ -124,14 +116,14 @@ export default function EbayXlsxFillPanel() {
 
     setBusy(true);
     try {
-      const buffer = await file.arrayBuffer();
+      const buffer = await fetch(TEMPLATE_URL).then((res) => res.arrayBuffer());
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);
-      const ws = workbook.getWorksheet(sheetName.trim());
+      const ws = workbook.getWorksheet(TEMPLATE_SHEET_NAME);
       if (!ws) {
         const available = workbook.worksheets.map((s) => s.name).join(", ");
         throw new Error(
-          `シート「${sheetName.trim()}」が見つかりません(このファイルのシート一覧: ${available})`,
+          `シート「${TEMPLATE_SHEET_NAME}」が見つかりません(このファイルのシート一覧: ${available})`,
         );
       }
 
@@ -264,7 +256,7 @@ export default function EbayXlsxFillPanel() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = file.name.replace(/\.xlsx$/i, "") + "_更新済み.xlsx";
+        a.download = "利益管理票_更新済み.xlsx";
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -279,47 +271,18 @@ export default function EbayXlsxFillPanel() {
     <div
       style={{
         marginTop: 24,
+        marginBottom: 24,
         padding: "14px 16px",
         border: "0.5px solid var(--border)",
         borderRadius: 12,
       }}
     >
-      <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>利益管理票の更新</p>
+      <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>利益管理票更新用データの作成</p>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
-        エクセルファイルをアップロードし、シート名とOrder No(eBay注文番号)を指定すると、eBay(soulcameraアカウント)からその場でAPI取得した売上データを、指定シート内のまだ入力されていない行(C列が空欄の行)に上から順に自動入力し、ダウンロードを促します。
+        Order No(eBay注文番号)を指定すると、eBay(soulcameraアカウント)からその場でAPI取得した売上データを、テンプレートのまだ入力されていない行(C列が空欄の行)に上から順に自動入力し、ダウンロードを促します。
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div>
-            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              エクセルファイル(.xlsx)
-            </label>
-            <input
-              type="file"
-              accept=".xlsx"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setResults(null);
-                setErrorMessage(null);
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              編集対象のシート名
-            </label>
-            <input
-              type="text"
-              value={sheetName}
-              onChange={(e) => setSheetName(e.target.value)}
-              placeholder="例: 2026.9(商品)"
-              style={{ width: 220 }}
-            />
-          </div>
-        </div>
-
         <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>
           <div>
             <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>

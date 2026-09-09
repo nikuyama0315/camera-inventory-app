@@ -51,11 +51,20 @@ async function createImportRow(
 
 // SKU(Custom Label)の最初の"-"より前の部分(大文字化)をitems.management_noの同部分と突合する。
 // ebay-sync-orders Edge Functionのロジックと同じ考え方(参考候補程度の緩いヒューリスティック)。
+//
+// 2026-09-09追加(ユーザー指示): レポート側(CSVのCustom Label)の当該部分が「2026mmdd」のような
+// 西暦4桁+MMDDの8桁形式の場合、items.management_noの体系(YYMMDD、6桁、例:260825)に合わせて
+// 先頭の"20"を除いた「26mmdd」形式に変換してから突合する。management_no側はこの8桁形式には
+// ならないため(常に6桁のYYMMDD形式)、この変換はレポート側の値にのみ実質的に作用する。
 function skuMatchKey(sku: string | null | undefined): string | null {
   if (!sku) return null;
   const trimmed = sku.trim();
   if (!trimmed) return null;
-  return trimmed.split("-")[0].trim().toUpperCase();
+  let key = trimmed.split("-")[0].trim().toUpperCase();
+  if (/^20\d{6}$/.test(key)) {
+    key = key.slice(2);
+  }
+  return key;
 }
 
 async function buildItemMatchIndex(): Promise<Map<string, string[]>> {
