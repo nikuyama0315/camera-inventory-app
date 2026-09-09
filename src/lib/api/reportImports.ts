@@ -744,34 +744,48 @@ export async function fetchPayoneerSummaryForMonth(
   };
 }
 
+/**
+ * 2026-09-09修正(ユーザー指摘: 「円建てが引き続き表示されていません」): 以前はebay_payout_jpy
+ * (Transaction Report取込時点でmonthly_exchange_ratesにレートが保存されていないと記録されない)
+ * ・monthly_payoneer_summary.ttm_rate(Payoneer取込時点のレート)という、取込時点で固定された
+ * レートに依存していたため、レートを後から保存してもいつまでも円建てが空欄のままになる問題が
+ * あった。ここではmonthly_exchange_rates(月次為替レート機能で保存された「現時点で分かっている
+ * その月のレート」)を都度取得し、USD建ての値からその場で円建てを計算する方式に変更した。
+ * これにより、レートの保存タイミングに関わらず、レートさえ保存されていれば円建てが表示される。
+ */
 export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconciliationSummary[]> {
   const { data: reconRows, error: reconErr } = await supabase
     .from("monthly_settlement_reconciliations")
-    .select("year_month, ebay_payout_usd, ebay_payout_jpy");
+    .select("year_month, ebay_payout_usd");
   if (reconErr) throw reconErr;
 
   const { data: payoneerRows, error: payoneerErr } = await supabase
     .from("monthly_payoneer_summary")
-    .select("year_month, credit_amount_total, ttm_rate");
+    .select("year_month, credit_amount_total");
   if (payoneerErr) throw payoneerErr;
 
-  const byMonth = new Map<string, { payoutUsd: number; payoutJpy: number; anyJpy: boolean }>();
+  const { data: rateRows, error: rateErr } = await supabase
+    .from("monthly_exchange_rates")
+    .select("year_month, rate");
+  if (rateErr) throw rateErr;
+
+  const rateByMonth = new Map<string, number>();
+  for (const r of rateRows ?? []) {
+    rateByMonth.set(r.year_month as string, r.rate as number);
+  }
+
+  const byMonth = new Map<string, { payoutUsd: number }>();
   for (const r of reconRows ?? []) {
     const ym = r.year_month as string;
-    const entry = byMonth.get(ym) ?? { payoutUsd: 0, payoutJpy: 0, anyJpy: false };
+    const entry = byMonth.get(ym) ?? { payoutUsd: 0 };
     entry.payoutUsd += (r.ebay_payout_usd as number | null) ?? 0;
-    if (r.ebay_payout_jpy != null) {
-      entry.payoutJpy += r.ebay_payout_jpy as number;
-      entry.anyJpy = true;
-    }
     byMonth.set(ym, entry);
   }
 
-  const payoneerByMonth = new Map<string, { creditUsd: number; ttmRate: number | null }>();
+  const payoneerByMonth = new Map<string, { creditUsd: number }>();
   for (const r of payoneerRows ?? []) {
     payoneerByMonth.set(r.year_month as string, {
       creditUsd: (r.credit_amount_total as number | null) ?? 0,
-      ttmRate: (r.ttm_rate as number | null) ?? null,
     });
   }
 
@@ -782,10 +796,11 @@ export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconc
     .map((ym) => {
       const recon = byMonth.get(ym);
       const payoneer = payoneerByMonth.get(ym);
+      const rate = rateByMonth.get(ym) ?? null;
       const payoutUsdTotal = recon ? recon.payoutUsd : null;
-      const payoutJpyTotal = recon && recon.anyJpy ? recon.payoutJpy : null;
+      const payoutJpyTotal = payoutUsdTotal != null && rate != null ? payoutUsdTotal * rate : null;
       const creditUsd = payoneer ? payoneer.creditUsd : null;
-      const creditJpy = payoneer && payoneer.ttmRate != null ? payoneer.creditUsd * payoneer.ttmRate : null;
+      const creditJpy = creditUsd != null && rate != null ? creditUsd * rate : null;
       const feeJpy = payoutJpyTotal != null && creditJpy != null ? payoutJpyTotal + creditJpy : null;
       const feeUsd = payoutUsdTotal != null && creditUsd != null ? payoutUsdTotal + creditUsd : null;
       return {
