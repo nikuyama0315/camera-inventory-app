@@ -333,14 +333,53 @@ async function lookupFxRatesFromTransactionLines(orderNumbers: string[]): Promis
   return rateMap;
 }
 
+/**
+ * 2026-09-09追加(ユーザー指示): 同一注文番号での自動取得(lookupFxRatesFromTransactionLines)が
+ * できなかった行について、次善の候補として「同じ日付・同じ通貨」のebay_transaction_lines行から
+ * レートを取得する(eBayは同じ日の同じ通貨換算には基本的に同一レートを使うため)。注文番号一致と同様、
+ * 行ごとに自動で適用する(通貨単位で一律の値を使うのではなく、行ごとの実際の取引日に対応するレートを
+ * 使うため、同じ通貨でも日付が異なれば異なるレートが適用され得る)。この2段階(注文番号→同日)の
+ * どちらでも見つからなかった行がある通貨だけが、引き続き手動レート入力を必要とする。
+ */
+async function lookupFxRatesByDate(dates: (string | null)[]): Promise<Map<string, number>> {
+  const uniqueDates = Array.from(new Set(dates.filter((v): v is string => Boolean(v))));
+  const rateMap = new Map<string, number>();
+  if (uniqueDates.length === 0) return rateMap;
+  const CHUNK = 200;
+  for (let i = 0; i < uniqueDates.length; i += CHUNK) {
+    const chunk = uniqueDates.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from("ebay_transaction_lines")
+      .select("transaction_date, transaction_currency, exchange_rate")
+      .in("transaction_date", chunk);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const r = row as {
+        transaction_date: string | null;
+        transaction_currency: string | null;
+        exchange_rate: number | null;
+      };
+      if (!r.transaction_date || !r.transaction_currency || r.exchange_rate == null) continue;
+      const key = `${r.transaction_date}::${r.transaction_currency.toUpperCase()}`;
+      if (!rateMap.has(key)) rateMap.set(key, r.exchange_rate);
+    }
+  }
+  return rateMap;
+}
+
 export interface TaxInvoiceAnalysis {
   rows: TaxInvoiceRawRow[];
   /** 通貨コードごとの非USD行数(自動取得できたかどうかに関わらず、内訳表示用) */
   currencyCounts: Record<string, number>;
-  /** 自動取得できなかった通貨の一覧(手動レート入力が必要) */
+  /** 注文番号一致・同日一致のどちらでも自動取得できなかった通貨の一覧(手動レート入力が必要) */
   unresolvedCurrencies: string[];
-  /** 自動取得できたレート("注文番号::通貨" -> レート)。取込実行時にそのまま再利用する。 */
+  /** 注文番号一致で自動取得できたレート("注文番号::通貨" -> レート)。取込実行時にそのまま再利用する。 */
   resolvedRates: Record<string, number>;
+  /**
+   * 2026-09-09追加: 同日一致で自動取得できたレート("日付::通貨" -> レート、日付はYYYY-MM-DD)。
+   * resolvedRatesで解決できなかった行のフォールバックとして、行ごとの実際の取引日で突合する。
+   */
+  dateResolvedRates: Record<string, number>;
 }
 
 /**
@@ -357,14 +396,20 @@ export async function analyzeEbayTaxInvoiceCsv(csv: ParsedCsv): Promise<TaxInvoi
 
   const nonUsdRows = validRows.filter((r) => r.currency.toUpperCase() !== "USD");
   const rateMap = await lookupFxRatesFromTransactionLines(nonUsdRows.map((r) => r.order_number ?? ""));
+  // 2026-09-09追加: 注文番号一致で解決できない行のフォールバックとして、同日一致のレートも取得しておく
+  // (上記コメント参照)。
+  const dateRateMap = await lookupFxRatesByDate(nonUsdRows.map((r) => r.line_date));
 
   const currencyCounts: Record<string, number> = {};
   const unresolvedCurrencies = new Set<string>();
   for (const r of nonUsdRows) {
     const currency = r.currency.toUpperCase();
     currencyCounts[currency] = (currencyCounts[currency] ?? 0) + 1;
-    const key = `${r.order_number ?? ""}::${currency}`;
-    if (!rateMap.has(key)) unresolvedCurrencies.add(currency);
+    const orderKey = `${r.order_number ?? ""}::${currency}`;
+    const dateKey = `${r.line_date ?? ""}::${currency}`;
+    if (!rateMap.has(orderKey) && !dateRateMap.has(dateKey)) {
+      unresolvedCurrencies.add(currency);
+    }
   }
 
   return {
@@ -372,15 +417,18 @@ export async function analyzeEbayTaxInvoiceCsv(csv: ParsedCsv): Promise<TaxInvoi
     currencyCounts,
     unresolvedCurrencies: Array.from(unresolvedCurrencies).sort(),
     resolvedRates: Object.fromEntries(rateMap),
+    dateResolvedRates: Object.fromEntries(dateRateMap),
   };
 }
 
 /**
- * analyzeEbayTaxInvoiceCsvの結果を実際に取り込む。非USD行のUSD換算レートは、
- * ①ebay_transaction_linesから自動取得できたレート(resolvedRates)を最優先、
- * ②取得できなかった通貨についてはmanualRatesByCurrency(UIで手動入力された、
- *   その通貨からUSDへの実際のレート)をフォールバックとして使用する。
- * どちらも無い場合は換算せず原数値のまま保存し、警告として返す(要目視確認)。
+ * analyzeEbayTaxInvoiceCsvの結果を実際に取り込む。非USD行のUSD換算レートは、行ごとに
+ * ①ebay_transaction_linesから注文番号一致で自動取得できたレート(resolvedRates)、
+ * ②同じく同日一致で自動取得できたレート(dateResolvedRates、2026-09-09追加。
+ *   同じ通貨でも行(取引日)ごとに別々の値が使われ得る)、
+ * ③どちらも無い場合はmanualRatesByCurrency(UIで手動入力された、その通貨からUSDへの
+ *   実際のレート。①②で解決できなかった行にのみ適用される)、の優先順で使用する。
+ * それでも無い場合は換算せず原数値のまま保存し、警告として返す(要目視確認)。
  */
 export async function importEbayTaxInvoiceRows(
   analysis: TaxInvoiceAnalysis,
@@ -389,6 +437,7 @@ export async function importEbayTaxInvoiceRows(
   manualRatesByCurrency: Record<string, number>,
 ): Promise<EbayTransactionImportResult & { unconvertedWarnings: string[] }> {
   const resolvedRates = new Map(Object.entries(analysis.resolvedRates));
+  const dateResolvedRates = new Map(Object.entries(analysis.dateResolvedRates));
   const unconvertedWarnings: string[] = [];
 
   const validRows = analysis.rows.map((r) => {
@@ -397,8 +446,9 @@ export async function importEbayTaxInvoiceRows(
     let rateUsed: number | null = null;
     let netAmountUsd = r.net_amount;
     if (!isUsd) {
-      const autoKey = `${r.order_number ?? ""}::${currency}`;
-      rateUsed = resolvedRates.get(autoKey) ?? manualRatesByCurrency[currency] ?? null;
+      const orderKey = `${r.order_number ?? ""}::${currency}`;
+      const dateKey = `${r.line_date ?? ""}::${currency}`;
+      rateUsed = resolvedRates.get(orderKey) ?? dateResolvedRates.get(dateKey) ?? manualRatesByCurrency[currency] ?? null;
       if (rateUsed != null) {
         netAmountUsd = r.net_amount * rateUsed;
       } else {
