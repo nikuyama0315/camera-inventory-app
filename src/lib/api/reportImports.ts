@@ -691,6 +691,35 @@ export interface MonthlyReconciliationSummary {
  * 対象年月のデータが無ければnullを返す(呼び出し側は「先にPayoneerレポートを取り込んでください」
  * という趣旨のエラーにする)。
  */
+/**
+ * 2026-09-09追加(ユーザー指示): 月次売掛金Excel更新機能で、eBay Financial Statementを変換した
+ * Excelファイルを都度アップロードし直すのではなく、既に上部のeBay Financial Statement欄で
+ * 解析・保存済みのmonthly_settlement_reconciliations(ebay_payout_usd・ebay_closing_funds_usd)を
+ * 再利用する(ユーザー指摘: 「既に取り込んだものを使えるのでは？」)。
+ * ebay_payout_usdはTransaction Report取込でも書き込まれる共有カラムのため(取込状況の
+ * Financial Statement済/未判定で対応済みの問題と同じ)、ebay_closing_funds_usdが入力済み
+ * (null以外、Financial Statementの保存からしか書き込まれない)の場合のみ、本当にFinancial
+ * Statementが保存済みとみなして値を返す。未保存ならnullを返す(呼び出し側は「先に上部で
+ * 保存してください」という趣旨のエラーにする)。
+ */
+export async function fetchFinancialStatementForMonth(
+  ebayAccount: string,
+  yearMonth: string, // "YYYY-MM"
+): Promise<{ payoutUsd: number; closingFundsUsd: number } | null> {
+  const { data, error } = await supabase
+    .from("monthly_settlement_reconciliations")
+    .select("ebay_payout_usd, ebay_closing_funds_usd")
+    .eq("ebay_account", ebayAccount)
+    .eq("year_month", `${yearMonth}-01`)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || data.ebay_closing_funds_usd == null) return null;
+  return {
+    payoutUsd: (data.ebay_payout_usd as number | null) ?? 0,
+    closingFundsUsd: data.ebay_closing_funds_usd as number,
+  };
+}
+
 export async function fetchPayoneerSummaryForMonth(
   yearMonth: string, // "YYYY-MM"
 ): Promise<{ creditAmountTotal: number; runningBalanceStart: number } | null> {

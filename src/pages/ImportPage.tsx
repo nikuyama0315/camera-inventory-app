@@ -15,6 +15,7 @@ import {
   importEbayTaxInvoiceRows,
   importEbayTransactionReport,
   importPayoneerReport,
+  fetchFinancialStatementForMonth,
   fetchPayoneerSummaryForMonth,
   parseFinancialStatementXlsx,
   saveFinancialStatementManualEntry,
@@ -785,15 +786,15 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   // 不要。ユーザー指示: 「Payoneer Transaction Report(CSV・2アカウント統合)で取り込んだデータを
   // 使えないか」)、三菱UFJ公表の対象月末レートを、既存の月次売掛金Excel(仕入・販売帳)の該当セルに
   // 書き込み、更新後のファイルをダウンロードする機能。
-  // 2026-09-09修正(ユーザー報告): 上記の手動入力欄(payout/closingFunds等)に依存していたため、
-  // その欄を埋め忘れた状態(特に4月分までしかデータの無い月次売掛金Excelで、5月以降の未入力月を
-  // 処理しようとした場合)に「Payout・Closing fundsが未入力です」というエラーになっていた。
-  // この欄はこの月次売掛金Excel更新専用のeBay Financial Statementファイルを直接アップロードする
-  // ようにし、上部の手動入力欄には依存しない、独立した機能にした(対象月・アカウントはこの
-  // ファイルから毎回自動判定するため、月次売掛金Excel側にどの月まで既存データが入っているかには
-  // 影響されない)。
+  // 2026-09-09修正(ユーザー報告・指摘): 当初は上部の手動入力欄(payout/closingFunds等)への
+  // 依存が原因で「未入力です」エラーになる問題があり、専用ファイルの再アップロードに変更したが、
+  // 「既に取り込んだものを使えるのでは」との指摘を受け、Payoneerと同様にDB
+  // (monthly_settlement_reconciliations、上部のeBay Financial Statement欄で保存済みのもの)を
+  // 再利用する方式に変更した。対象アカウント・年月はこのセクション専用の選択欄で指定する
+  // (上部の入力欄が現在どの状態かには依存しない、独立した選択)。
   const [ledgerFile, setLedgerFile] = useState<File | null>(null);
-  const [ledgerStatementFile, setLedgerStatementFile] = useState<File | null>(null);
+  const [ledgerAccount, setLedgerAccount] = useState(EBAY_ACCOUNTS[0]);
+  const [ledgerYearMonth, setLedgerYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
   const [ledgerIsError, setLedgerIsError] = useState(false);
@@ -859,25 +860,18 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       setLedgerMessage("月次売掛金Excelファイルを選択してください");
       return;
     }
-    if (!ledgerStatementFile) {
-      setLedgerIsError(true);
-      setLedgerMessage("eBay Financial Statementを変換したExcelファイルを選択してください");
-      return;
-    }
 
     setLedgerBusy(true);
     try {
-      const stmt = await parseFinancialStatementXlsx(await ledgerStatementFile.arrayBuffer());
-      if (stmt.payoutUsd == null || stmt.closingFundsUsd == null || !stmt.ebayAccount || !stmt.yearMonth) {
+      const ebayAccount = ledgerAccount;
+      const yearMonth = ledgerYearMonth;
+
+      const stmt = await fetchFinancialStatementForMonth(ebayAccount, yearMonth);
+      if (!stmt) {
         throw new Error(
-          "選択したファイルからPayout・Closing funds・アカウント・対象年月を読み取れませんでした。想定と異なる形式のファイルの可能性があります。",
+          `${ebayAccount}の${yearMonth}分のeBay Financial Statementが保存されていません。先に上部の欄でPayout・Closing fundsを解析または入力し、「保存」を押してください。`,
         );
       }
-      if (!(EBAY_ACCOUNTS as string[]).includes(stmt.ebayAccount)) {
-        throw new Error(`未対応のeBayアカウントです: ${stmt.ebayAccount}`);
-      }
-      const ebayAccount = stmt.ebayAccount;
-      const yearMonth = stmt.yearMonth;
       const payoutUsd = stmt.payoutUsd;
       const closingFundsUsd = stmt.closingFundsUsd;
 
@@ -973,21 +967,25 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        eBay Financial Statementを変換したExcelファイル(対象月・アカウントはこのファイルから自動
-        判定します。上のPayout・Closing funds入力欄とは独立しています)と、取込済みのPayoneer
-        Transaction Report(下部「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に
-        取り込んでおいてください)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel
-        (仕入・販売帳)の該当行に書き込み、更新後のファイルをダウンロードします。対象月・アカウントの
-        行があらかじめ用意されているファイルを使用してください(新規行の自動追加はしません)。
+        対象アカウント・対象年月について、上部の欄で保存済みのeBay Financial
+        Statement(Payout・Closing funds)と、取込済みのPayoneer Transaction Report(下部
+        「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に取り込んでおいてください)、
+        三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の該当行に
+        書き込み、更新後のファイルをダウンロードします。対象月・アカウントの行があらかじめ用意
+        されているファイルを使用してください(新規行の自動追加はしません)。
       </p>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          eBay Financial Statementを変換したExcel(.xlsx):
-        </label>
+        <select value={ledgerAccount} onChange={(e) => setLedgerAccount(e.target.value)} disabled={ledgerBusy}>
+          {EBAY_ACCOUNTS.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
         <input
-          type="file"
-          accept=".xlsx"
-          onChange={(e) => setLedgerStatementFile(e.target.files?.[0] ?? null)}
+          type="month"
+          value={ledgerYearMonth}
+          onChange={(e) => setLedgerYearMonth(e.target.value)}
           disabled={ledgerBusy}
         />
       </div>
