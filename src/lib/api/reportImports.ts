@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { supabase } from "../supabaseClient";
 import { pickField, toDateOrNull, toNumberOrNull, type ParsedCsv } from "../csvUtils";
 
@@ -568,13 +569,89 @@ export async function importPayoneerReport(csv: ParsedCsv, fileName: string): Pr
 }
 
 // ---------------------------------------------------------------
-// eBay Financial Statement(PDF・手動入力)
+// eBay Financial Statement(PDF・手動入力 / PDFをExcelに変換したファイルからの自動解析)
 // ---------------------------------------------------------------
 export interface FinancialStatementManualInput {
   ebayAccount: string;
   yearMonth: string; // YYYY-MM
   payoutUsd: number;
   closingFundsUsd: number;
+}
+
+export interface FinancialStatementParseResult {
+  payoutUsd: number | null;
+  closingFundsUsd: number | null;
+  ebayAccount: string | null;
+  yearMonth: string | null; // YYYY-MM
+}
+
+/**
+ * 2026-09-09追加(ユーザー指示): eBay Financial StatementのPDFを直接解析することはできないが、
+ * PDFをExcel(.xlsx)に変換したファイルであれば、明細(Payouts・Closing funds等)が1行=1セルの
+ * テキストとして抽出できるため、それを解析してPayout・Closing funds・対象年月・eBayアカウントの
+ * 参考値を取得する(実際のeBay公式PDFのExcel変換結果で検証済み)。
+ *
+ * 抽出方法: 全セルのテキストを走査し、
+ *   - 前後の空白(改行・タブ・&nbsp;等)を正規化した上で先頭が「Payouts」/「Closing funds」で始まり、
+ *     末尾が金額(例: -$6,147.82 / $369.77)で終わるセルから、それぞれの値を取り出す
+ *     (「Payouts are sent to...」等の説明文はこの両条件を同時に満たさないため誤検出しない)。
+ *   - 「eBay username」というセルの直後のセルの値をeBayアカウント名の候補とする。
+ *   - 「Date range: M/D/YY ...」という文言から、統治期間の開始日(=対象年月)を取り出す。
+ * 値が見つからなかった項目はnullを返す(呼び出し側は入力欄を空のままにし、手動入力を促す)。
+ */
+export async function parseFinancialStatementXlsx(buffer: ArrayBuffer): Promise<FinancialStatementParseResult> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+
+  const cellTexts: string[] = [];
+  for (const ws of workbook.worksheets) {
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        const raw = cell.value;
+        if (raw == null) return;
+        const text = typeof raw === "object" && raw !== null && "richText" in (raw as object)
+          ? (raw as { richText: { text: string }[] }).richText.map((r) => r.text).join("")
+          : String(raw);
+        if (text.trim()) cellTexts.push(text);
+      });
+    });
+  }
+
+  const AMOUNT_RE = /(-?)\$\s*([\d,]+\.\d{2})\s*$/;
+  function extractLabeledAmount(label: string): number | null {
+    for (const text of cellTexts) {
+      const norm = text.replace(/\s+/g, " ").trim();
+      if (!norm.startsWith(label)) continue;
+      const m = norm.match(AMOUNT_RE);
+      if (!m) continue;
+      const value = parseFloat(m[2].replace(/,/g, ""));
+      return m[1] === "-" ? -value : value;
+    }
+    return null;
+  }
+
+  const payoutUsd = extractLabeledAmount("Payouts");
+  const closingFundsUsd = extractLabeledAmount("Closing funds");
+
+  let ebayAccount: string | null = null;
+  const usernameIdx = cellTexts.findIndex((t) => t.replace(/\s+/g, " ").trim() === "eBay username");
+  if (usernameIdx !== -1 && cellTexts[usernameIdx + 1]) {
+    ebayAccount = cellTexts[usernameIdx + 1].trim();
+  }
+
+  let yearMonth: string | null = null;
+  const dateRangeText = cellTexts.find((t) => t.includes("Date range:"));
+  if (dateRangeText) {
+    // 例: "Date range: 1/1/26 12:00 AM - 1/31/26 11:59 PM PST"(M/D/YY、西暦下2桁)
+    const m = dateRangeText.match(/Date range:\s*(\d{1,2})\/(\d{1,2})\/(\d{2})/);
+    if (m) {
+      const month = Number(m[1]);
+      const year = 2000 + Number(m[3]);
+      yearMonth = `${year}-${String(month).padStart(2, "0")}`;
+    }
+  }
+
+  return { payoutUsd, closingFundsUsd, ebayAccount, yearMonth };
 }
 
 export async function saveFinancialStatementManualEntry(input: FinancialStatementManualInput): Promise<void> {

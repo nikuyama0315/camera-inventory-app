@@ -14,6 +14,7 @@ import {
   importEbayTaxInvoiceRows,
   importEbayTransactionReport,
   importPayoneerReport,
+  parseFinancialStatementXlsx,
   saveFinancialStatementManualEntry,
   type MonthlyImportStatusRow,
   type MonthlyReconciliationSummary,
@@ -772,6 +773,42 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  // 2026-09-09追加: PDFをExcel(.xlsx)に変換したファイルを解析し、Payout・Closing funds・
+  // 対象年月・アカウントの候補値を入力欄に反映する(値はそのまま自動保存せず、確認・編集してから
+  // 「保存」を押す必要がある。ユーザー指示: 「PDFをWord、Excelに変換したファイルでも解析できないか」)。
+  const [parsingXlsx, setParsingXlsx] = useState(false);
+
+  async function handleXlsxSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setParsingXlsx(true);
+    setMessage(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const result = await parseFinancialStatementXlsx(buffer);
+      if (result.payoutUsd == null && result.closingFundsUsd == null) {
+        setIsError(true);
+        setMessage(
+          "Payout・Closing fundsの数値が見つかりませんでした。想定と異なる形式のファイルの可能性があります。手動で入力してください。",
+        );
+      } else {
+        if (result.payoutUsd != null) setPayout(String(result.payoutUsd));
+        if (result.closingFundsUsd != null) setClosingFunds(String(result.closingFundsUsd));
+        if (result.yearMonth) setYearMonth(result.yearMonth);
+        if (result.ebayAccount && (EBAY_ACCOUNTS as string[]).includes(result.ebayAccount)) {
+          setAccount(result.ebayAccount);
+        }
+        setIsError(false);
+        setMessage("解析結果を入力欄に反映しました。内容を確認のうえ「保存」を押してください。");
+      }
+    } catch (err) {
+      setIsError(true);
+      setMessage(err instanceof Error ? err.message : "解析に失敗しました");
+    } finally {
+      setParsingXlsx(false);
+      e.target.value = "";
+    }
+  }
 
   async function handleSave() {
     setBusy(true);
@@ -797,8 +834,16 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   return (
     <SectionCard title="eBay Financial Statement(PDF・手動入力)">
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        PDF形式のため自動解析は未対応です。PDFの1ページ目に記載のPayout・Closing fundsを見て入力してください。
+        PDF自体の自動解析は未対応ですが、PDFをExcel(.xlsx)に変換したファイルであれば下記で解析できます。
+        PDFの1ページ目に記載のPayout・Closing fundsを見て入力するか、変換ファイルを選択してください。
       </p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          PDFをExcelに変換したファイル(.xlsx):
+        </label>
+        <input type="file" accept=".xlsx" onChange={handleXlsxSelected} disabled={parsingXlsx} />
+        {parsingXlsx && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>解析中...</span>}
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <select value={account} onChange={(e) => setAccount(e.target.value)}>
           {EBAY_ACCOUNTS.map((a) => (
