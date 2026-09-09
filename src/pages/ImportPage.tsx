@@ -47,7 +47,8 @@ const CLEAR_SCOPE_DEFS: Array<{ scope: ClearScope; lineLabel: string; extraLabel
     lineLabel: "eBay取引明細",
     extraLabel: null,
     // 2026-09-10追加(ユーザー指示): あわせて月次照合サマリーのPayout表示もリセットされる旨を明示。
-    note: "あわせて月次照合サマリーの当該月のPayout表示もリセットします(eBay Financial Statementを保存済みの月は、その値を保護するためリセットしません)。",
+    // Financial Statement保存有無に関わらず無条件でリセットする(ユーザー確認・了承済み)。
+    note: "あわせて月次照合サマリーの全月のPayout表示もリセットします(eBay Financial Statement保存済みの値も含みます)。",
   },
   { scope: "ebay_tax_invoice", lineLabel: "手数料明細", extraLabel: null },
   { scope: "payoneer_transaction_report", lineLabel: "Payoneer明細", extraLabel: "月次サマリー" },

@@ -239,13 +239,6 @@ export async function importEbayTransactionReport(
       transaction_report_gross_usd: grossUsdTotal,
       transaction_report_gross_jpy: ttmRate != null ? grossUsdTotal * ttmRate : undefined,
       ebay_payout_usd: payoutUsdTotal,
-      // 2026-09-10追加(ユーザー指示「Transaction Reportをクリアしたら月次照合サマリーのPayout表示も
-      // リセットしたい」対応): ebay_payout_usdはeBay Financial Statement保存(下記
-      // saveFinancialStatementManualEntry)とも書き込みを共有する列のため、直近にどちらが書いたかを
-      // この列で記録する。clearScopedImportData(scope='ebay_transaction_report')は、この値が
-      // 'transaction_report'の月のみebay_payout_usdをリセットし、Financial Statementが最後に
-      // 書き込んだ月(ebay_payout_usd_source='financial_statement')は保護する。
-      ebay_payout_usd_source: "transaction_report",
       ebay_payout_jpy: ttmRate != null ? payoutUsdTotal * ttmRate : undefined,
       ttm_rate: ttmRate ?? undefined,
     },
@@ -674,9 +667,6 @@ export async function saveFinancialStatementManualEntry(input: FinancialStatemen
       year_month: yearMonthDate,
       ebay_account: input.ebayAccount,
       ebay_payout_usd: input.payoutUsd,
-      // 上記importEbayTransactionReportのコメント参照。Financial Statement保存がこの共有列の
-      // 最新の書き手であることを記録する。
-      ebay_payout_usd_source: "financial_statement",
       ebay_closing_funds_usd: input.closingFundsUsd,
     },
     { onConflict: "year_month,ebay_account" },
@@ -1101,9 +1091,10 @@ export async function getScopedImportCounts(scope: ClearScope): Promise<ScopedCl
  * Statementの3種が列を共有しているため、基本的には個別クリアの対象から意図的に除外している
  * (他種別のデータまで巻き込んで消してしまう恐れがあるため)。
  * 唯一の例外がeBay Transaction Reportで、ユーザー指示「Transaction Reportをクリアしたら月次照合
- * サマリーのPayout表示もリセットしたい」への対応として、Transaction Report専用列
- * (transaction_report_gross_usd/jpy・ebay_payout_jpy・ttm_rate)は無条件でリセットし、共有列
- * ebay_payout_usdは直近の書き手がTransaction Report自身の月に限ってリセットする(下記参照)。
+ * サマリーのPayout表示もリセットしたい(Financial Statementの保存有無に関わらず無条件で)」への
+ * 対応として、この5列(transaction_report_gross_usd/jpy・ebay_payout_usd/jpy・ttm_rate)を
+ * 無条件でリセットする。ebay_payout_usdはeBay Financial Statementとも書き込みを共有する列で、
+ * その月のFinancial Statement保存値も一緒に消える点はユーザー確認・了承済み。
  * eBay Tax Invoice・Payoneer・eLogi・CPaSSのその他4種はこのテーブルに一切触れない。
  */
 export async function clearScopedImportData(scope: ClearScope): Promise<void> {
@@ -1125,27 +1116,21 @@ export async function clearScopedImportData(scope: ClearScope): Promise<void> {
     }
     if (scope === "ebay_transaction_report") {
       // ユーザー指示(2026-09-10): 「Transaction Reportをクリアしたら月次照合サマリーのPayout表示も
-      // リセットしたい」への対応。transaction_report_gross_usd/jpy・ebay_payout_jpy・ttm_rateは
-      // Transaction Report専用列のため無条件でリセットする。ebay_payout_usdのみeBay Financial
-      // Statementとの共有列のため、直近の書き手がTransaction Report自身の月
-      // (ebay_payout_usd_source='transaction_report')に限ってリセットし、Financial Statementが
-      // 最後に書き込んだ月は保護する(上記importEbayTransactionReportのコメント参照)。
-      const reconExclusiveDel = await supabase
+      // リセットしたい。Financial Statementの保存有無に関わらず無条件で」への対応。
+      // ebay_payout_usdはeBay Financial Statement保存(saveFinancialStatementManualEntry)とも
+      // 書き込みを共有する列だが、ユーザー確認の上、Transaction Reportクリア時は無条件でリセットする
+      // (Financial Statement側の値を保護する仕組みは導入したが、ユーザーの希望により不採用とした)。
+      const reconDel = await supabase
         .from("monthly_settlement_reconciliations")
         .update({
           transaction_report_gross_usd: null,
           transaction_report_gross_jpy: null,
+          ebay_payout_usd: null,
           ebay_payout_jpy: null,
           ttm_rate: null,
         })
         .neq("id", ZERO_UUID_REPORT);
-      if (reconExclusiveDel.error) throw reconExclusiveDel.error;
-
-      const reconPayoutDel = await supabase
-        .from("monthly_settlement_reconciliations")
-        .update({ ebay_payout_usd: null, ebay_payout_usd_source: null })
-        .eq("ebay_payout_usd_source", "transaction_report");
-      if (reconPayoutDel.error) throw reconPayoutDel.error;
+      if (reconDel.error) throw reconDel.error;
     }
     const importsDel = await supabase.from("platform_settlement_imports").delete().eq("platform", scope as Platform);
     if (importsDel.error) throw importsDel.error;
