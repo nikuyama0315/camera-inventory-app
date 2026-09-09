@@ -19,7 +19,7 @@ import logo from "./assets/logo.png";
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "ledgerImport";
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "inventory", label: "在庫・販売" },
+  { key: "inventory", label: "仕入・在庫・販売" },
   { key: "sales", label: "売上・粗利" },
   { key: "skuLookup", label: "SKU検索" },
   { key: "stockAlerts", label: "在庫アラート" },
