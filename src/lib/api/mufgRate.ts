@@ -50,3 +50,30 @@ export async function fetchMonthlyMufgDailyRates(yearMonth: string): Promise<Muf
   if (data?.error) throw new Error(data.error);
   return data as MufgMonthlyDailyResult;
 }
+
+export interface MufgCrossRateResult {
+  requested_date: string; // YYYY-MM-DD
+  date_used: string; // YYYY-MM-DD(休日等で遡った場合はrequested_dateと異なる)
+  currency: string;
+  currency_ttm_jpy: number;
+  usd_ttm_jpy: number;
+  rate_to_usd: number;
+}
+
+/**
+ * 三菱UFJ銀行公表の為替相場から、指定した通貨(USD以外)の指定日時点における「通貨→USD」の
+ * クロスレートを算出して取得する(2026-09-09追加、ユーザー指示)。
+ * eBay Tax Invoice取込で、ebay_transaction_lines(注文番号一致・同日一致)からレートを
+ * 自動取得できなかった通貨について、手動レート入力欄への参考値表示に使う。
+ * 指定日が休日等でデータが無い場合は、Edge Function側で直近の営業日まで遡る
+ * (戻り値のdate_usedで実際に使われた日付を確認できる)。
+ */
+export async function fetchMufgCrossRate(date: string, currency: string): Promise<MufgCrossRateResult> {
+  const { data, error } = await supabase.functions.invoke("fetch-mufg-cross-rate", {
+    body: { date, currency },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data as MufgCrossRateResult;
+}
+

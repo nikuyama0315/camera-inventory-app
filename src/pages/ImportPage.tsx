@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
-import { fetchLatestMufgTtm } from "../lib/api/mufgRate";
+import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -435,6 +435,11 @@ function TaxInvoiceSection({ onImported }: { onImported: () => void }) {
   const [analysis, setAnalysis] = useState<TaxInvoiceAnalysis | null>(null);
   const [manualRates, setManualRates] = useState<Record<string, string>>({});
   const [analyzing, setAnalyzing] = useState(false);
+  // 2026-09-09追加: 自動取得できなかった通貨について、三菱UFJ公表レートから算出した
+  // 「通貨→USD」クロスレートを取得し、手動レート入力欄に反映する(ユーザー指示。
+  // 「米ドルと同じ手法で米ドル以外の通貨の該当日のレートを取得して表示」)。
+  const [crossRateFetching, setCrossRateFetching] = useState<Record<string, boolean>>({});
+  const [crossRateMessages, setCrossRateMessages] = useState<Record<string, string>>({});
 
   const savedRate = monthlyRates[yearMonth];
   const savedRateStr = savedRate !== undefined ? String(savedRate) : "";
@@ -491,6 +496,52 @@ function TaxInvoiceSection({ onImported }: { onImported: () => void }) {
     }
   }
 
+  /**
+   * 2026-09-09追加: 指定した通貨について、analysis.rows内でその通貨かつ自動取得(注文番号一致・
+   * 同日一致)できなかった行のうち、最も早い日付を代表日として選ぶ(unresolvedCurrenciesに
+   * 挙がる通貨は、この2段階のどちらでも解決できない行を少なくとも1つ含むため必ず見つかる)。
+   */
+  function representativeUnresolvedDate(currency: string): string | null {
+    if (!analysis) return null;
+    const resolvedRates = new Map(Object.entries(analysis.resolvedRates));
+    const dateResolvedRates = new Map(Object.entries(analysis.dateResolvedRates));
+    const dates = analysis.rows
+      .filter((r) => r.currency.toUpperCase() === currency && r.line_date)
+      .filter((r) => {
+        const orderKey = `${r.order_number ?? ""}::${currency}`;
+        const dateKey = `${r.line_date ?? ""}::${currency}`;
+        return !resolvedRates.has(orderKey) && !dateResolvedRates.has(dateKey);
+      })
+      .map((r) => r.line_date as string)
+      .sort();
+    return dates[0] ?? null;
+  }
+
+  async function handleFetchCrossRate(currency: string) {
+    const date = representativeUnresolvedDate(currency);
+    if (!date) return;
+    setCrossRateFetching((prev) => ({ ...prev, [currency]: true }));
+    setCrossRateMessages((prev) => ({ ...prev, [currency]: "" }));
+    try {
+      const result = await fetchMufgCrossRate(date, currency);
+      setManualRates((prev) => ({ ...prev, [currency]: String(result.rate_to_usd) }));
+      setCrossRateMessages((prev) => ({
+        ...prev,
+        [currency]:
+          result.date_used === date
+            ? `三菱UFJ公表レート(${result.date_used}時点)から算出。内容を確認してください。`
+            : `${date}はデータが無いため、直近の営業日(${result.date_used}時点)の三菱UFJ公表レートから算出。内容を確認してください。`,
+      }));
+    } catch (err) {
+      setCrossRateMessages((prev) => ({
+        ...prev,
+        [currency]: err instanceof Error ? err.message : "取得に失敗しました",
+      }));
+    } finally {
+      setCrossRateFetching((prev) => ({ ...prev, [currency]: false }));
+    }
+  }
+
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -498,6 +549,8 @@ function TaxInvoiceSection({ onImported }: { onImported: () => void }) {
     setMessage(null);
     setAnalysis(null);
     setManualRates({});
+    setCrossRateFetching({});
+    setCrossRateMessages({});
     try {
       const csv = await parseCsvFile(file, ["Fee group", "Fee type", "JCT"]);
       const result = await analyzeEbayTaxInvoiceCsv(csv);
@@ -625,21 +678,35 @@ function TaxInvoiceSection({ onImported }: { onImported: () => void }) {
             )}
           </p>
           {analysis.unresolvedCurrencies.length > 0 && (
-            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                自動取得できなかった通貨のレート(→USD)を入力してください:
+                自動取得できなかった通貨のレート(→USD)を入力してください(「取得」で三菱UFJ公表レートから算出した参考値を反映できます):
               </span>
               {analysis.unresolvedCurrencies.map((currency) => (
-                <label key={currency} style={{ fontSize: 12, display: "flex", gap: 4, alignItems: "center" }}>
-                  {currency}→USD:
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={manualRates[currency] ?? ""}
-                    onChange={(e) => setManualRates((prev) => ({ ...prev, [currency]: e.target.value }))}
-                    style={{ width: 90 }}
-                  />
-                </label>
+                <div key={currency} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 12, display: "flex", gap: 4, alignItems: "center" }}>
+                    {currency}→USD:
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={manualRates[currency] ?? ""}
+                      onChange={(e) => setManualRates((prev) => ({ ...prev, [currency]: e.target.value }))}
+                      style={{ width: 90 }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleFetchCrossRate(currency)}
+                    disabled={crossRateFetching[currency]}
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    {crossRateFetching[currency] ? "取得中..." : "取得"}
+                  </button>
+                  {crossRateMessages[currency] && (
+                    <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                      {crossRateMessages[currency]}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           )}
