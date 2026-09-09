@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
-import { updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
+import { detectTargetMonth, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -793,8 +793,6 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   // 再利用する方式に変更した。対象アカウント・年月はこのセクション専用の選択欄で指定する
   // (上部の入力欄が現在どの状態かには依存しない、独立した選択)。
   const [ledgerFile, setLedgerFile] = useState<File | null>(null);
-  const [ledgerAccount, setLedgerAccount] = useState(EBAY_ACCOUNTS[0]);
-  const [ledgerYearMonth, setLedgerYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
   const [ledgerIsError, setLedgerIsError] = useState(false);
@@ -863,17 +861,27 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
     setLedgerBusy(true);
     try {
-      const ebayAccount = ledgerAccount;
-      const yearMonth = ledgerYearMonth;
+      const ledgerBuffer = await ledgerFile.arrayBuffer();
 
-      const stmt = await fetchFinancialStatementForMonth(ebayAccount, yearMonth);
-      if (!stmt) {
+      // 2026-09-09修正(ユーザー指示): アカウント・年月を選ばせず、アップロードした
+      // 月次売掛金Excel自体から「まだ入力されていない最初の月」を自動検出する。
+      const target = await detectTargetMonth(ledgerBuffer);
+      if (!target) {
+        throw new Error("アップロードされた月次売掛金Excelに未入力の月が見つかりませんでした(全月入力済みです)。");
+      }
+      const { yearMonth, monthLabel } = target;
+
+      const soulcameraStmt = await fetchFinancialStatementForMonth("soulcamera", yearMonth);
+      const soulmenStmt = await fetchFinancialStatementForMonth("soulmenjapan", yearMonth);
+      const missingAccounts = [
+        !soulcameraStmt ? "soulcamera" : null,
+        !soulmenStmt ? "soulmenjapan" : null,
+      ].filter((v): v is string => v != null);
+      if (missingAccounts.length > 0) {
         throw new Error(
-          `${ebayAccount}の${yearMonth}分のeBay Financial Statementが保存されていません。先に上部の欄でPayout・Closing fundsを解析または入力し、「保存」を押してください。`,
+          `${monthLabel}分のeBay Financial Statementが${missingAccounts.join("・")}で保存されていません。先に上部の欄でPayout・Closing fundsを解析または入力し、「保存」を押してください。`,
         );
       }
-      const payoutUsd = stmt.payoutUsd;
-      const closingFundsUsd = stmt.closingFundsUsd;
 
       const payoneerSummary = await fetchPayoneerSummaryForMonth(yearMonth);
       if (!payoneerSummary) {
@@ -884,20 +892,16 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       const mufg = await fetchLatestMufgTtm(yearMonth);
 
-      const ledgerBuffer = await ledgerFile.arrayBuffer();
       const { buffer, updatedRowLabels } = await updateMonthlyLedgerWorkbook({
         ledgerBuffer,
-        ebayAccount,
         yearMonth,
-        payoutUsd,
-        closingFundsUsd,
+        soulcamera: soulcameraStmt!,
+        soulmenjapan: soulmenStmt!,
         payoneerCreditAmountSum: payoneerSummary.creditAmountTotal,
         payoneerLatestRunningBalance: payoneerSummary.runningBalanceStart,
         mufgRate: mufg.ttm,
       });
 
-      // 月次売掛金Excelへの反映と合わせて、取込状況(済/未表示)用のDB保存も行う
-      await saveFinancialStatementManualEntry({ ebayAccount, yearMonth, payoutUsd, closingFundsUsd });
       onImported();
 
       const blob = new Blob([buffer as BlobPart], {
@@ -912,7 +916,7 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       setLedgerIsError(false);
       setLedgerMessage(
-        `更新して ${mufg.source_text}時点の三菱UFJ公表レート(${mufg.ttm})を反映し、ダウンロードしました(更新行: ${updatedRowLabels.join("、")})。`,
+        `${monthLabel}分を更新し、${mufg.source_text}時点の三菱UFJ公表レート(${mufg.ttm})を反映してダウンロードしました(更新行: ${updatedRowLabels.join("、")})。`,
       );
     } catch (err) {
       setLedgerIsError(true);
@@ -967,28 +971,13 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        対象アカウント・対象年月について、上部の欄で保存済みのeBay Financial
-        Statement(Payout・Closing funds)と、取込済みのPayoneer Transaction Report(下部
-        「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に取り込んでおいてください)、
-        三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の該当行に
-        書き込み、更新後のファイルをダウンロードします。対象月・アカウントの行があらかじめ用意
-        されているファイルを使用してください(新規行の自動追加はしません)。
+        アップロードした月次売掛金Excel(仕入・販売帳)自体を見て、まだ入力されていない最初の月を
+        自動的に対象とします(アカウント・年月の選択は不要です)。その月について、soulcamera・
+        soulmenjapan両方のeBay Financial Statement(上部の欄で保存済みのPayout・Closing
+        funds)と、取込済みのPayoneer Transaction Report(下部「Payoneer Transaction
+        Report(CSV・2アカウント統合)」欄で先に取り込んでおいてください)、三菱UFJ公表の対象月末
+        レートを該当行に書き込み、更新後のファイルをダウンロードします。
       </p>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-        <select value={ledgerAccount} onChange={(e) => setLedgerAccount(e.target.value)} disabled={ledgerBusy}>
-          {EBAY_ACCOUNTS.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <input
-          type="month"
-          value={ledgerYearMonth}
-          onChange={(e) => setLedgerYearMonth(e.target.value)}
-          disabled={ledgerBusy}
-        />
-      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>月次売掛金Excel(.xlsx):</label>
         <input
