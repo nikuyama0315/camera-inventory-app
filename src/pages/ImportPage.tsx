@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseCsvFile } from "../lib/csvUtils";
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
-import { detectTargetMonth, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
+import { detectUnfilledMonths, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import {
   clearAllReportImportData,
   fetchImportHistory,
@@ -861,46 +861,61 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
     setLedgerBusy(true);
     try {
-      const ledgerBuffer = await ledgerFile.arrayBuffer();
+      let buffer = await ledgerFile.arrayBuffer();
 
       // 2026-09-09修正(ユーザー指示): アカウント・年月を選ばせず、アップロードした
-      // 月次売掛金Excel自体から「まだ入力されていない最初の月」を自動検出する。
-      const target = await detectTargetMonth(ledgerBuffer);
-      if (!target) {
+      // 月次売掛金Excel自体から「まだ入力されていない月」をすべて自動検出する。
+      const unfilledMonths = await detectUnfilledMonths(buffer);
+      if (unfilledMonths.length === 0) {
         throw new Error("アップロードされた月次売掛金Excelに未入力の月が見つかりませんでした(全月入力済みです)。");
       }
-      const { yearMonth, monthLabel } = target;
 
-      const soulcameraStmt = await fetchFinancialStatementForMonth("soulcamera", yearMonth);
-      const soulmenStmt = await fetchFinancialStatementForMonth("soulmenjapan", yearMonth);
-      const missingAccounts = [
-        !soulcameraStmt ? "soulcamera" : null,
-        !soulmenStmt ? "soulmenjapan" : null,
-      ].filter((v): v is string => v != null);
-      if (missingAccounts.length > 0) {
-        throw new Error(
-          `${monthLabel}分のeBay Financial Statementが${missingAccounts.join("・")}で保存されていません。先に上部の欄でPayout・Closing fundsを解析または入力し、「保存」を押してください。`,
-        );
+      // 2026-09-09追加(ユーザー指示): 「取込済みの月分までまとめて入力できないか」を受け、
+      // 未入力月を先頭(月の若い順)から順に処理し、必要なデータ(eBay Financial Statement・
+      // Payoneer取込データ)が揃わなくなった時点でそこで打ち切る(揃っている月までは処理する)。
+      const processedMonthLabels: string[] = [];
+      const allUpdatedRowLabels: string[] = [];
+      let lastMufgText: string | null = null;
+      let stoppedReason: string | null = null;
+
+      for (const { yearMonth, monthLabel } of unfilledMonths) {
+        const soulcameraStmt = await fetchFinancialStatementForMonth("soulcamera", yearMonth);
+        const soulmenStmt = await fetchFinancialStatementForMonth("soulmenjapan", yearMonth);
+        const missingAccounts = [
+          !soulcameraStmt ? "soulcamera" : null,
+          !soulmenStmt ? "soulmenjapan" : null,
+        ].filter((v): v is string => v != null);
+        if (missingAccounts.length > 0) {
+          stoppedReason = `${monthLabel}分のeBay Financial Statementが${missingAccounts.join("・")}で未保存のため、ここで停止しました。`;
+          break;
+        }
+
+        const payoneerSummary = await fetchPayoneerSummaryForMonth(yearMonth);
+        if (!payoneerSummary) {
+          stoppedReason = `${monthLabel}分のPayoneer Transaction Report取込データが見つからないため、ここで停止しました。`;
+          break;
+        }
+
+        const mufg = await fetchLatestMufgTtm(yearMonth);
+
+        const result = await updateMonthlyLedgerWorkbook({
+          ledgerBuffer: buffer,
+          yearMonth,
+          soulcamera: soulcameraStmt!,
+          soulmenjapan: soulmenStmt!,
+          payoneerCreditAmountSum: payoneerSummary.creditAmountTotal,
+          payoneerLatestRunningBalance: payoneerSummary.runningBalanceStart,
+          mufgRate: mufg.ttm,
+        });
+        buffer = result.buffer;
+        allUpdatedRowLabels.push(...result.updatedRowLabels);
+        processedMonthLabels.push(monthLabel);
+        lastMufgText = `${mufg.source_text}(${mufg.ttm})`;
       }
 
-      const payoneerSummary = await fetchPayoneerSummaryForMonth(yearMonth);
-      if (!payoneerSummary) {
-        throw new Error(
-          `${yearMonth}分のPayoneer Transaction Report取込データが見つかりませんでした。先に上部の「Payoneer Transaction Report(CSV・2アカウント統合)」欄で取り込んでください。`,
-        );
+      if (processedMonthLabels.length === 0) {
+        throw new Error(stoppedReason ?? "処理できる月がありませんでした。");
       }
-
-      const mufg = await fetchLatestMufgTtm(yearMonth);
-
-      const { buffer, updatedRowLabels } = await updateMonthlyLedgerWorkbook({
-        ledgerBuffer,
-        yearMonth,
-        soulcamera: soulcameraStmt!,
-        soulmenjapan: soulmenStmt!,
-        payoneerCreditAmountSum: payoneerSummary.creditAmountTotal,
-        payoneerLatestRunningBalance: payoneerSummary.runningBalanceStart,
-        mufgRate: mufg.ttm,
-      });
 
       onImported();
 
@@ -916,7 +931,9 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       setLedgerIsError(false);
       setLedgerMessage(
-        `${monthLabel}分を更新し、${mufg.source_text}時点の三菱UFJ公表レート(${mufg.ttm})を反映してダウンロードしました(更新行: ${updatedRowLabels.join("、")})。`,
+        `${processedMonthLabels.join("、")}分を更新しました(直近の三菱UFJ公表レート: ${lastMufgText})。` +
+          `更新行: ${allUpdatedRowLabels.join("、")}。` +
+          (stoppedReason ? ` ${stoppedReason}` : ""),
       );
     } catch (err) {
       setLedgerIsError(true);
@@ -971,12 +988,13 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        アップロードした月次売掛金Excel(仕入・販売帳)自体を見て、まだ入力されていない最初の月を
-        自動的に対象とします(アカウント・年月の選択は不要です)。その月について、soulcamera・
+        アップロードした月次売掛金Excel(仕入・販売帳)自体を見て、まだ入力されていない月を古い順に
+        すべて対象とします(アカウント・年月の選択は不要です)。各月について、soulcamera・
         soulmenjapan両方のeBay Financial Statement(上部の欄で保存済みのPayout・Closing
         funds)と、取込済みのPayoneer Transaction Report(下部「Payoneer Transaction
         Report(CSV・2アカウント統合)」欄で先に取り込んでおいてください)、三菱UFJ公表の対象月末
-        レートを該当行に書き込み、更新後のファイルをダウンロードします。
+        レートを該当行に書き込みます。必要なデータが揃っている月まで処理し、揃わなくなった月で
+        自動的に停止したうえで、それまでの結果をダウンロードします。
       </p>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>月次売掛金Excel(.xlsx):</label>

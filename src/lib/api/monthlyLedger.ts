@@ -72,23 +72,21 @@ function collectMonthRows(worksheet: ExcelJS.Worksheet): MonthRows[] {
 }
 
 /**
- * 月次売掛金Excelを走査し、Soulmen行・Soulcamera行のいずれかでB列(Payout)が未入力の、
- * 最初の月を対象月として返す(ユーザー指示: 年月・アカウントを選ばせず、Excel側の状態から
- * 自動判定する)。全ての月が入力済みの場合はnullを返す。
+ * 月次売掛金Excelを走査し、Soulmen行・Soulcamera行のいずれかでB列(Payout)が未入力の月を、
+ * すべて出現順(月の若い順)で返す(ユーザー指示: 年月・アカウントを選ばせず、Excel側の状態から
+ * 自動判定する。さらに「取込済みの月分までまとめて入力できないか」との指示を受け、最初の1か月
+ * だけでなく未入力の月をすべて対象候補として返すよう変更。呼び出し側は先頭から順に、
+ * 必要なデータ(eBay Financial Statement等)が揃っている月まで処理し、揃わなくなった時点で
+ * 打ち切る)。1件も無ければ空配列を返す。
  */
-export async function detectTargetMonth(
+export async function detectUnfilledMonths(
   ledgerBuffer: ArrayBuffer,
-): Promise<{ yearMonth: string; monthLabel: string } | null> {
+): Promise<{ yearMonth: string; monthLabel: string }[]> {
   const worksheet = await loadWorksheet(ledgerBuffer);
   const months = collectMonthRows(worksheet);
-  for (const m of months) {
-    const soulmenFilled = m.soulmenRow.getCell(2).value != null;
-    const soulcameraFilled = m.soulcameraRow.getCell(2).value != null;
-    if (!soulmenFilled || !soulcameraFilled) {
-      return { yearMonth: m.yearMonth, monthLabel: m.monthLabel };
-    }
-  }
-  return null;
+  return months
+    .filter((m) => m.soulmenRow.getCell(2).value == null || m.soulcameraRow.getCell(2).value == null)
+    .map((m) => ({ yearMonth: m.yearMonth, monthLabel: m.monthLabel }));
 }
 
 export interface AccountFinancialFigures {
