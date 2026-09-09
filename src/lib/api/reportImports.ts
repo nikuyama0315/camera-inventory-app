@@ -682,6 +682,14 @@ export interface MonthlyReconciliationSummary {
   // ユーザーの手動集計シート「Payoneer Fee(JPY)」と同じ算出式(実データで一致確認済み)。
   // 実際の手数料(為替スプレッド)だけでなく、月またぎの入金タイミング差も含まれる点に注意。
   payoneerFeeJpy: number | null;
+  /**
+   * 2026-09-09追加(ユーザー指示): 上記のJPY版と同じ算出式(eBay Payout(USD、マイナス)+
+   * Payoneer入金額(USD、プラス))をUSD建てでも計算したもの。JPY版は月次為替レート
+   * (monthly_exchange_rates)が保存されていないと常にnullになってしまうため
+   * (ebay_payout_jpyがTransaction Report取込時点でレート未保存だと記録されない仕組みのため)、
+   * レートに依存しないUSD建ての差額も併せて表示する。
+   */
+  payoneerFeeUsd: number | null;
 }
 
 /**
@@ -779,6 +787,7 @@ export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconc
       const creditUsd = payoneer ? payoneer.creditUsd : null;
       const creditJpy = payoneer && payoneer.ttmRate != null ? payoneer.creditUsd * payoneer.ttmRate : null;
       const feeJpy = payoutJpyTotal != null && creditJpy != null ? payoutJpyTotal + creditJpy : null;
+      const feeUsd = payoutUsdTotal != null && creditUsd != null ? payoutUsdTotal + creditUsd : null;
       return {
         yearMonth: ym,
         ebayPayoutUsdTotal: payoutUsdTotal,
@@ -786,6 +795,7 @@ export async function fetchMonthlyReconciliationSummary(): Promise<MonthlyReconc
         payoneerCreditUsd: creditUsd,
         payoneerCreditJpy: creditJpy,
         payoneerFeeJpy: feeJpy,
+        payoneerFeeUsd: feeUsd,
       };
     });
 }

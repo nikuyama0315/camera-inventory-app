@@ -229,6 +229,7 @@ export default function ImportPage() {
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>eBay Payout(¥)</th>
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>Payoneer入金($)</th>
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>Payoneer入金(¥)</th>
+            <th style={{ padding: "6px 4px", fontWeight: 500 }}>差額($)</th>
             <th style={{ padding: "6px 4px", fontWeight: 500 }}>差額(¥)</th>
           </tr>
         </thead>
@@ -240,6 +241,7 @@ export default function ImportPage() {
               <td style={{ padding: "8px 4px" }}>{fmtJpy(r.ebayPayoutJpyTotal)}</td>
               <td style={{ padding: "8px 4px" }}>{fmtUsd(r.payoneerCreditUsd)}</td>
               <td style={{ padding: "8px 4px" }}>{fmtJpy(r.payoneerCreditJpy)}</td>
+              <td style={{ padding: "8px 4px" }}>{fmtUsd(r.payoneerFeeUsd)}</td>
               <td style={{ padding: "8px 4px" }}>{fmtJpy(r.payoneerFeeJpy)}</td>
             </tr>
           ))}
