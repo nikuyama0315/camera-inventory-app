@@ -143,7 +143,7 @@ export default function ImportPage() {
       <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜前月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
         各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial StatementのみPayout/Closing fundsを実際に保存した月のみ「済」)。
-        当月について、7日を過ぎても取込が無い場合は行に警告(⚠)を表示します。
+        各レポートは月が閉まってから翌月7日頃までに提供されるため、前月分が当月7日を過ぎても未取込の場合に行に警告(⚠)を表示します。
       </p>
       <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse", marginBottom: 24 }}>
         <thead>
@@ -166,7 +166,8 @@ export default function ImportPage() {
               if (!platformOrder.includes(row.platform)) platformOrder.push(row.platform);
             }
             return monthlyImportStatus.map((row) => {
-              // 当月の7日目以降(6日経過後)、当月分が未取込ならこの行に警告を出す(App.tsxの
+              // 当月の7日目以降(6日経過後)、前月分が未取込ならこの行に警告を出す(各レポートは
+              // 月が閉まってから翌月7日頃までに提供されるため、判定対象は「前月分」。App.tsxの
               // 全ページ共通バナーと同じ判定基準をreportImportRowHasAlert()で共有する)。
               const rowAlert = reportImportRowHasAlert(row);
               const groupIndex = platformOrder.indexOf(row.platform);
@@ -184,7 +185,7 @@ export default function ImportPage() {
                   {rowAlert && (
                     <span
                       style={{ marginLeft: 6, color: "var(--danger-text)", fontWeight: 700 }}
-                      title="当月分が、当月7日を過ぎても取込まれていません"
+                      title="前月分が、当月7日を過ぎても取込まれていません"
                     >
                       ⚠
                     </span>

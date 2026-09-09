@@ -825,13 +825,14 @@ export interface MonthlyImportStatusCell {
 export interface MonthlyImportStatusRow {
   platform: Platform;
   account: string | null;
-  /** 古い月→新しい月の順(2026-09-09修正: 表示上は当年1月〜前月まで。当月は含まない)。 */
-  months: MonthlyImportStatusCell[];
   /**
-   * 2026-09-09追加: 表(months)には表示しない当月分の状況。reportImportRowHasAlert
-   * (当月分未取込の警告判定)専用に保持する。
+   * 古い月→新しい月の順。当年1月〜前月まで(2026-09-09修正)。最後の要素が前月。
+   * 2026-09-09再修正(ユーザー指摘): 各レポートは月が閉まってから翌月7日頃までに提供される
+   * ため、警告判定(reportImportRowHasAlert)は「前月分」の取込有無を見る必要がある
+   * (「当月分」は月の途中では原理的にまだ提供され得ないため、判定対象として意味を成さない)。
+   * 前月はこのmonths配列の最後の要素と一致するため、当月分を別途保持する必要は無い。
    */
-  currentMonthCell: MonthlyImportStatusCell;
+  months: MonthlyImportStatusCell[];
 }
 
 // 「取込状況」表の行順序。Payoneerのみ2アカウント統合のためaccount=null。
@@ -850,7 +851,7 @@ function lastDayOfMonthNum(year: number, month1based: number): number {
 }
 
 /**
- * 「取込状況」画面向けに、当年1月〜当月について、レポート種別・アカウントごとにその月のデータが
+ * 「取込状況」画面向けに、当年1月〜前月について、レポート種別・アカウントごとにその月のデータが
  * 取込済みかどうかを判定する(2026-09-08、直近6か月→直近12か月を経てユーザー指示により変更。
  * 年をまたいで固定N か月分表示すると前年分まで表示されてしまい分かりにくいため、当年1月始まりに
  * 統一した)。
@@ -926,23 +927,24 @@ export async function fetchMonthlyImportStatus(): Promise<MonthlyImportStatusRow
         );
   }
 
-  const currentYearMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
   return IMPORT_STATUS_ROW_DEFS.map(({ platform, account }) => ({
     platform,
     account,
     months: months.map((ym) => ({ yearMonth: ym, imported: isImported(platform, account, ym) })),
-    currentMonthCell: { yearMonth: currentYearMonth, imported: isImported(platform, account, currentYearMonth) },
   }));
 }
 
 /**
- * 「取込状況」の1行(レポート種別×アカウント)が警告対象かどうかを判定する(2026-09-08追加)。
- * 当月の7日を過ぎても当月分が未取込の場合に警告とする。ImportPage.tsx(行ごとの⚠表示)と
- * App.tsx(ヘッダー直下の全ページ共通バナー)の両方で同じ基準を使うための共有ロジック。
+ * 「取込状況」の1行(レポート種別×アカウント)が警告対象かどうかを判定する(2026-09-08追加、
+ * 2026-09-09再修正)。各レポートは月が閉まってから翌月7日頃までに提供されるため、当月7日を
+ * 過ぎても前月分が未取込の場合に警告とする(「当月分」の取込有無は、月の途中では原理的に
+ * まだ提供され得ないため判定対象にできない)。前月はrow.months配列の最後の要素と一致する
+ * (months自体が当年1月〜前月までのため)。ImportPage.tsx(行ごとの⚠表示)とApp.tsx
+ * (ヘッダー直下の全ページ共通バナー)の両方で同じ基準を使うための共有ロジック。
  */
 export function reportImportRowHasAlert(row: MonthlyImportStatusRow, today: Date = new Date()): boolean {
-  return today.getDate() > 6 && !row.currentMonthCell.imported;
+  const previousMonthCell = row.months[row.months.length - 1];
+  return today.getDate() > 6 && previousMonthCell != null && !previousMonthCell.imported;
 }
 
 // ---------------------------------------------------------------

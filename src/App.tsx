@@ -118,8 +118,10 @@ export default function App() {
     checkStockAlertsAndNotify().catch(() => {
       /* メール送信設定が未完了の場合は静かに失敗させる */
     });
-    // レポート取込(ImportPage.tsxの「取込状況」)で、当月分が7日を過ぎても未取込のレポートが
-    // 1件でもあれば全ページ共通バナーで知らせる(2026-09-08追加、在庫アラートバナーと同じ方式)。
+    // レポート取込(ImportPage.tsxの「取込状況」)で、前月分が当月7日を過ぎても未取込のレポートが
+    // 1件でもあれば全ページ共通バナーで知らせる(2026-09-08追加、在庫アラートバナーと同じ方式。
+    // 2026-09-09修正: 各レポートは月が閉まってから翌月7日頃までに提供されるため、判定対象は
+    // 「当月分」ではなく「前月分」)。
     fetchMonthlyImportStatus()
       .then((rows) => setReportImportAlertCount(rows.filter((r) => reportImportRowHasAlert(r)).length))
       .catch(() => {
