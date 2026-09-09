@@ -780,12 +780,20 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
   // 「保存」を押す必要がある。ユーザー指示: 「PDFをWord、Excelに変換したファイルでも解析できないか」)。
   const [parsingXlsx, setParsingXlsx] = useState(false);
 
-  // 2026-09-09追加(ユーザー指示): eBay Financial Statement(上記で解析したPayout・Closing funds)、
+  // 2026-09-09追加(ユーザー指示): eBay Financial Statement(PDFをExcelに変換したファイル)、
   // Payoneer Transaction Report取込済みデータ(monthly_payoneer_summary、CSVの再アップロードは
   // 不要。ユーザー指示: 「Payoneer Transaction Report(CSV・2アカウント統合)で取り込んだデータを
   // 使えないか」)、三菱UFJ公表の対象月末レートを、既存の月次売掛金Excel(仕入・販売帳)の該当セルに
   // 書き込み、更新後のファイルをダウンロードする機能。
+  // 2026-09-09修正(ユーザー報告): 上記の手動入力欄(payout/closingFunds等)に依存していたため、
+  // その欄を埋め忘れた状態(特に4月分までしかデータの無い月次売掛金Excelで、5月以降の未入力月を
+  // 処理しようとした場合)に「Payout・Closing fundsが未入力です」というエラーになっていた。
+  // この欄はこの月次売掛金Excel更新専用のeBay Financial Statementファイルを直接アップロードする
+  // ようにし、上部の手動入力欄には依存しない、独立した機能にした(対象月・アカウントはこの
+  // ファイルから毎回自動判定するため、月次売掛金Excel側にどの月まで既存データが入っているかには
+  // 影響されない)。
   const [ledgerFile, setLedgerFile] = useState<File | null>(null);
+  const [ledgerStatementFile, setLedgerStatementFile] = useState<File | null>(null);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerMessage, setLedgerMessage] = useState<string | null>(null);
   const [ledgerIsError, setLedgerIsError] = useState(false);
@@ -851,18 +859,28 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       setLedgerMessage("月次売掛金Excelファイルを選択してください");
       return;
     }
-    const payoutUsd = Number(payout);
-    const closingFundsUsd = Number(closingFunds);
-    if (!payout.trim() || !Number.isFinite(payoutUsd) || !closingFunds.trim() || !Number.isFinite(closingFundsUsd)) {
+    if (!ledgerStatementFile) {
       setLedgerIsError(true);
-      setLedgerMessage(
-        "Payout・Closing fundsが未入力です。上のPDF変換ファイルを解析するか、手動で入力してください。",
-      );
+      setLedgerMessage("eBay Financial Statementを変換したExcelファイルを選択してください");
       return;
     }
 
     setLedgerBusy(true);
     try {
+      const stmt = await parseFinancialStatementXlsx(await ledgerStatementFile.arrayBuffer());
+      if (stmt.payoutUsd == null || stmt.closingFundsUsd == null || !stmt.ebayAccount || !stmt.yearMonth) {
+        throw new Error(
+          "選択したファイルからPayout・Closing funds・アカウント・対象年月を読み取れませんでした。想定と異なる形式のファイルの可能性があります。",
+        );
+      }
+      if (!(EBAY_ACCOUNTS as string[]).includes(stmt.ebayAccount)) {
+        throw new Error(`未対応のeBayアカウントです: ${stmt.ebayAccount}`);
+      }
+      const ebayAccount = stmt.ebayAccount;
+      const yearMonth = stmt.yearMonth;
+      const payoutUsd = stmt.payoutUsd;
+      const closingFundsUsd = stmt.closingFundsUsd;
+
       const payoneerSummary = await fetchPayoneerSummaryForMonth(yearMonth);
       if (!payoneerSummary) {
         throw new Error(
@@ -875,7 +893,7 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       const ledgerBuffer = await ledgerFile.arrayBuffer();
       const { buffer, updatedRowLabels } = await updateMonthlyLedgerWorkbook({
         ledgerBuffer,
-        ebayAccount: account,
+        ebayAccount,
         yearMonth,
         payoutUsd,
         closingFundsUsd,
@@ -885,7 +903,7 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
       });
 
       // 月次売掛金Excelへの反映と合わせて、取込状況(済/未表示)用のDB保存も行う
-      await saveFinancialStatementManualEntry({ ebayAccount: account, yearMonth, payoutUsd, closingFundsUsd });
+      await saveFinancialStatementManualEntry({ ebayAccount, yearMonth, payoutUsd, closingFundsUsd });
       onImported();
 
       const blob = new Blob([buffer as BlobPart], {
@@ -955,12 +973,24 @@ function FinancialStatementSection({ onImported }: { onImported: () => void }) {
 
       <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>月次売掛金Excelの更新</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-        上記のPayout・Closing funds(アカウント・対象年月含む)と、取込済みのPayoneer Transaction
-        Report(下部「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に取り込んでおいて
-        ください)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel(仕入・販売帳)の
-        該当行に書き込み、更新後のファイルをダウンロードします。対象月・アカウントの行があらかじめ
-        用意されているファイルを使用してください(新規行の自動追加はしません)。
+        eBay Financial Statementを変換したExcelファイル(対象月・アカウントはこのファイルから自動
+        判定します。上のPayout・Closing funds入力欄とは独立しています)と、取込済みのPayoneer
+        Transaction Report(下部「Payoneer Transaction Report(CSV・2アカウント統合)」欄で先に
+        取り込んでおいてください)、三菱UFJ公表の対象月末レートを、アップロードした月次売掛金Excel
+        (仕入・販売帳)の該当行に書き込み、更新後のファイルをダウンロードします。対象月・アカウントの
+        行があらかじめ用意されているファイルを使用してください(新規行の自動追加はしません)。
       </p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+        <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          eBay Financial Statementを変換したExcel(.xlsx):
+        </label>
+        <input
+          type="file"
+          accept=".xlsx"
+          onChange={(e) => setLedgerStatementFile(e.target.files?.[0] ?? null)}
+          disabled={ledgerBusy}
+        />
+      </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
         <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>月次売掛金Excel(.xlsx):</label>
         <input
