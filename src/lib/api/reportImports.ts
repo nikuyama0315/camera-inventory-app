@@ -380,6 +380,16 @@ export interface TaxInvoiceAnalysis {
    * resolvedRatesで解決できなかった行のフォールバックとして、行ごとの実際の取引日で突合する。
    */
   dateResolvedRates: Record<string, number>;
+  /** 2026-09-09追加: 対象月と判定した年月(YYYY-MM-01、行の最頻月)。取込結果の期間もこの月のみになる。 */
+  targetYearMonth: string;
+  /**
+   * 2026-09-09追加: CSV内に対象月以外(前月末・翌月初のはみ出し行)の日付が含まれていたため、
+   * 取込対象から除外した行数。eBayの月次Tax InvoiceレポートはCSVの対象月を跨いだ日の行を
+   * 含むことがあり(実例: 1月分レポートに2/1付の行が数件含まれていた)、これをそのまま取り込むと
+   * 「取込状況」画面で翌月分まで誤って「済」と表示されてしまう不具合があったための対策
+   * (ユーザー指摘により発覚)。
+   */
+  excludedOtherMonthCount: number;
 }
 
 /**
@@ -389,10 +399,18 @@ export interface TaxInvoiceAnalysis {
  */
 export async function analyzeEbayTaxInvoiceCsv(csv: ParsedCsv): Promise<TaxInvoiceAnalysis> {
   const rows = parseTaxInvoiceRows(csv);
-  const validRows = rows.filter((r) => r.line_date);
-  if (validRows.length === 0) {
+  const rowsWithDate = rows.filter((r) => r.line_date);
+  if (rowsWithDate.length === 0) {
     throw new Error("日付が取得できる行が1件もありませんでした。CSVの列名が想定と異なる可能性があります。");
   }
+
+  // 2026-09-09追加(ユーザー指示): eBayの月次Tax Invoiceレポートは対象月を跨いだ日の行
+  // (前月末・翌月初のはみ出し)を含むことがあるため、行の最頻月を対象月とみなし、それ以外の
+  // 月の行は取込対象から除外する(上記TaxInvoiceAnalysis.excludedOtherMonthCountのコメント参照)。
+  const targetYearMonth = modalYearMonth(rowsWithDate.map((r) => r.line_date as string));
+  const targetYm = targetYearMonth.slice(0, 7);
+  const validRows = rowsWithDate.filter((r) => (r.line_date as string).slice(0, 7) === targetYm);
+  const excludedOtherMonthCount = rowsWithDate.length - validRows.length;
 
   const nonUsdRows = validRows.filter((r) => r.currency.toUpperCase() !== "USD");
   const rateMap = await lookupFxRatesFromTransactionLines(nonUsdRows.map((r) => r.order_number ?? ""));
@@ -418,6 +436,8 @@ export async function analyzeEbayTaxInvoiceCsv(csv: ParsedCsv): Promise<TaxInvoi
     unresolvedCurrencies: Array.from(unresolvedCurrencies).sort(),
     resolvedRates: Object.fromEntries(rateMap),
     dateResolvedRates: Object.fromEntries(dateRateMap),
+    targetYearMonth,
+    excludedOtherMonthCount,
   };
 }
 

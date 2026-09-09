@@ -556,17 +556,22 @@ function TaxInvoiceSection({ onImported }: { onImported: () => void }) {
       const result = await analyzeEbayTaxInvoiceCsv(csv);
       setAnalysis(result);
       setPendingFile(file);
+      const excludedNote =
+        result.excludedOtherMonthCount > 0
+          ? ` (対象月を${result.targetYearMonth.slice(0, 7)}と判定し、それ以外の日付の行${result.excludedOtherMonthCount}件は取込対象から除外しました)`
+          : "";
       if (result.unresolvedCurrencies.length === 0) {
         setIsError(false);
         setMessage(
-          Object.keys(result.currencyCounts).length > 0
+          (Object.keys(result.currencyCounts).length > 0
             ? `解析完了。USD以外の通貨(${Object.keys(result.currencyCounts).join("、")})はすべてebay_transaction_linesから換算レートを自動取得できました。内容を確認のうえ「取込実行」を押してください。`
-            : "解析完了。全行USD建てです。「取込実行」を押してください。",
+            : "解析完了。全行USD建てです。「取込実行」を押してください。") + excludedNote,
         );
       } else {
         setIsError(false);
         setMessage(
-          `解析完了。${result.unresolvedCurrencies.join("、")}は換算レートを自動取得できなかったため、下記に手動でレートを入力してから「取込実行」を押してください。`,
+          `解析完了。${result.unresolvedCurrencies.join("、")}は換算レートを自動取得できなかったため、下記に手動でレートを入力してから「取込実行」を押してください。` +
+            excludedNote,
         );
       }
     } catch (err) {
