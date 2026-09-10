@@ -382,6 +382,13 @@ export default function ExpensesPage() {
                 onChange={(e) => setFilters((prev) => ({ ...prev, vendor: e.target.value || undefined }))}
                 style={{ width: 160 }}
               />
+              <input
+                type="text"
+                placeholder="内容で絞り込み"
+                value={filters.description ?? ""}
+                onChange={(e) => setFilters((prev) => ({ ...prev, description: e.target.value || undefined }))}
+                style={{ width: 160 }}
+              />
               <span style={{ fontSize: 13, color: "var(--text-secondary)", marginLeft: "auto" }}>
                 表示中の合計: {total.toLocaleString()}円({expenses.length}件)
               </span>

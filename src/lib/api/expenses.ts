@@ -35,6 +35,7 @@ export interface ExpenseFilters {
   to?: string;
   category?: string;
   vendor?: string; // 部分一致(前方/中間/後方いずれもOK)
+  description?: string; // 内容(部分一致、前方/中間/後方いずれもOK)
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -58,6 +59,7 @@ export async function fetchExpenses(filters: ExpenseFilters = {}): Promise<Expen
   if (filters.to) query = query.lte("expense_date", filters.to);
   if (filters.category) query = query.eq("category", filters.category);
   if (filters.vendor) query = query.ilike("vendor", `%${filters.vendor}%`);
+  if (filters.description) query = query.ilike("description", `%${filters.description}%`);
 
   const { data, error } = await query;
   if (error) throw error;
