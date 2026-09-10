@@ -217,8 +217,6 @@ export default function ExportPage() {
           <SettleRow label="eBay決済口座" value={salesSettleEbayAccount} onChange={setSalesSettleEbayAccount} placeholder="例: Payoneer" />
         </ExportCard>
 
-        <FreeeTemplatePanel />
-
         <ExportCard title="仕入データCSV" onExport={handleExportPurchases} exporting={exportingKind === "purchases"} disabled={busy}>
           <SettleRow label="決済日" type="date" value={purchaseSettleDate} onChange={setPurchaseSettleDate} />
           <SettleRow label="決済口座" value={purchaseSettleAccount} onChange={setPurchaseSettleAccount} placeholder="例: 楽天銀行" />
@@ -228,6 +226,10 @@ export default function ExportPage() {
           <SettleRow label="決済日" type="date" value={expenseSettleDate} onChange={setExpenseSettleDate} />
           <SettleRow label="決済口座" value={expenseSettleAccount} onChange={setExpenseSettleAccount} placeholder="例: 楽天銀行" />
         </ExportCard>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <FreeeTemplatePanel />
       </div>
     </div>
   );
