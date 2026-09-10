@@ -34,8 +34,8 @@ export default function DirectSalesCsvPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  /** 一覧テーブルの折りたたみ表示(2026-09-03追加)。 */
-  const [isTableCollapsed, setIsTableCollapsed] = useState(false);
+  /** 一覧テーブルの折りたたみ表示(2026-09-03追加、2026-09-10デフォルトを折りたたみ済みに変更)。 */
+  const [isTableCollapsed, setIsTableCollapsed] = useState(true);
 
   async function reload() {
     setLoading(true);
