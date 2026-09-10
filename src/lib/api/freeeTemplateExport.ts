@@ -164,10 +164,26 @@ async function computeDomesticTotals(
   return { salesJpy, feeJpy };
 }
 
+/**
+ * 2026-09-10追加(ユーザー指示): 「利益管理票更新用データの作成」と同じ形式で、作成した
+ * 当該月分のデータを画面上に一覧表示するための行データ。テンプレートの各行(I/J/K列)に対応する。
+ */
+export interface FreeeTemplateRowValues {
+  platform: string;
+  account: string | null;
+  /** I列(売上高、円) */
+  salesJpy: number;
+  /** J列(販売手数料、円) */
+  feeJpy: number;
+  /** K列(広告宣伝費、円)。メルカリ・ヤフーフリマ行(K列自体が無い)はnull。 */
+  adFeeJpy: number | null;
+}
+
 export interface FreeeTemplateResult {
   buffer: ArrayBuffer;
   fileName: string;
   warnings: string[];
+  rows: FreeeTemplateRowValues[];
 }
 
 export async function buildFreeeTemplateWorkbook(yearMonth: string): Promise<FreeeTemplateResult> {
@@ -228,10 +244,42 @@ export async function buildFreeeTemplateWorkbook(yearMonth: string): Promise<Fre
   ws.getCell("I5").value = Math.round(yafuma.salesJpy);
   ws.getCell("J5").value = Math.round(yafuma.feeJpy);
 
+  const rows: FreeeTemplateRowValues[] = [
+    {
+      platform: "eBay",
+      account: "Soulcamera",
+      salesJpy: Math.round(soulcameraGrossUsd * rate),
+      feeJpy: Math.round(soulcameraFees.feeUsd * rate),
+      adFeeJpy: Math.round(soulcameraFees.adFeeUsd * rate),
+    },
+    {
+      platform: "eBay",
+      account: "Soulmenjapan",
+      salesJpy: Math.round(soulmenjapanGrossUsd * rate),
+      feeJpy: Math.round(soulmenjapanFees.feeUsd * rate),
+      adFeeJpy: Math.round(soulmenjapanFees.adFeeUsd * rate),
+    },
+    {
+      platform: "メルカリ",
+      account: null,
+      salesJpy: Math.round(mercari.salesJpy),
+      feeJpy: Math.round(mercari.feeJpy),
+      adFeeJpy: null,
+    },
+    {
+      platform: "ヤフーフリマ",
+      account: null,
+      salesJpy: Math.round(yafuma.salesJpy),
+      feeJpy: Math.round(yafuma.feeJpy),
+      adFeeJpy: null,
+    },
+  ];
+
   const buffer = await workbook.xlsx.writeBuffer();
   return {
     buffer: buffer as ArrayBuffer,
     fileName: `Freee取引テンプレート用データ${yearMonth.replace("-", "")}.xlsx`,
     warnings,
+    rows,
   };
 }
