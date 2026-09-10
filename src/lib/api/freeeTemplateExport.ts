@@ -197,7 +197,7 @@ export async function buildFreeeTemplateWorkbook(yearMonth: string): Promise<Fre
   const ttmRate = rates[yearMonth] ?? null;
   if (ttmRate == null) {
     warnings.push(
-      `${yearMonth}の月末TTMレートが「月次為替レート」に未登録のため、eBay関連(I2〜K3)は0円のまま出力しました。データ出力タブ上部でレートを保存してから再実行してください。`,
+      `${yearMonth}の月末TTMレートが「月次為替レート」に未登録のため、eBay関連(I2〜K3)は0円のまま出力しました。データ作成タブ上部でレートを保存してから再実行してください。`,
     );
   }
   const rate = ttmRate ?? 0;

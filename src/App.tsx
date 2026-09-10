@@ -22,12 +22,12 @@ type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "e
 const TABS: { key: Tab; label: string }[] = [
   { key: "inventory", label: "仕入・在庫・販売" },
   { key: "sales", label: "売上・粗利" },
+  { key: "expenses", label: "経費" },
   { key: "skuLookup", label: "SKU検索" },
   { key: "stockAlerts", label: "在庫アラート" },
-  { key: "expenses", label: "経費" },
-  { key: "exchangeRate", label: "為替" },
   { key: "import", label: "レポート取込" },
-  { key: "export", label: "データ出力" },
+  { key: "export", label: "データ作成" },
+  { key: "exchangeRate", label: "為替" },
   { key: "eventLog", label: "イベントログ" },
 ];
 
