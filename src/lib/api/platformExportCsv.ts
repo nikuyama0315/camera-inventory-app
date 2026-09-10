@@ -62,13 +62,17 @@ type RawRow = {
 };
 
 /**
- * 商品を全件取得する(絞り込みはクライアント側、在庫タブの一覧表示と同じ方針)。
+ * 商品を取得する(絞り込みはクライアント側、在庫タブの一覧表示と同じ方針)。
  *
  * 2026-09-10修正(ユーザー指摘「一覧を展開する(1000件) 1000件の根拠は?」): .range()指定無しの
  * select()はSupabase(PostgREST)側のデフォルト上限(max-rows、既定1000件)で暗黙的に打ち切られる。
- * items全体が1167件(2026-09-10時点)あるため、修正前は167件が一覧・CSVの両方から漏れていた
- * (「全件取得」のつもりが実際には先頭1000件のみだった不具合)。.range()で1000件ずつページングし、
- * 取得件数がページサイズ未満になるまで繰り返すことで、件数に関わらず本当の全件を取得する。
+ * .range()で1000件ずつページングし、取得件数がページサイズ未満になるまで繰り返すことで、
+ * 件数に関わらず本当の全件を取得する。
+ *
+ * 2026-09-10追加(ユーザー指示): この機能の対象を「Soulcameraアカウントで、検品済・出品待ち
+ * または出品中のもの」に限定した(直販プラットフォームへの新規登録・出品中の内容確認が目的のため、
+ * 他アカウント・他ステータス(販売済み等)は対象外)。account="soulcamera" かつ
+ * status IN (inspected_awaiting_listing, listed) をクエリ側で絞り込む。
  */
 export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> {
   const PAGE_SIZE = 1000;
@@ -82,6 +86,8 @@ export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> 
           "purchases(purchase_date), sales(sale_date, sale_item_title), " +
           "inspections(inspected_at, overall_notes_en, appearance_notes_en, viewfinder_notes_en, lens_notes_en, other_notes_en)",
       )
+      .eq("account", "soulcamera")
+      .in("status", ["inspected_awaiting_listing", "listed"])
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
