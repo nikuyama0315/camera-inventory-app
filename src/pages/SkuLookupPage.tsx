@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { searchBySkuFragment, type SkuLookupRow } from "../lib/api/skuLookup";
+import {
+  searchBySkuFragment,
+  searchEbayLiveBySkuFragment,
+  type SkuLookupRow,
+  type EbayLiveSkuMatch,
+} from "../lib/api/skuLookup";
 import { ITEM_STATUS_LABELS } from "../lib/types";
 import ItemDetailPane from "../components/inventory/ItemDetailPane";
 
@@ -17,10 +22,33 @@ export default function SkuLookupPage() {
   const [searched, setSearched] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
+  // ライブ検索(2026-09-10追加): soulcameraアカウントのeBayアクティブ出品(USサイトのみ)を対象に、
+  // Item Specificsの「Soulcamera Item Info」があればそれを優先し、無ければCustom Label(SKU)に
+  // フォールバックして部分一致検索する。DB検索とは別に(結果が揃うタイミングが違うため独立して)実行する。
+  const [liveRows, setLiveRows] = useState<EbayLiveSkuMatch[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveErrorMessage, setLiveErrorMessage] = useState<string | null>(null);
+  const [liveSearched, setLiveSearched] = useState(false);
+
   async function handleSearch() {
     setLoading(true);
     setErrorMessage(null);
     setSearched(true);
+    setLiveLoading(true);
+    setLiveErrorMessage(null);
+    setLiveSearched(true);
+
+    void (async () => {
+      try {
+        const data = await searchEbayLiveBySkuFragment(query);
+        setLiveRows(data);
+      } catch (err) {
+        setLiveErrorMessage(err instanceof Error ? err.message : "ライブ検索に失敗しました");
+      } finally {
+        setLiveLoading(false);
+      }
+    })();
+
     try {
       const data = await searchBySkuFragment(query);
       setRows(data);
@@ -54,6 +82,8 @@ export default function SkuLookupPage() {
           {loading ? "検索中..." : "検索"}
         </button>
       </div>
+
+      {searched && <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 8px" }}>DB検索結果</p>}
 
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}
 
@@ -117,6 +147,71 @@ export default function SkuLookupPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {searched && (
+        <div style={{ marginTop: 28 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>
+            eBayライブ検索結果(soulcameraアカウント・USサイトのみ)
+          </p>
+          <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+            eBayのアクティブ出品を毎回APIでライブ取得して検索します(DBには保存されていない値のため)。
+            出品のItem Specifics「Soulcamera Item Info」があればそれを優先して検索し、無ければCustom
+            label(SKU)で検索します。件数によっては時間がかかります。
+          </p>
+
+          {liveLoading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>ライブ検索中...</p>}
+          {liveErrorMessage && (
+            <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{liveErrorMessage}</p>
+          )}
+          {!liveLoading && liveSearched && liveRows.length === 0 && !liveErrorMessage && (
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              該当するeBayアクティブ出品(soulcamera・USサイト)が見つかりませんでした
+            </p>
+          )}
+          {!liveLoading && liveRows.length > 0 && (
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                  <th style={{ padding: "6px 4px", fontWeight: 500 }}>一致元</th>
+                  <th style={{ padding: "6px 4px", fontWeight: 500 }}>一致した文字列</th>
+                  <th style={{ padding: "6px 4px", fontWeight: 500 }}>商品タイトル</th>
+                  <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>在庫数</th>
+                  <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {liveRows.map((r) => (
+                  <tr key={r.itemId} style={{ borderTop: "0.5px solid var(--border)" }}>
+                    <td style={{ padding: "8px 4px" }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          background: "var(--surface-1)",
+                          border: "0.5px solid var(--border)",
+                        }}
+                      >
+                        {r.matchSource === "soulcamera_item_info" ? "Item Info" : "SKU"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "8px 4px", fontWeight: 500 }}>{r.matchedText}</td>
+                    <td style={{ padding: "8px 4px" }}>{r.title ?? "-"}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right" }}>{r.quantityAvailable}</td>
+                    <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                      {r.viewItemUrl && (
+                        <a href={r.viewItemUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
+                          eBayで開く
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       {editingItemId && (

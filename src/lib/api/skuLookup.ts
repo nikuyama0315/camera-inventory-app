@@ -57,3 +57,34 @@ export async function searchBySkuFragment(fragment: string): Promise<SkuLookupRo
     };
   });
 }
+
+export interface EbayLiveSkuMatch {
+  itemId: string;
+  sku: string | null;
+  soulcameraItemInfo: string | null;
+  title: string | null;
+  quantityAvailable: number;
+  viewItemUrl: string | null;
+  matchSource: "soulcamera_item_info" | "sku";
+  matchedText: string;
+}
+
+/**
+ * SKU検索「ライブ検索」(2026-09-10追加)。soulcameraアカウントのeBayアクティブ出品(USサイトのみ)を
+ * 対象に、Item Specificsの「Soulcamera Item Info」があればそれを優先して検索対象文字列とし、
+ * 無ければCustom Label(SKU)にフォールバックして、入力文字列の部分一致で検索する。
+ * DBには保存されていない値のため、検索の都度eBay APIから取得する(ebay-sku-live-search Edge Function)。
+ */
+export async function searchEbayLiveBySkuFragment(fragment: string): Promise<EbayLiveSkuMatch[]> {
+  const trimmed = fragment.trim();
+  if (!trimmed) return [];
+
+  const { data, error } = await supabase.functions.invoke("ebay-sku-live-search", {
+    body: { query: trimmed },
+  });
+  if (error) throw error;
+  if (data && typeof data === "object" && "error" in data && (data as { error?: unknown }).error) {
+    throw new Error(String((data as { error: unknown }).error));
+  }
+  return (data as { matches: EbayLiveSkuMatch[] }).matches;
+}
