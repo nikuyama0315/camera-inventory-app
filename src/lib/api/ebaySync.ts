@@ -26,7 +26,7 @@ export type EbayMatchStatus = "unmatched" | "matched_pending" | "registered" | "
  * before summing (order+item+date+description+fee_type+amount) - legitimate duplicate charges
  * with identical values are effectively never expected for the same order/item.
  */
-function dedupeTaxInvoiceRows<
+export function dedupeTaxInvoiceRows<
   T extends {
     order_number: string | null;
     item_number: string | null;

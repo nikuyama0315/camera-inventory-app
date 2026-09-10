@@ -10,6 +10,7 @@ import {
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm } from "../lib/api/mufgRate";
 import DirectSalesCsvPanel from "../components/csvExport/DirectSalesCsvPanel";
+import FreeeTemplatePanel from "../components/csvExport/FreeeTemplatePanel";
 
 /** "YYYY-MM" を delta ヶ月分シフトした "YYYY-MM" を返す(delta=-1で前月)。 */
 function shiftMonth(yearMonth: string, delta: number): string {
@@ -215,6 +216,8 @@ export default function ExportPage() {
           <SettleRow label="国内決済口座" value={salesSettleJpAccount} onChange={setSalesSettleJpAccount} placeholder="例: 楽天銀行" />
           <SettleRow label="eBay決済口座" value={salesSettleEbayAccount} onChange={setSalesSettleEbayAccount} placeholder="例: Payoneer" />
         </ExportCard>
+
+        <FreeeTemplatePanel />
 
         <ExportCard title="仕入データCSV" onExport={handleExportPurchases} exporting={exportingKind === "purchases"} disabled={busy}>
           <SettleRow label="決済日" type="date" value={purchaseSettleDate} onChange={setPurchaseSettleDate} />
