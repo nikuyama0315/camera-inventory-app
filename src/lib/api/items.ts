@@ -108,6 +108,8 @@ export interface ItemWithPurchase extends Item {
   sales_record_reference: string | null;
   /** 直近の売上(sales)レコードの追跡番号(sales.tracking_info)。未販売ならnull。2026-09-06追加。 */
   tracking_info: string | null;
+  /** 直近の売上(sales)レコードの送料支払額(sales.shipping_cost_paid)。未販売ならnull。2026-09-10追加。 */
+  shipping_cost_paid: number | null;
   drive_folder_id: string | null;
   drive_folder_path: string | null;
   drive_model_folder_name: string | null;
@@ -126,11 +128,14 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   // 埋め込み側の配列内容が絞られるだけになるため、items自体を絞り込みたい場合は !inner が必須。
   // 通常時(絞り込み無し)は従来通り左外部結合のままにし、売上未登録の商品も一覧に含まれるようにする。
   const needsSalesInnerJoin = Boolean(
-    filters.trackingNumber || filters.saleDateFrom || filters.saleDateTo,
+    filters.trackingNumber ||
+      filters.saleDateFrom ||
+      filters.saleDateTo ||
+      filters.status === "sold_missing_shipping_tracking",
   );
   const salesEmbed = needsSalesInnerJoin
-    ? "sales!inner(sale_date, sale_item_title, sales_record_reference, tracking_info)"
-    : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info)";
+    ? "sales!inner(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)"
+    : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)";
   let query = supabase
     .from("items")
     .select(
@@ -152,6 +157,13 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
 
   if (filters.status === "not_sold") {
     query = query.neq("status", "sold");
+  } else if (filters.status === "sold_missing_shipping_tracking") {
+    // 2026-09-10追加(ユーザー指示): 販売済み(sold)かつ、直近の売上の送料支払額が未入力(0/未設定)
+    // または追跡番号が未入力のものを対象とする。埋め込みリソース(sales)側の条件をOR結合するため、
+    // foreignTableオプションを使う(sales!inner結合であることが前提。needsSalesInnerJoin参照)。
+    query = query
+      .eq("status", "sold")
+      .or("shipping_cost_paid.is.null,shipping_cost_paid.eq.0,tracking_info.is.null", { foreignTable: "sales" });
   } else if (filters.status) {
     query = query.eq("status", filters.status);
   }
@@ -255,8 +267,8 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
         | { purchase_date: string; purchase_price: number; source_type: string | null; source_name: string | null }[]
         | null;
       sales:
-        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null }[]
-        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null }
+        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null; shipping_cost_paid: number | null }[]
+        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null; shipping_cost_paid: number | null }
         | null;
       item_drive_folders:
         | { drive_folder_id: string | null; drive_folder_path: string; model_folder_name: string | null; item_folder_name: string | null; current_stage: string | null }
@@ -279,6 +291,7 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
       sale_item_title: latestSale?.sale_item_title ?? null,
       sales_record_reference: latestSale?.sales_record_reference ?? null,
       tracking_info: latestSale?.tracking_info ?? null,
+      shipping_cost_paid: latestSale?.shipping_cost_paid ?? null,
       drive_folder_id: driveFolder?.drive_folder_id ?? null,
       drive_folder_path: driveFolder?.drive_folder_path ?? null,
       drive_model_folder_name: driveFolder?.model_folder_name ?? null,

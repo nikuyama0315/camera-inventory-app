@@ -153,8 +153,11 @@ export interface ItemDetail extends Item {
 }
 
 export interface ItemListFilters {
-  /** "not_sold" は特殊な絞り込み条件で、ステータスが"sold"(販売済み)以外の全件を対象とする(個別のItemStatus値との完全一致ではない)。 */
-  status?: ItemStatus | "not_sold";
+  /** "not_sold" は特殊な絞り込み条件で、ステータスが"sold"(販売済み)以外の全件を対象とする(個別のItemStatus値との完全一致ではない)。
+   *  "sold_missing_shipping_tracking"も特殊な絞り込み条件で、ステータスが"sold"かつ、直近の売上(sales)の
+   *  送料支払額(shipping_cost_paid)が未入力(0または未設定)か追跡番号(tracking_info)が未入力のもの
+   *  (2026-09-10追加、ユーザー指示)。 */
+  status?: ItemStatus | "not_sold" | "sold_missing_shipping_tracking";
   brand?: string;
   keyword?: string;
   /** 業務分類カテゴリ(items.category、カメラ関連品/雑貨/衣類など)での絞り込み(完全一致)。

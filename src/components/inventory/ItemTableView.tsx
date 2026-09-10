@@ -141,8 +141,10 @@ interface TableFilters {
   category: string;
   /** ""=すべて, "unset"=未設定(null)のみ, それ以外はEbayAccountの値と完全一致 */
   account: string;
-  /** "not_sold" はステータスが"sold"(販売済み)以外の全件を対象とする特殊な絞り込み条件。 */
-  status: ItemStatus | "not_sold" | "";
+  /** "not_sold" はステータスが"sold"(販売済み)以外の全件を対象とする特殊な絞り込み条件。
+   *  "sold_missing_shipping_tracking"は、ステータスが"sold"かつ送料支払額未入力(0/未設定)か
+   *  追跡番号未入力のものを対象とする特殊な絞り込み条件(2026-09-10追加、ユーザー指示)。 */
+  status: ItemStatus | "not_sold" | "sold_missing_shipping_tracking" | "";
   purchaseDateFrom: string;
   purchaseDateTo: string;
   saleDateFrom: string;
@@ -309,6 +311,11 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
       }
       if (filters.status === "not_sold") {
         if (item.status === "sold") return false;
+      } else if (filters.status === "sold_missing_shipping_tracking") {
+        if (item.status !== "sold") return false;
+        const shippingMissing = !item.shipping_cost_paid;
+        const trackingMissing = !item.tracking_info;
+        if (!shippingMissing && !trackingMissing) return false;
       } else if (filters.status && item.status !== filters.status) {
         return false;
       }
@@ -419,10 +426,16 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
           <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ステータス</label>
           <select
             value={filters.status}
-            onChange={(e) => updateFilter("status", e.target.value as ItemStatus | "not_sold" | "")}
+            onChange={(e) =>
+              updateFilter(
+                "status",
+                e.target.value as ItemStatus | "not_sold" | "sold_missing_shipping_tracking" | "",
+              )
+            }
           >
             <option value="">すべて</option>
             <option value="not_sold">販売済み以外</option>
+            <option value="sold_missing_shipping_tracking">販売済・送料/追跡情報未入力</option>
             {STATUS_OPTIONS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}

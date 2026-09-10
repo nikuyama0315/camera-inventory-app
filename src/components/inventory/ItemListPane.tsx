@@ -54,13 +54,18 @@ export default function ItemListPane({
             onChange={(e) =>
               onFiltersChange({
                 ...filters,
-                status: (e.target.value || undefined) as ItemStatus | "not_sold" | undefined,
+                status: (e.target.value || undefined) as
+                  | ItemStatus
+                  | "not_sold"
+                  | "sold_missing_shipping_tracking"
+                  | undefined,
               })
             }
             style={{ flex: 1 }}
           >
             <option value="">ステータス(すべて)</option>
             <option value="not_sold">販売済み以外</option>
+            <option value="sold_missing_shipping_tracking">販売済・送料/追跡情報未入力</option>
             {STATUS_OPTIONS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
