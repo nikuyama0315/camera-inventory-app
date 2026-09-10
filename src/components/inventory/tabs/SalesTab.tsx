@@ -20,6 +20,9 @@ interface EditForm {
   tracking_info: string;
   /** 2026-09-10追加(ユーザー指示): 販売プラットフォーム(メルカリ・ヤフーフリマ等)。 */
   sales_platform: string;
+  /** 2026-09-10追加(ユーザー指示): 邦プラットフォーム販売価格・手数料(円)を編集可能にした。 */
+  jp_platform_price: string;
+  jp_platform_fee: string;
 }
 
 type SaleRow = ItemDetail["sales"][number];
@@ -89,6 +92,8 @@ export default function SalesTab({ item, onChanged }: Props) {
     shipping_cost_paid: "0",
     tracking_info: "",
     sales_platform: "",
+    jp_platform_price: "0",
+    jp_platform_fee: "0",
   });
   const [busy, setBusy] = useState(false);
   const [resettingSaleId, setResettingSaleId] = useState<string | null>(null);
@@ -150,6 +155,8 @@ export default function SalesTab({ item, onChanged }: Props) {
       shipping_cost_paid: String(sale.shipping_cost_paid),
       tracking_info: sale.tracking_info ?? "",
       sales_platform: sale.sales_platform ?? "",
+      jp_platform_price: String(sale.jp_platform_price),
+      jp_platform_fee: String(sale.jp_platform_fee),
     });
   }
 
@@ -174,6 +181,8 @@ export default function SalesTab({ item, onChanged }: Props) {
         shipping_cost_paid: Number(editForm.shipping_cost_paid) || 0,
         tracking_info: editForm.tracking_info.trim() || null,
         sales_platform: editForm.sales_platform.trim() || null,
+        jp_platform_price: Number(editForm.jp_platform_price) || 0,
+        jp_platform_fee: Number(editForm.jp_platform_fee) || 0,
       });
       setEditingSaleId(null);
       onChanged();
@@ -345,11 +354,29 @@ export default function SalesTab({ item, onChanged }: Props) {
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>邦プラットフォーム販売価格(円)</span>
-              <span>{jpy(sale.jp_platform_price)}</span>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={editForm.jp_platform_price}
+                  onChange={(e) => updateEditField("jp_platform_price", e.target.value)}
+                  style={{ width: 140 }}
+                />
+              ) : (
+                <span>{jpy(sale.jp_platform_price)}</span>
+              )}
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>邦プラットフォーム手数料(円)</span>
-              <span>{jpy(sale.jp_platform_fee)}</span>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={editForm.jp_platform_fee}
+                  onChange={(e) => updateEditField("jp_platform_fee", e.target.value)}
+                  style={{ width: 140 }}
+                />
+              ) : (
+                <span>{jpy(sale.jp_platform_fee)}</span>
+              )}
             </div>
             <div style={ROW_STYLE}>
               <span style={LABEL_STYLE}>送料支払額(円)</span>
