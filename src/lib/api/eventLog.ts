@@ -18,6 +18,9 @@ const SOURCE_LABELS: Record<string, string> = {
   "move-drive-folder": "フォルダ移動",
   "check-stock-alerts": "在庫アラート",
   "notify-password-changed": "パスワード変更",
+  // 2026-09-10追加: ebay-automation側のevent_notifier.py(受注・メッセージ・返品・キャンセル・
+  // INR問い合わせ・ケース・フィードバックをまとめて通知)由来のログ。
+  "event_notifier": "eBay通知",
 };
 
 export function eventSourceLabel(source: string): string {
