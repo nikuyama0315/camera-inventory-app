@@ -901,6 +901,7 @@ export default function SalesPage() {
 
       <EbayXlsxFillPanel />
 
+      <div style={{ marginBottom: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>売上一覧{summary ? `(${summary.count}件)` : ""}</p>
         <button onClick={scrollToFormSection} style={{ fontSize: 12, padding: "4px 10px", marginLeft: "auto" }}>
@@ -918,13 +919,13 @@ export default function SalesPage() {
               <col style={{ width: "7%" }} />
               <col style={{ width: "7%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "26%" }} />
+              <col style={{ width: "22%" }} />
               <col style={{ width: "9%" }} />
               <col style={{ width: "10%" }} />
               <col style={{ width: "9%" }} />
               <col style={{ width: "8%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "5%" }} />
+              <col style={{ width: "12%" }} />
             </colgroup>
             <thead>
               <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
@@ -989,6 +990,7 @@ export default function SalesPage() {
         </div>
       )}
       {!loading && list.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>該当する売上データがありません</p>}
+      </div>
 
       <div style={{ background: "var(--surface-2)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
