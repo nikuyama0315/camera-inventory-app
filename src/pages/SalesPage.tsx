@@ -901,6 +901,95 @@ export default function SalesPage() {
 
       <EbayXlsxFillPanel />
 
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>売上一覧{summary ? `(${summary.count}件)` : ""}</p>
+        <button onClick={scrollToFormSection} style={{ fontSize: 12, padding: "4px 10px", marginLeft: "auto" }}>
+          フォームへ移動
+        </button>
+        <button onClick={() => setIsSalesListCollapsed((v) => !v)} style={{ fontSize: 12, padding: "4px 10px" }}>
+          {isSalesListCollapsed ? `一覧を展開する${summary ? `(${summary.count}件)` : ""}` : "一覧を折りたたむ"}
+        </button>
+      </div>
+      {loading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>読み込み中...</p>}
+      {!loading && !isSalesListCollapsed && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap", tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "5%" }} />
+            </colgroup>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                <th
+                  onClick={() => handleSalesSort("sale_date")}
+                  style={{ padding: "6px 8px", cursor: "pointer", userSelect: "none" }}
+                >
+                  販売日{salesSortColumn === "sale_date" && (salesSortDirection === "asc" ? " ▲" : " ▼")}
+                </th>
+                <th
+                  onClick={() => handleSalesSort("management_no")}
+                  style={{ padding: "6px 8px", cursor: "pointer", userSelect: "none" }}
+                >
+                  管理番号{salesSortColumn === "management_no" && (salesSortDirection === "asc" ? " ▲" : " ▼")}
+                </th>
+                <th style={{ padding: "6px 8px" }}>アカウント</th>
+                <th style={{ padding: "6px 8px" }}>販売アイテム名</th>
+                <th style={{ padding: "6px 8px" }}>追跡情報</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>円貨+ドル貨合計</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>送料支払</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>仕入高</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>粗利</th>
+                <th style={{ padding: "6px 8px" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedList.map((s) => (
+                <tr key={s.id} style={{ borderTop: "0.5px solid var(--border)" }}>
+                  <td style={{ padding: "8px" }}>{s.sale_date}</td>
+                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
+                    <div>{s.items?.management_no ?? "-"}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.items?.title ?? "-"}</div>
+                  </td>
+                  <td style={{ padding: "8px" }}>
+                    {s.account ? EBAY_ACCOUNT_LABELS[s.account as keyof typeof EBAY_ACCOUNT_LABELS] ?? s.account : "-"}
+                  </td>
+                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
+                    {s.sale_item_title ?? "-"}
+                  </td>
+                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
+                    {s.tracking_info ?? "-"}
+                  </td>
+                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.total_jpy).toLocaleString()}</td>
+                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.shipping_cost_paid).toLocaleString()}</td>
+                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.purchase_price_snapshot).toLocaleString()}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontWeight: 500 }}>¥{Math.round(s.gross_profit_jpy).toLocaleString()}</td>
+                  <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
+                    <button
+                      onClick={() => startEditSale(s)}
+                      style={{ fontSize: 11, padding: "2px 8px", marginRight: 4 }}
+                    >
+                      編集
+                    </button>
+                    <button onClick={() => handleDelete(s.id)} style={{ fontSize: 11, padding: "2px 8px" }}>
+                      削除
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!loading && list.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>該当する売上データがありません</p>}
+
       <div style={{ background: "var(--surface-2)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
@@ -1414,95 +1503,6 @@ export default function SalesPage() {
           {saving ? (editingSaleId ? "更新中..." : "登録中...") : editingSaleId ? "更新する" : "登録する"}
         </button>
       </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>売上一覧{summary ? `(${summary.count}件)` : ""}</p>
-        <button onClick={scrollToFormSection} style={{ fontSize: 12, padding: "4px 10px", marginLeft: "auto" }}>
-          フォームへ移動
-        </button>
-        <button onClick={() => setIsSalesListCollapsed((v) => !v)} style={{ fontSize: 12, padding: "4px 10px" }}>
-          {isSalesListCollapsed ? `一覧を展開する${summary ? `(${summary.count}件)` : ""}` : "一覧を折りたたむ"}
-        </button>
-      </div>
-      {loading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>読み込み中...</p>}
-      {!loading && !isSalesListCollapsed && (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap", tableLayout: "fixed" }}>
-            <colgroup>
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "5%" }} />
-            </colgroup>
-            <thead>
-              <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
-                <th
-                  onClick={() => handleSalesSort("sale_date")}
-                  style={{ padding: "6px 8px", cursor: "pointer", userSelect: "none" }}
-                >
-                  販売日{salesSortColumn === "sale_date" && (salesSortDirection === "asc" ? " ▲" : " ▼")}
-                </th>
-                <th
-                  onClick={() => handleSalesSort("management_no")}
-                  style={{ padding: "6px 8px", cursor: "pointer", userSelect: "none" }}
-                >
-                  管理番号{salesSortColumn === "management_no" && (salesSortDirection === "asc" ? " ▲" : " ▼")}
-                </th>
-                <th style={{ padding: "6px 8px" }}>アカウント</th>
-                <th style={{ padding: "6px 8px" }}>販売アイテム名</th>
-                <th style={{ padding: "6px 8px" }}>追跡情報</th>
-                <th style={{ padding: "6px 8px", textAlign: "right" }}>円貨+ドル貨合計</th>
-                <th style={{ padding: "6px 8px", textAlign: "right" }}>送料支払</th>
-                <th style={{ padding: "6px 8px", textAlign: "right" }}>仕入高</th>
-                <th style={{ padding: "6px 8px", textAlign: "right" }}>粗利</th>
-                <th style={{ padding: "6px 8px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedList.map((s) => (
-                <tr key={s.id} style={{ borderTop: "0.5px solid var(--border)" }}>
-                  <td style={{ padding: "8px" }}>{s.sale_date}</td>
-                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
-                    <div>{s.items?.management_no ?? "-"}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.items?.title ?? "-"}</div>
-                  </td>
-                  <td style={{ padding: "8px" }}>
-                    {s.account ? EBAY_ACCOUNT_LABELS[s.account as keyof typeof EBAY_ACCOUNT_LABELS] ?? s.account : "-"}
-                  </td>
-                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
-                    {s.sale_item_title ?? "-"}
-                  </td>
-                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
-                    {s.tracking_info ?? "-"}
-                  </td>
-                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.total_jpy).toLocaleString()}</td>
-                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.shipping_cost_paid).toLocaleString()}</td>
-                  <td style={{ padding: "8px", textAlign: "right" }}>¥{Math.round(s.purchase_price_snapshot).toLocaleString()}</td>
-                  <td style={{ padding: "8px", textAlign: "right", fontWeight: 500 }}>¥{Math.round(s.gross_profit_jpy).toLocaleString()}</td>
-                  <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
-                    <button
-                      onClick={() => startEditSale(s)}
-                      style={{ fontSize: 11, padding: "2px 8px", marginRight: 4 }}
-                    >
-                      編集
-                    </button>
-                    <button onClick={() => handleDelete(s.id)} style={{ fontSize: 11, padding: "2px 8px" }}>
-                      削除
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {!loading && list.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>該当する売上データがありません</p>}
 
       <div
         style={{
