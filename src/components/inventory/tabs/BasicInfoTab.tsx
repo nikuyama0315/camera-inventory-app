@@ -44,6 +44,12 @@ interface EditForm {
   /** 「仕入・販売帳」エクセルのSales #列。sales.sales_record_referenceに保存される(management_noとは別物)。
    *  該当する売上(sales)が1件のときのみ編集可能(0件・複数件の場合は編集対象を一意に決められないため読み取り専用)。 */
   sales_record_reference: string;
+  /** 2026-09-10追加(ユーザー指示): 「ITEM TITLE」(sales.sale_item_title)。sales_record_referenceと
+   *  同様、該当する売上が1件のときのみ編集可能。 */
+  sale_item_title: string;
+  /** 2026-09-10追加(ユーザー指示): 「販売プラットフォーム」(sales.sales_platform、メルカリ・
+   *  ヤフーフリマ等)。sales_record_referenceと同様、該当する売上が1件のときのみ編集可能。 */
+  sales_platform: string;
   title: string;
   category: string;
   brand: string;
@@ -156,6 +162,8 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
     setEditForm({
       management_no: item.management_no,
       sales_record_reference: item.sales?.length === 1 ? item.sales[0].sales_record_reference ?? "" : "",
+      sale_item_title: item.sales?.length === 1 ? item.sales[0].sale_item_title ?? "" : "",
+      sales_platform: item.sales?.length === 1 ? item.sales[0].sales_platform ?? "" : "",
       title: item.title ?? "",
       category: item.category,
       brand: item.brand ?? "",
@@ -286,6 +294,8 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       if (item.sales && item.sales.length === 1) {
         await updateSale(item.sales[0].id, {
           sales_record_reference: editForm.sales_record_reference.trim() || null,
+          sale_item_title: editForm.sale_item_title.trim() || null,
+          sales_platform: editForm.sales_platform.trim() || null,
         });
       }
 
@@ -360,6 +370,62 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
                 value={
                   item.sales && item.sales.length > 1
                     ? item.sales.map((s) => s.sales_record_reference).filter(Boolean).join("、")
+                    : ""
+                }
+                disabled
+                style={{ width: "100%" }}
+              />
+              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                {item.sales && item.sales.length > 1
+                  ? "この商品には売上が複数件あるため、ここでは編集できません(売上・粗利タブの売上一覧から個別に編集してください)"
+                  : "売上データが未登録のため編集できません(売上登録後に編集できます)"}
+              </p>
+            </>
+          )}
+        </EditField>
+        <EditField label="ITEM TITLE">
+          {item.sales && item.sales.length === 1 ? (
+            <input
+              type="text"
+              value={editForm.sale_item_title}
+              onChange={(e) => updateEdit("sale_item_title", e.target.value)}
+              style={{ width: "100%" }}
+            />
+          ) : (
+            <>
+              <input
+                type="text"
+                value={
+                  item.sales && item.sales.length > 1
+                    ? item.sales.map((s) => s.sale_item_title).filter(Boolean).join("、")
+                    : ""
+                }
+                disabled
+                style={{ width: "100%" }}
+              />
+              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                {item.sales && item.sales.length > 1
+                  ? "この商品には売上が複数件あるため、ここでは編集できません(売上・粗利タブの売上一覧から個別に編集してください)"
+                  : "売上データが未登録のため編集できません(売上登録後に編集できます)"}
+              </p>
+            </>
+          )}
+        </EditField>
+        <EditField label="販売プラットフォーム">
+          {item.sales && item.sales.length === 1 ? (
+            <input
+              type="text"
+              value={editForm.sales_platform}
+              onChange={(e) => updateEdit("sales_platform", e.target.value)}
+              style={{ width: "100%" }}
+            />
+          ) : (
+            <>
+              <input
+                type="text"
+                value={
+                  item.sales && item.sales.length > 1
+                    ? item.sales.map((s) => s.sales_platform).filter(Boolean).join("、")
                     : ""
                 }
                 disabled
@@ -729,6 +795,28 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
           {item.sales && item.sales.length > 0
             ? item.sales
                 .map((s) => s.sales_record_reference)
+                .filter((v): v is string => Boolean(v))
+                .join("、") || "-"
+            : "-"}
+        </span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>ITEM TITLE</span>
+        <span>
+          {item.sales && item.sales.length > 0
+            ? item.sales
+                .map((s) => s.sale_item_title)
+                .filter((v): v is string => Boolean(v))
+                .join("、") || "-"
+            : "-"}
+        </span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>販売プラットフォーム</span>
+        <span>
+          {item.sales && item.sales.length > 0
+            ? item.sales
+                .map((s) => s.sales_platform)
                 .filter((v): v is string => Boolean(v))
                 .join("、") || "-"
             : "-"}

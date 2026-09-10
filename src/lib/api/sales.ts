@@ -7,6 +7,9 @@ export interface Sale {
   sale_date: string;
   sale_item_title: string | null;
   tracking_info: string | null;
+  /** 販売プラットフォーム(メルカリ・ヤフーフリマ等)。2026-09-10追加。従来tracking_infoに入っていた
+   *  プラットフォーム名を転記したもの(tracking_info自体は変更していない)。 */
+  sales_platform: string | null;
   jp_platform_price: number;
   jp_platform_fee: number;
   jp_platform_shipping_collected: number;
@@ -41,6 +44,7 @@ export interface CreateSaleInput {
   sale_date: string;
   sale_item_title?: string;
   tracking_info?: string;
+  sales_platform?: string;
   jp_platform_price?: number;
   jp_platform_fee?: number;
   jp_platform_shipping_collected?: number;
@@ -207,6 +211,7 @@ export async function createSale(input: CreateSaleInput, purchasePriceSnapshot: 
       sale_date: input.sale_date,
       sale_item_title: input.sale_item_title ?? null,
       tracking_info: input.tracking_info ?? null,
+      sales_platform: input.sales_platform ?? null,
       jp_platform_price: input.jp_platform_price ?? 0,
       jp_platform_fee: input.jp_platform_fee ?? 0,
       jp_platform_shipping_collected: input.jp_platform_shipping_collected ?? 0,
@@ -260,6 +265,7 @@ export interface UpdateSaleInput {
   sale_date?: string;
   sale_item_title?: string | null;
   tracking_info?: string | null;
+  sales_platform?: string | null;
   jp_platform_price?: number;
   jp_platform_fee?: number;
   jp_platform_shipping_collected?: number;

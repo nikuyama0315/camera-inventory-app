@@ -18,6 +18,8 @@ interface EditForm {
   ebay_ad_fee_usd: string;
   shipping_cost_paid: string;
   tracking_info: string;
+  /** 2026-09-10追加(ユーザー指示): 販売プラットフォーム(メルカリ・ヤフーフリマ等)。 */
+  sales_platform: string;
 }
 
 type SaleRow = ItemDetail["sales"][number];
@@ -86,6 +88,7 @@ export default function SalesTab({ item, onChanged }: Props) {
     ebay_ad_fee_usd: "0",
     shipping_cost_paid: "0",
     tracking_info: "",
+    sales_platform: "",
   });
   const [busy, setBusy] = useState(false);
   const [resettingSaleId, setResettingSaleId] = useState<string | null>(null);
@@ -146,6 +149,7 @@ export default function SalesTab({ item, onChanged }: Props) {
       ebay_ad_fee_usd: String(sale.ebay_ad_fee_usd),
       shipping_cost_paid: String(sale.shipping_cost_paid),
       tracking_info: sale.tracking_info ?? "",
+      sales_platform: sale.sales_platform ?? "",
     });
   }
 
@@ -169,6 +173,7 @@ export default function SalesTab({ item, onChanged }: Props) {
         ebay_ad_fee_usd: Number(editForm.ebay_ad_fee_usd) || 0,
         shipping_cost_paid: Number(editForm.shipping_cost_paid) || 0,
         tracking_info: editForm.tracking_info.trim() || null,
+        sales_platform: editForm.sales_platform.trim() || null,
       });
       setEditingSaleId(null);
       onChanged();
@@ -323,6 +328,19 @@ export default function SalesTab({ item, onChanged }: Props) {
                 />
               ) : (
                 <span>{sale.tracking_info ?? "-"}</span>
+              )}
+            </div>
+            <div style={ROW_STYLE}>
+              <span style={LABEL_STYLE}>販売プラットフォーム</span>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={editForm.sales_platform}
+                  onChange={(e) => updateEditField("sales_platform", e.target.value)}
+                  style={{ width: 220 }}
+                />
+              ) : (
+                <span>{sale.sales_platform ?? "-"}</span>
               )}
             </div>
             <div style={ROW_STYLE}>
