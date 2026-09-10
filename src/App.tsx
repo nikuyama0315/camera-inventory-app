@@ -12,11 +12,12 @@ import AccountSecurityPage from "./pages/AccountSecurityPage";
 import SalesPage from "./pages/SalesPage";
 import LedgerImportPage from "./pages/LedgerImportPage";
 import ExchangeRatePage from "./pages/ExchangeRatePage";
+import EventLogPage from "./pages/EventLogPage";
 import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import logo from "./assets/logo.png";
 
-type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "ledgerImport";
+type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "eventLog" | "ledgerImport";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "inventory", label: "仕入・在庫・販売" },
@@ -27,6 +28,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "exchangeRate", label: "為替" },
   { key: "import", label: "レポート取込" },
   { key: "export", label: "データ出力" },
+  { key: "eventLog", label: "イベントログ" },
 ];
 
 // 2026-09-09追加: ポータル統合(ebay-automationと同一オリジン)で「マーケティング →」
@@ -293,6 +295,7 @@ export default function App() {
             {tab === "skuLookup" && <SkuLookupPage />}
             {tab === "import" && <ImportPage />}
             {tab === "export" && <ExportPage />}
+            {tab === "eventLog" && <EventLogPage />}
             {tab === "ledgerImport" && <LedgerImportPage />}
           </>
         )}

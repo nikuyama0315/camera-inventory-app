@@ -106,7 +106,7 @@ export default function FreeeTemplatePanel() {
       )}
 
       {rows && rows.length > 0 && (
-        <div style={{ overflowX: "auto", marginTop: 12 }}>
+        <div style={{ overflowX: "auto", marginTop: 12, width: "50%", minWidth: 420 }}>
           <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", whiteSpace: "nowrap" }}>
             <thead>
               <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
