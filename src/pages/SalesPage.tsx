@@ -1136,7 +1136,7 @@ export default function SalesPage() {
                   <th style={{ padding: "6px 8px" }}>追跡番号</th>
                   <th style={{ padding: "6px 8px", textAlign: "right" }}>送料</th>
                   <th style={{ padding: "6px 8px" }}>在庫アイテム</th>
-                  <th style={{ padding: "6px 8px" }}></th>
+                  <th style={{ padding: "6px 8px", minWidth: 130 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -1284,7 +1284,7 @@ export default function SalesPage() {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: "8px", whiteSpace: "nowrap", minWidth: 130 }}>
                         <button
                           onClick={() => handlePrefillFromEbay(row)}
                           disabled={!row.matched_item_id}
