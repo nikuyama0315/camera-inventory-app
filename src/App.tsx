@@ -26,7 +26,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "expenses", label: "経費" },
   { key: "exchangeRate", label: "為替" },
   { key: "import", label: "レポート取込" },
-  { key: "export", label: "CSV出力" },
+  { key: "export", label: "データ出力" },
 ];
 
 // 2026-09-09追加: ポータル統合(ebay-automationと同一オリジン)で「マーケティング →」
