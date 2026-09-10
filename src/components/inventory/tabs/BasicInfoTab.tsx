@@ -16,11 +16,16 @@ import { COUNTERPARTY_TYPE_OPTIONS, type CounterpartyType } from "../../../lib/t
 import DeductionBadge from "../../shared/DeductionBadge";
 import { pickFolderNameViaDirectoryPicker } from "../../../lib/folderPicker";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   item: ItemDetail;
   onChanged: () => void;
+  /** 2026-09-10追加: 「編集」ボタンをItemDetailPane上部(「複写して新規作成」の左)へ移設した
+   *  ことに伴う連携用props。親側がこの値をインクリメントするたびstartEditing()を実行する。 */
+  editTrigger?: number;
+  /** 編集モードのon/offを親(ItemDetailPane)へ通知する。親側で上部「編集」ボタンの表示/非表示に使う。 */
+  onEditingChange?: (editing: boolean) => void;
 }
 
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 8, fontSize: 13 };
@@ -66,7 +71,7 @@ interface EditForm {
   drive_folder_url: string;
 }
 
-export default function BasicInfoTab({ item, onChanged }: Props) {
+export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingChange }: Props) {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -134,6 +139,18 @@ export default function BasicInfoTab({ item, onChanged }: Props) {
       setBusy(false);
     }
   }
+
+  // 親(ItemDetailPane)上部の「編集」ボタンから、editTriggerの増加をトリガーに編集モードへ入る。
+  useEffect(() => {
+    if (editTrigger) startEditing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editTrigger]);
+
+  // 編集モードのon/offを親へ通知(上部「編集」ボタンの表示/非表示に使う)。
+  useEffect(() => {
+    onEditingChange?.(editing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   function startEditing() {
     setEditForm({
@@ -842,7 +859,6 @@ export default function BasicInfoTab({ item, onChanged }: Props) {
           advanceStepが未定義になり、ボタン自体を表示しない(以前は無効化してステータス名を
           表示していたが、検品タブ側のボタン群と役割が重複するため非表示に変更)。 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16, alignItems: "flex-start" }}>
-        <button onClick={startEditing}>編集する</button>
         {advanceStep && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button onClick={handleAdvanceStatus} disabled={busy}>

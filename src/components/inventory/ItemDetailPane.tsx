@@ -44,6 +44,11 @@ export default function ItemDetailPane({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 2026-09-10追加: 「基本情報」タブの「編集」ボタンをこの上部ヘッダーへ移設(元は
+  // BasicInfoTab内部にあった)。editTriggerをインクリメントしてBasicInfoTab側のstartEditing()を
+  // 呼び出し、basicInfoEditingで現在編集中かどうかを受け取ってボタンの表示/非表示を切り替える。
+  const [basicInfoEditTrigger, setBasicInfoEditTrigger] = useState(0);
+  const [basicInfoEditing, setBasicInfoEditing] = useState(false);
 
   useEffect(() => {
     if (isCreatingNew) {
@@ -129,6 +134,24 @@ export default function ItemDetailPane({
               {detail.management_no} / {[detail.brand, detail.model].filter(Boolean).join(" ")}
             </p>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              {activeTab === "basic" && !basicInfoEditing && (
+                <button
+                  type="button"
+                  onClick={() => setBasicInfoEditTrigger((n) => n + 1)}
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 10px",
+                    border: "0.5px solid var(--border)",
+                    borderRadius: 4,
+                    background: "var(--surface)",
+                    color: "var(--text-secondary)",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="基本情報を編集します"
+                >
+                  編集
+                </button>
+              )}
               {onCopyAsNew && (
                 <button
                   type="button"
@@ -192,7 +215,15 @@ export default function ItemDetailPane({
         ))}
       </div>
 
-      {activeTab === "basic" && detail && <BasicInfoTab item={detail} onChanged={handleAfterChange} />}
+      {activeTab === "basic" && detail && (
+        <BasicInfoTab
+          key={detail.id}
+          item={detail}
+          onChanged={handleAfterChange}
+          editTrigger={basicInfoEditTrigger}
+          onEditingChange={setBasicInfoEditing}
+        />
+      )}
 
       {activeTab === "purchase" && (
         <PurchaseTab
