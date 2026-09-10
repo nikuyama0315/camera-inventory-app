@@ -61,19 +61,37 @@ type RawRow = {
   inspections: RawInspectionRow | RawInspectionRow[] | null;
 };
 
-/** 商品を全件取得する(絞り込みはクライアント側、在庫タブの一覧表示と同じ方針)。 */
+/**
+ * 商品を全件取得する(絞り込みはクライアント側、在庫タブの一覧表示と同じ方針)。
+ *
+ * 2026-09-10修正(ユーザー指摘「一覧を展開する(1000件) 1000件の根拠は?」): .range()指定無しの
+ * select()はSupabase(PostgREST)側のデフォルト上限(max-rows、既定1000件)で暗黙的に打ち切られる。
+ * items全体が1167件(2026-09-10時点)あるため、修正前は167件が一覧・CSVの両方から漏れていた
+ * (「全件取得」のつもりが実際には先頭1000件のみだった不具合)。.range()で1000件ずつページングし、
+ * 取得件数がページサイズ未満になるまで繰り返すことで、件数に関わらず本当の全件を取得する。
+ */
 export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> {
-  const { data, error } = await supabase
-    .from("items")
-    .select(
-      "id, management_no, brand, model, category, status, platform_category, grade, accessories_included, " +
-        "purchases(purchase_date), sales(sale_date, sale_item_title), " +
-        "inspections(inspected_at, overall_notes_en, appearance_notes_en, viewfinder_notes_en, lens_notes_en, other_notes_en)",
-    )
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  const PAGE_SIZE = 1000;
+  const rawRows: RawRow[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from("items")
+      .select(
+        "id, management_no, brand, model, category, status, platform_category, grade, accessories_included, " +
+          "purchases(purchase_date), sales(sale_date, sale_item_title), " +
+          "inspections(inspected_at, overall_notes_en, appearance_notes_en, viewfinder_notes_en, lens_notes_en, other_notes_en)",
+      )
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data as unknown as RawRow[]) ?? [];
+    rawRows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
-  return (data as unknown as RawRow[]).map((row) => {
+  return rawRows.map((row) => {
     const { purchases, sales, inspections, ...item } = row;
     const purchase = Array.isArray(purchases) ? purchases[0] : purchases;
     const saleArray = Array.isArray(sales) ? sales : sales ? [sales] : [];
