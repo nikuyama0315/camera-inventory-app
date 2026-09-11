@@ -68,7 +68,13 @@ export default function App() {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
   const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
-  const [showAccountSecurity, setShowAccountSecurity] = useState(false);
+  // ?view=account-security でこの画面を直接開けるようにする(2026-09-11追加、
+  // マーケティング側「ログイン情報再設定」リンクからの誘導先。ユーザー指示「販売管理の
+  // ほうと同じにすべき」により、マーケティング固有の自己サービス型パスワード変更画面を
+  // 廃止し、こちらへ一本化した)。
+  const [showAccountSecurity, setShowAccountSecurity] = useState(
+    () => new URLSearchParams(window.location.search).get("view") === "account-security",
+  );
   const [marketingHref, setMarketingHref] = useState(loadMarketingHref);
 
   // タブを切り替えるたびに保存し、次回このアプリを開いたとき(マーケティング側から
