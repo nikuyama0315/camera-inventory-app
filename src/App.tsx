@@ -151,16 +151,38 @@ export default function App() {
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 10,
           padding: "10px 16px",
           borderBottom: "0.5px solid var(--border)",
           background: "var(--surface-2)",
         }}
       >
-        <img src={logo} alt="" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0 }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-          Soulmen Japan Business Portal
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={logo} alt="" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0 }} />
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+            Soulmen Japan Business Portal
+          </span>
+        </div>
+        <a
+          href="/?view=todo"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 12,
+            padding: "4px 10px",
+            border: "0.5px solid var(--border-strong)",
+            borderRadius: 6,
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          To Do →
+        </a>
       </div>
       <div
         style={{
@@ -209,24 +231,6 @@ export default function App() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <a
-            href="/?view=todo"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 12,
-              padding: "4px 10px",
-              border: "0.5px solid var(--border-strong)",
-              borderRadius: 6,
-              background: "var(--surface-2)",
-              color: "var(--text-primary)",
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-            }}
-          >
-            To Do →
-          </a>
           <a
             href={marketingHref}
             style={{
