@@ -679,7 +679,7 @@ export default function TodoPage() {
               >
                 (追加日時: {formatDateTime(todo.created_at)})
               </span>
-              {isEditingDue ? (
+              {(todo.due_at || !todo.done) && (isEditingDue ? (
                 <span
                   style={{ marginLeft: 8, display: "inline-flex", gap: 4, alignItems: "center" }}
                   onClick={(e) => e.stopPropagation()}
@@ -737,7 +737,7 @@ export default function TodoPage() {
                 >
                   {todo.due_at ? `期限: ${formatDateTime(todo.due_at)}` : "＋期限を設定"}
                 </span>
-              )}
+              ))}
               {todo.done && todo.completed_at && (
                 <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)" }}>
                   (完了日時: {formatDateTime(todo.completed_at)})
