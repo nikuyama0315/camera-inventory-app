@@ -15,6 +15,7 @@ import ExchangeRatePage from "./pages/ExchangeRatePage";
 import EventLogPage from "./pages/EventLogPage";
 import TodoPage from "./pages/TodoPage";
 import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
+import { establishMarketingSession } from "./lib/api/auth";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import logo from "./assets/logo.png";
 
@@ -110,6 +111,11 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
+    // マーケティング(ebay-automation)側のセッションも、販売管理のセッションが確立/復元される
+    // たびにあわせて確立する(2026-09-11追加、ユーザー指示「販売管理でログインしていれば
+    // そのままマーケティングも使えるようにして」への対応。新規ログイン時・ページ再読み込みでの
+    // 永続セッション復元時の両方でこの effect が走る)。
+    if (session.access_token) void establishMarketingSession(session.access_token);
     fetchModelStockOverview()
       .then((rows) => setBelowThresholdRows(rows.filter((r) => r.belowThreshold)))
       .catch(() => {

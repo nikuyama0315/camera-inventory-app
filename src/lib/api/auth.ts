@@ -70,3 +70,23 @@ export async function resetPasswordWithRecoveryCode(recoveryCode: string, newPas
   if (error) throw new Error(await extractEdgeFunctionErrorMessage(error, "パスワードの再設定に失敗しました"));
   return (data as { newRecoveryCode: string }).newRecoveryCode;
 }
+
+/**
+ * マーケティング(ebay-automation)側のFlaskセッションを、販売管理のSupabaseセッションを
+ * 根拠にあわせて確立する(2026-09-11追加、ユーザー指示「販売管理でログインしていればそのまま
+ * マーケティングも使えるようにして」への対応)。ベストエフォート(失敗しても例外を投げない)。
+ * App.tsx側でセッション確立のたびに(新規ログイン時・ページ再読み込みでの永続セッション復元時の
+ * 両方)呼び出すことで、「販売管理にログイン中なら常にマーケティングも使える」を実現する。
+ */
+export async function establishMarketingSession(accessToken: string): Promise<void> {
+  try {
+    await fetch("/marketing/api/sso-login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ access_token: accessToken }),
+    });
+  } catch {
+    /* マーケティング側への自動ログインはベストエフォートのため失敗は無視する */
+  }
+}
