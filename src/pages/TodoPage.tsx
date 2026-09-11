@@ -392,10 +392,16 @@ export default function TodoPage() {
     if (files.length > 0 && todoId) void uploadFilesToTodo(todoId, files);
   }
 
-  function handleRowDragOver(todoId: string, e: React.DragEvent) {
+  function handleRowDragEnter(todoId: string, e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setDragOverId(todoId);
+  }
+
+  function handleRowDragOver(todoId: string, e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragOverId !== todoId) setDragOverId(todoId);
   }
 
   function handleRowDragLeave(todoId: string) {
@@ -406,8 +412,10 @@ export default function TodoPage() {
     e.preventDefault();
     e.stopPropagation();
     setDragOverId(null);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      void uploadFilesToTodo(todoId, e.dataTransfer.files);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    console.log("[dnd-debug] drop fired. todoId=", todoId, "files.length=", files.length, "dataTransfer=", e.dataTransfer, "types=", e.dataTransfer?.types);
+    if (files.length > 0) {
+      void uploadFilesToTodo(todoId, files);
     }
   }
 
@@ -462,6 +470,7 @@ export default function TodoPage() {
     return (
       <div key={todo.id}>
         <div
+          onDragEnter={(e) => handleRowDragEnter(todo.id, e)}
           onDragOver={(e) => handleRowDragOver(todo.id, e)}
           onDragLeave={() => handleRowDragLeave(todo.id)}
           onDrop={(e) => handleRowDrop(todo.id, e)}
@@ -696,7 +705,21 @@ export default function TodoPage() {
   const rootTodos = childrenByParent.get(null) ?? [];
 
   return (
-    <div style={{ height: "100vh", overflowY: "auto", padding: "1.5rem", boxSizing: "border-box", background: "var(--surface-1)" }}>
+    <div
+      onDragOver={(e) => {
+        // ページ全体でブラウザ既定のファイルドロップ動作(ドロップしたファイルを新規タブで
+        // 開いてしまう)を止める安全策(2026-09-12追加、ユーザー報告: タスク行の外側に
+        // ドロップするとブラウザがファイルをそのまま開いてしまっていた)。各タスク行自体の
+        // ドロップ処理は行側のonDropでstopPropagationしているため、ここまでバブリングして
+        // くるのは「どの行にも当たらなかったドロップ」のみ。
+        e.preventDefault();
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setErrorMessage("ファイルは追加したいタスクの行の上にドロップしてください");
+      }}
+      style={{ height: "100vh", overflowY: "auto", padding: "1.5rem", boxSizing: "border-box", background: "var(--surface-1)" }}
+    >
       <h2 style={{ fontSize: 16, fontWeight: 700, marginTop: 0, marginBottom: 4 }}>To Do</h2>
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         ツリー構造で管理できるTo Doリストです。項目をダブルクリックすると内容を編集できます。
