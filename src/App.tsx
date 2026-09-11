@@ -212,7 +212,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {TABS.map((t) => (
             <Fragment key={t.key}>
-              {(t.key === "skuLookup" || t.key === "exchangeRate") && (
+              {(t.key === "skuLookup" || t.key === "import" || t.key === "exchangeRate") && (
                 <span style={{ color: "var(--text-secondary)", fontSize: 13, margin: "0 4px" }}>｜</span>
               )}
               <button
