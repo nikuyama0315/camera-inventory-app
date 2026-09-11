@@ -117,3 +117,11 @@ export function checklistTypeHasAlert(
   const check = checks.find((c) => c.type_id === typeId && c.year_month === previousMonth);
   return !check?.checked;
 }
+
+export async function updateChecklistTypeSortOrder(id: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from("checklist_types")
+    .update({ sort_order: sortOrder, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}

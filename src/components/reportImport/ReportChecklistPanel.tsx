@@ -4,6 +4,7 @@ import {
   fetchChecklistChecks,
   createChecklistType,
   updateChecklistType,
+  updateChecklistTypeSortOrder,
   deleteChecklistType,
   setChecklistChecked,
   checklistMonthRange,
@@ -123,6 +124,24 @@ export default function ReportChecklistPanel() {
     }
   }
 
+  /** 種別の表示順を1つ上/下の種別と入れ替える(sort_orderのswap)。 */
+  async function handleMoveType(t: ChecklistType, direction: "up" | "down") {
+    const idx = types.findIndex((x) => x.id === t.id);
+    const neighborIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx === -1 || neighborIdx < 0 || neighborIdx >= types.length) return;
+    const neighbor = types[neighborIdx];
+    setErrorMessage(null);
+    try {
+      await Promise.all([
+        updateChecklistTypeSortOrder(t.id, neighbor.sort_order),
+        updateChecklistTypeSortOrder(neighbor.id, t.sort_order),
+      ]);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "並び替えに失敗しました");
+    }
+  }
+
   async function handleAdd() {
     if (!newName.trim()) return;
     setAdding(true);
@@ -173,6 +192,9 @@ export default function ReportChecklistPanel() {
             {types.map((t) => {
               const isEditing = editingId === t.id;
               const alert = checklistTypeHasAlert(t.id, checks, months);
+              const typeIdx = types.findIndex((x) => x.id === t.id);
+              const canMoveUp = typeIdx > 0;
+              const canMoveDown = typeIdx >= 0 && typeIdx < types.length - 1;
               return (
                 <tr key={t.id} style={{ borderTop: "0.5px solid var(--border)" }}>
                   <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
@@ -252,6 +274,22 @@ export default function ReportChecklistPanel() {
                       </>
                     ) : (
                       <>
+                        <button
+                          onClick={() => void handleMoveType(t, "up")}
+                          disabled={!canMoveUp}
+                          title="上へ移動"
+                          style={{ fontSize: 11, padding: "2px 6px", marginRight: 4 }}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => void handleMoveType(t, "down")}
+                          disabled={!canMoveDown}
+                          title="下へ移動"
+                          style={{ fontSize: 11, padding: "2px 6px", marginRight: 4 }}
+                        >
+                          ▼
+                        </button>
                         <button
                           onClick={() => startEdit(t)}
                           style={{ fontSize: 11, padding: "2px 6px", marginRight: 4 }}
