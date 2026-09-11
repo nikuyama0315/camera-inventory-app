@@ -24,6 +24,7 @@ export default function InvoiceNumberCandidatesPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [manualInputs, setManualInputs] = useState<Record<string, string>>({});
   const [manualBusyVendor, setManualBusyVendor] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -121,7 +122,15 @@ export default function InvoiceNumberCandidatesPanel() {
         background: "var(--surface-2)",
       }}
     >
-      <p style={{ fontSize: 14, fontWeight: 500, margin: "0 0 6px" }}>適格請求書番号 候補</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>適格請求書番号 候補{rows.length > 0 ? `(${byVendor.size}件)` : ""}</p>
+        <button
+          onClick={() => setIsCollapsed((v) => !v)}
+          style={{ fontSize: 11, padding: "2px 8px", marginLeft: "auto" }}
+        >
+          {isCollapsed ? "展開する" : "折りたたむ"}
+        </button>
+      </div>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 10px" }}>
         経費の事業者名から、国税庁の適格請求書発行事業者公表サイトの全件データ(法人・人格のない社団等分)を名称検索した候補です。
         採用すると、その事業者名で登録番号が未入力の経費レコードすべてに反映されます。個人事業主は全件データで氏名が非公開のため検出できません
@@ -131,7 +140,7 @@ export default function InvoiceNumberCandidatesPanel() {
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}
       {loading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>読み込み中...</p>}
 
-      {Array.from(byVendor.entries()).map(([vendor, candidates]) => {
+      {!isCollapsed && Array.from(byVendor.entries()).map(([vendor, candidates]) => {
         const hasCandidates = candidates.some((c) => c.candidate_reg_no);
         return (
           <div key={vendor} style={{ marginBottom: 14, paddingBottom: 10, borderBottom: "0.5px solid var(--border)" }}>
