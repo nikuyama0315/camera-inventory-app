@@ -46,6 +46,7 @@ export default function TodoPage() {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [attachmentMessage, setAttachmentMessage] = useState<string | null>(null);
   const uploadTargetIdRef = useRef<string | null>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -357,12 +358,17 @@ export default function TodoPage() {
     if (fileArray.length === 0) return;
     setUploadingFor(todoId);
     setErrorMessage(null);
+    setAttachmentMessage(null);
     try {
       for (const file of fileArray) {
         await uploadTodoAttachment(todoId, file);
       }
       setExpandedAttachmentsFor((prev) => new Set(prev).add(todoId));
       await reload();
+      setAttachmentMessage(
+        `${fileArray.length}件のファイルを添付しました(📎ボタンの一覧に表示されています)`,
+      );
+      setTimeout(() => setAttachmentMessage((cur) => (cur ? null : cur)), 5000);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "添付ファイルのアップロードに失敗しました");
     } finally {
@@ -579,10 +585,15 @@ export default function TodoPage() {
           </button>
           <button
             onClick={() => toggleAttachments(todo.id)}
-            title="添付ファイル"
-            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+            title="添付ファイルを表示/追加(クリックして開閉)"
+            style={{
+              fontSize: 11,
+              padding: "2px 6px",
+              flexShrink: 0,
+              fontWeight: todoAttachments.length > 0 ? 700 : 400,
+            }}
           >
-            📎{todoAttachments.length > 0 ? todoAttachments.length : ""}
+            📎{todoAttachments.length}
           </button>
           <button
             onClick={() => startEdit(todo)}
@@ -734,6 +745,9 @@ export default function TodoPage() {
         />
       </div>
 
+      {attachmentMessage && (
+        <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>{attachmentMessage}</p>
+      )}
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}
       {loading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>読み込み中...</p>}
       {!loading && rootTodos.length === 0 && (

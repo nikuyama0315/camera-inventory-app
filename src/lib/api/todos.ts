@@ -161,9 +161,28 @@ export async function fetchAttachmentsForTodoIds(todoIds: string[]): Promise<Tod
   return data as TodoAttachment[];
 }
 
+/**
+ * ファイル名の重複回避用に、一意な文字列を生成する。
+ * crypto.randomUUID()はセキュアコンテキスト(HTTPS、またはlocalhost)でしか使えず、
+ * このアプリはプレーンHTTP配信のため呼び出すとTypeErrorになり、添付アップロードが
+ * 常に失敗する不具合があった(ユーザー報告により発覚。クリップボードコピー機能で
+ * 過去に踏んだのと同じ制約)。crypto.randomUUID()が使える環境ではそちらを優先し、
+ * 使えない場合は現在時刻+乱数によるフォールバックを使う。
+ */
+function generateUniqueSuffix(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      /* セキュアコンテキストでない場合など、呼び出し自体が例外になることがあるためフォールバックへ */
+    }
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /** 添付ファイルをアップロードし、todo_attachmentsに行を作成する。 */
 export async function uploadTodoAttachment(todoId: string, file: File): Promise<TodoAttachment> {
-  const storagePath = `${todoId}/${crypto.randomUUID()}-${file.name}`;
+  const storagePath = `${todoId}/${generateUniqueSuffix()}-${file.name}`;
   const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(storagePath, file);
   if (uploadError) throw uploadError;
 
