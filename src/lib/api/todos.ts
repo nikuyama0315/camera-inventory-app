@@ -180,9 +180,22 @@ function generateUniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * ストレージ保存キー用に、拡張子だけを安全に取り出す(英数字のみ、無ければ空文字)。
+ * 元のファイル名をそのまま保存パスに使うと、"#"(URLフラグメント区切り)や空白・カンマ等の
+ * 特殊文字を含む場合にアップロード先のキーが途中で切れてしまう不具合があった
+ * (実データで確認: "....PBC #2269-0645-3513.pdf"というファイル名で、保存されたオブジェクト名が
+ * "#"の手前で切れ、DB上のstorage_pathと実体が食い違っていた)。ファイル名は表示用として
+ * file_name列にそのまま保存し、実際の保存パスには含めないことで回避する。
+ */
+function safeFileExtension(fileName: string): string {
+  const match = /\.([A-Za-z0-9]{1,10})$/.exec(fileName);
+  return match ? `.${match[1].toLowerCase()}` : "";
+}
+
 /** 添付ファイルをアップロードし、todo_attachmentsに行を作成する。 */
 export async function uploadTodoAttachment(todoId: string, file: File): Promise<TodoAttachment> {
-  const storagePath = `${todoId}/${generateUniqueSuffix()}-${file.name}`;
+  const storagePath = `${todoId}/${generateUniqueSuffix()}${safeFileExtension(file.name)}`;
   const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(storagePath, file);
   if (uploadError) throw uploadError;
 
