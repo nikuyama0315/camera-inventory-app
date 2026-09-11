@@ -170,10 +170,10 @@ export default function App() {
           style={{
             fontSize: 12,
             padding: "4px 10px",
-            border: "0.5px solid var(--border-strong)",
+            border: "0.5px solid #b8d4ef",
             borderRadius: 6,
-            background: "var(--surface-1)",
-            color: "var(--text-primary)",
+            background: "#eaf2fb",
+            color: "var(--accent)",
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
