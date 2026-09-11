@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import InventoryPage from "./pages/InventoryPage";
@@ -209,40 +209,44 @@ export default function App() {
           background: "var(--surface-2)",
         }}
       >
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => {
-                setShowAccountSecurity(false);
-                setTab(t.key);
-              }}
-              style={{
-                border: "none",
-                borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
-                borderRadius: 0,
-                background: "transparent",
-                color: tab === t.key ? "var(--accent)" : "var(--text-secondary)",
-                fontSize: 13,
-                padding: "6px 10px",
-              }}
-            >
-              {t.label}
-              {t.key === "stockAlerts" && belowThresholdRows.length > 0 && (
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 11,
-                    padding: "1px 6px",
-                    borderRadius: 999,
-                    background: "var(--danger-bg)",
-                    color: "var(--danger-text)",
-                  }}
-                >
-                  {belowThresholdRows.length}
-                </span>
+            <Fragment key={t.key}>
+              {(t.key === "skuLookup" || t.key === "exchangeRate") && (
+                <span style={{ color: "var(--border-strong)", fontSize: 13 }}>｜</span>
               )}
-            </button>
+              <button
+                onClick={() => {
+                  setShowAccountSecurity(false);
+                  setTab(t.key);
+                }}
+                style={{
+                  border: "none",
+                  borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
+                  borderRadius: 0,
+                  background: "transparent",
+                  color: tab === t.key ? "var(--accent)" : "var(--text-secondary)",
+                  fontSize: 13,
+                  padding: "6px 10px",
+                }}
+              >
+                {t.label}
+                {t.key === "stockAlerts" && belowThresholdRows.length > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 11,
+                      padding: "1px 6px",
+                      borderRadius: 999,
+                      background: "var(--danger-bg)",
+                      color: "var(--danger-text)",
+                    }}
+                  >
+                    {belowThresholdRows.length}
+                  </span>
+                )}
+              </button>
+            </Fragment>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
