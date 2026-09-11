@@ -8,6 +8,7 @@ export interface Todo {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  completed_at: string | null;
 }
 
 export async function fetchAllTodos(): Promise<Todo[]> {
@@ -52,7 +53,11 @@ export async function updateTodoTitle(id: string, title: string): Promise<void> 
 export async function setTodoDone(id: string, done: boolean): Promise<void> {
   const { error } = await supabase
     .from("todos")
-    .update({ done, updated_at: new Date().toISOString() })
+    .update({
+      done,
+      completed_at: done ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
   if (error) throw error;
 }
@@ -114,6 +119,7 @@ export async function restoreTodosFromBackup(backup: TodoBackupFile): Promise<nu
     sort_order: r.sort_order,
     created_at: r.created_at,
     updated_at: r.updated_at,
+    completed_at: r.completed_at,
   }));
   const { error: insError } = await supabase.from("todos").insert(insertRows);
   if (insError) throw insError;
