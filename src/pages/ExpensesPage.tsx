@@ -12,6 +12,7 @@ import {
   type TaxCategory,
 } from "../lib/api/expenses";
 import ExpensesDataManagementPanel from "../components/expenses/ExpensesDataManagementPanel";
+import InvoiceNumberCandidatesPanel from "../components/expenses/InvoiceNumberCandidatesPanel";
 
 type SubTab = "register" | "data";
 
@@ -352,6 +353,7 @@ export default function ExpensesPage() {
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "1rem 1.5rem" }}>
+            <InvoiceNumberCandidatesPanel />
             <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
               <input
                 type="date"
