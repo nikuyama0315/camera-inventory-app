@@ -46,6 +46,20 @@ export default function LoginPage({ onLoggedIn }: Props) {
     setBusy(true);
     try {
       await loginWithSharedCredentials(username.trim(), password);
+      // マーケティング(ebay-automation)側のログインも、ベストエフォートであわせて確立する
+      // (2026-09-11追加、ユーザー指示「販売でログインすればマーケティングも使えるように
+      // したい」への対応)。両アプリの認証情報は別ストアで、値が揃っている運用が前提のため、
+      // 失敗してもエラー扱いにはしない(その場合は従来通りマーケティング側で個別ログインが必要)。
+      try {
+        await fetch("/marketing/api/sso-login", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: username.trim(), password }),
+        });
+      } catch {
+        /* マーケティング側への自動ログインはベストエフォートのため失敗は無視する */
+      }
       onLoggedIn();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "ログインに失敗しました");
