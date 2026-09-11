@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchAllTodos,
   createTodo,
@@ -7,7 +7,10 @@ import {
   moveTodoToParent,
   setTodoDone,
   deleteTodo,
+  buildTodosBackup,
+  restoreTodosFromBackup,
   type Todo,
+  type TodoBackupFile,
 } from "../lib/api/todos";
 
 /** ヘッダーの「To Do」ボタンから新規ウィンドウで開かれる、ツリー構造のTo Doリスト単体ページ(2026-09-11追加)。
@@ -25,6 +28,16 @@ export default function TodoPage() {
   const [newChildValue, setNewChildValue] = useState("");
   const [newRootValue, setNewRootValue] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
+
+  /** 追加日を日本時間(JST)で表示するためのフォーマッタ。閲覧者のブラウザのタイムゾーン設定に依らず、常に日本時間で表示する。 */
+  function formatAddedDate(createdAt: string): string {
+    return new Date(createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+  }
 
   async function reload() {
     setLoading(true);
@@ -222,6 +235,65 @@ export default function TodoPage() {
     }
   }
 
+  async function handleBackup() {
+    setBackupBusy(true);
+    setBackupMessage(null);
+    setErrorMessage(null);
+    try {
+      const backup = await buildTodosBackup();
+      const json = JSON.stringify(backup, null, 2);
+      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const filename = `todo_backup_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setBackupMessage(`${backup.todos.length}件をバックアップしました(${filename})`);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "バックアップに失敗しました");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  function handleRestoreButtonClick() {
+    restoreFileInputRef.current?.click();
+  }
+
+  async function handleRestoreFileSelected(file: File) {
+    setBackupMessage(null);
+    setErrorMessage(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Partial<TodoBackupFile>;
+      if (!Array.isArray(parsed.todos)) {
+        throw new Error("バックアップファイルの形式が正しくありません(todos配列が見つかりません)");
+      }
+      const backup = parsed as TodoBackupFile;
+      if (
+        !window.confirm(
+          `現在のTo Doをすべて削除し、バックアップファイル内の${backup.todos.length}件で置き換えます。よろしいですか？(元に戻せません)`,
+        )
+      ) {
+        return;
+      }
+      setRestoreBusy(true);
+      const count = await restoreTodosFromBackup(backup);
+      setBackupMessage(`${count}件を復元しました`);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "復元に失敗しました");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   function renderNode(todo: Todo, depth: number) {
     const children = childrenByParent.get(todo.id) ?? [];
     const hasChildren = children.length > 0;
@@ -301,6 +373,9 @@ export default function TodoPage() {
               }}
             >
               {todo.title}
+              <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}>
+                (追加日: {formatAddedDate(todo.created_at)})
+              </span>
             </span>
           )}
 
@@ -420,6 +495,27 @@ export default function TodoPage() {
         <button onClick={() => void reload()} disabled={loading} style={{ marginLeft: "auto" }}>
           {loading ? "更新中..." : "更新"}
         </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+        <button onClick={() => void handleBackup()} disabled={backupBusy}>
+          {backupBusy ? "バックアップ中..." : "バックアップ(ダウンロード)"}
+        </button>
+        <button onClick={handleRestoreButtonClick} disabled={restoreBusy}>
+          {restoreBusy ? "復元中..." : "バックアップから復元"}
+        </button>
+        <input
+          ref={restoreFileInputRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void handleRestoreFileSelected(file);
+          }}
+        />
+        {backupMessage && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{backupMessage}</span>}
       </div>
 
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}

@@ -80,3 +80,49 @@ export async function moveTodoToParent(id: string, newParentId: string | null): 
     .eq("id", id);
   if (error) throw error;
 }
+
+export interface TodoBackupFile {
+  exported_at: string;
+  todos: Todo[];
+}
+
+const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
+
+/** 現在の全To Doをバックアップ用のJSON構造として取得する。 */
+export async function buildTodosBackup(): Promise<TodoBackupFile> {
+  const todos = await fetchAllTodos();
+  return { exported_at: new Date().toISOString(), todos };
+}
+
+/**
+ * バックアップJSONから全To Doを復元する(既存のTo Doはすべて置き換わる)。
+ * id/parent_id/sort_order/created_atを保持するため、まずparent_idをnullにした状態で
+ * 全行を挿入し(親子の挿入順を気にしなくて済む)、その後に本来のparent_idを行ごとに反映する。
+ */
+export async function restoreTodosFromBackup(backup: TodoBackupFile): Promise<number> {
+  const rows = backup.todos;
+
+  const { error: delError } = await supabase.from("todos").delete().neq("id", ZERO_UUID);
+  if (delError) throw delError;
+  if (rows.length === 0) return 0;
+
+  const insertRows = rows.map((r) => ({
+    id: r.id,
+    parent_id: null,
+    title: r.title,
+    done: r.done,
+    sort_order: r.sort_order,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+  const { error: insError } = await supabase.from("todos").insert(insertRows);
+  if (insError) throw insError;
+
+  const withParent = rows.filter((r) => r.parent_id !== null);
+  for (const r of withParent) {
+    const { error: updError } = await supabase.from("todos").update({ parent_id: r.parent_id }).eq("id", r.id);
+    if (updError) throw updError;
+  }
+
+  return rows.length;
+}
