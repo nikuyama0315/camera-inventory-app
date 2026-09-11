@@ -413,7 +413,6 @@ export default function TodoPage() {
     e.stopPropagation();
     setDragOverId(null);
     const files = Array.from(e.dataTransfer.files ?? []);
-    console.log("[dnd-debug] drop fired. todoId=", todoId, "files.length=", files.length, "dataTransfer=", e.dataTransfer, "types=", e.dataTransfer?.types);
     if (files.length > 0) {
       void uploadFilesToTodo(todoId, files);
     }
@@ -635,7 +634,7 @@ export default function TodoPage() {
           >
             {todoAttachments.length === 0 && (
               <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
-                添付ファイルはありません(ここへドラッグ&ドロップ、または下のボタンで追加できます)
+                添付ファイルはありません(タスク行の上へドラッグ&ドロップ、または下のボタンで追加できます)
               </p>
             )}
             {todoAttachments.map((a) => (
