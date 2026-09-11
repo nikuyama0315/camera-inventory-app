@@ -52,9 +52,20 @@ function loadInitialTab(): Tab {
   return "inventory";
 }
 
+// 「マーケティング →」の遷移先として絶対に記録すべきでないパス(2026-09-11追加)。
+// 過去にブラウザへ記録済みの値がこれらだと、押すたびに元の画面へ押し返されてしまう
+// (/loginはログインフォーム自体、/account-securityは今や常に販売管理側へリダイレクト
+// するだけの画面になったため。実際にユーザー報告で発生)。既にlocalStorageに古い値が
+// 残っている環境でも安全に既定値へフォールバックできるよう、読み込み時に弾く。
+const MARKETING_HREF_BLOCKLIST = ["/marketing/login", "/marketing/account-security"];
+
 function loadMarketingHref(): string {
   try {
-    return localStorage.getItem(MARKETING_LAST_PATH_KEY) || "/marketing/";
+    const saved = localStorage.getItem(MARKETING_LAST_PATH_KEY);
+    if (saved && !MARKETING_HREF_BLOCKLIST.some((p) => saved.startsWith(p))) {
+      return saved;
+    }
+    return "/marketing/";
   } catch {
     return "/marketing/";
   }
