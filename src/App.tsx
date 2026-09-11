@@ -167,7 +167,6 @@ export default function App() {
         <a
           href="/?view=todo"
           target="soulmen_todo_window"
-          rel="noopener noreferrer"
           style={{
             fontSize: 12,
             padding: "4px 10px",
