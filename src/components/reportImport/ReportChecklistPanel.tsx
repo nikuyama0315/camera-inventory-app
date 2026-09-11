@@ -281,7 +281,7 @@ export default function ReportChecklistPanel() {
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 24 }}>
         <input
           type="text"
-          placeholder="種別名(例: AAAA)"
+          placeholder="種別名(例: 斉藤商会)"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           style={{ width: 140, fontSize: 12 }}
