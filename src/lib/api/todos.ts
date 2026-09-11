@@ -70,3 +70,13 @@ export async function updateTodoSortOrder(id: string, sortOrder: number): Promis
     .eq("id", id);
   if (error) throw error;
 }
+
+/** 項目の階層(親)を変更する。新しい親の子リストの末尾に追加される。 */
+export async function moveTodoToParent(id: string, newParentId: string | null): Promise<void> {
+  const sortOrder = await nextSortOrder(newParentId);
+  const { error } = await supabase
+    .from("todos")
+    .update({ parent_id: newParentId, sort_order: sortOrder, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}

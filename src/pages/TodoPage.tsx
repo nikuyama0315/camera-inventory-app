@@ -4,6 +4,7 @@ import {
   createTodo,
   updateTodoTitle,
   updateTodoSortOrder,
+  moveTodoToParent,
   setTodoDone,
   deleteTodo,
   type Todo,
@@ -180,6 +181,47 @@ export default function TodoPage() {
     }
   }
 
+  /** 階層を1つ上げる(親の階層へ、親と同じ兄弟レベルの末尾へ移動)。ルート直下の項目には適用不可。 */
+  async function handlePromote(todo: Todo) {
+    if (!todo.parent_id) return;
+    const parentTodo = todos.find((t) => t.id === todo.parent_id);
+    const newParentId = parentTodo?.parent_id ?? null;
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await moveTodoToParent(todo.id, newParentId);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "階層の変更に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 階層を1つ下げる(1つ上の兄弟の子として、その末尾へ移動)。先頭の項目には適用不可。 */
+  async function handleDemote(todo: Todo) {
+    const siblings = childrenByParent.get(todo.parent_id) ?? [];
+    const idx = siblings.findIndex((t) => t.id === todo.id);
+    if (idx <= 0) return;
+    const newParent = siblings[idx - 1];
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await moveTodoToParent(todo.id, newParent.id);
+      setCollapsedIds((prev) => {
+        if (!prev.has(newParent.id)) return prev;
+        const next = new Set(prev);
+        next.delete(newParent.id);
+        return next;
+      });
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "階層の変更に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderNode(todo: Todo, depth: number) {
     const children = childrenByParent.get(todo.id) ?? [];
     const hasChildren = children.length > 0;
@@ -191,6 +233,8 @@ export default function TodoPage() {
     const siblingIdx = siblings.findIndex((t) => t.id === todo.id);
     const canMoveUp = siblingIdx > 0;
     const canMoveDown = siblingIdx >= 0 && siblingIdx < siblings.length - 1;
+    const canPromote = todo.parent_id !== null;
+    const canDemote = siblingIdx > 0;
 
     return (
       <div key={todo.id}>
@@ -275,6 +319,22 @@ export default function TodoPage() {
             style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
           >
             ▼
+          </button>
+          <button
+            onClick={() => void handlePromote(todo)}
+            disabled={!canPromote || busy}
+            title="階層を上げる(親と同じ階層へ)"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            ←
+          </button>
+          <button
+            onClick={() => void handleDemote(todo)}
+            disabled={!canDemote || busy}
+            title="階層を下げる(1つ上の項目の子にする)"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            →
           </button>
           <button
             onClick={() => {
