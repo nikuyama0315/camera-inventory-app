@@ -62,3 +62,11 @@ export async function deleteTodo(id: string): Promise<void> {
   const { error } = await supabase.from("todos").delete().eq("id", id);
   if (error) throw error;
 }
+
+export async function updateTodoSortOrder(id: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from("todos")
+    .update({ sort_order: sortOrder, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}

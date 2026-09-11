@@ -3,6 +3,7 @@ import {
   fetchAllTodos,
   createTodo,
   updateTodoTitle,
+  updateTodoSortOrder,
   setTodoDone,
   deleteTodo,
   type Todo,
@@ -156,12 +157,40 @@ export default function TodoPage() {
     }
   }
 
+  /** 同じ親を持つ兄弟の中で、1つ上/下の項目とsort_orderを入れ替える(表示順の移動)。 */
+  async function handleMove(todo: Todo, direction: "up" | "down") {
+    const siblings = childrenByParent.get(todo.parent_id) ?? [];
+    const idx = siblings.findIndex((t) => t.id === todo.id);
+    const neighborIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (idx === -1 || neighborIdx < 0 || neighborIdx >= siblings.length) return;
+    const neighbor = siblings[neighborIdx];
+
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await Promise.all([
+        updateTodoSortOrder(todo.id, neighbor.sort_order),
+        updateTodoSortOrder(neighbor.id, todo.sort_order),
+      ]);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "並び替えに失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function renderNode(todo: Todo, depth: number) {
     const children = childrenByParent.get(todo.id) ?? [];
     const hasChildren = children.length > 0;
     const collapsed = collapsedIds.has(todo.id);
     const isEditing = editingId === todo.id;
     const isAddingChild = addingChildFor === todo.id;
+
+    const siblings = childrenByParent.get(todo.parent_id) ?? [];
+    const siblingIdx = siblings.findIndex((t) => t.id === todo.id);
+    const canMoveUp = siblingIdx > 0;
+    const canMoveDown = siblingIdx >= 0 && siblingIdx < siblings.length - 1;
 
     return (
       <div key={todo.id}>
@@ -231,6 +260,22 @@ export default function TodoPage() {
             </span>
           )}
 
+          <button
+            onClick={() => void handleMove(todo, "up")}
+            disabled={!canMoveUp || busy}
+            title="上へ移動"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            ▲
+          </button>
+          <button
+            onClick={() => void handleMove(todo, "down")}
+            disabled={!canMoveDown || busy}
+            title="下へ移動"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            ▼
+          </button>
           <button
             onClick={() => {
               setAddingChildFor(isAddingChild ? null : todo.id);
