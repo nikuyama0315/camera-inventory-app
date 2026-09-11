@@ -4,6 +4,7 @@ import {
   acceptInvoiceNumberCandidate,
   rejectInvoiceNumberCandidate,
   rejectAllCandidatesForVendor,
+  applyManualInvoiceNumber,
   type InvoiceNumberCandidate,
 } from "../../lib/api/invoiceLookup";
 
@@ -21,6 +22,8 @@ export default function InvoiceNumberCandidatesPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyVendor, setBusyVendor] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [manualInputs, setManualInputs] = useState<Record<string, string>>({});
+  const [manualBusyVendor, setManualBusyVendor] = useState<string | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -86,6 +89,23 @@ export default function InvoiceNumberCandidatesPanel() {
       setErrorMessage(err instanceof Error ? err.message : "却下に失敗しました");
     } finally {
       setBusyVendor(null);
+    }
+  }
+
+  async function handleApplyManual(vendor: string) {
+    const value = manualInputs[vendor] ?? "";
+    setManualBusyVendor(vendor);
+    setMessage(null);
+    setErrorMessage(null);
+    try {
+      const count = await applyManualInvoiceNumber(vendor, value);
+      setMessage(`「${vendor}」の経費${count}件に登録番号を反映しました`);
+      setManualInputs((prev) => ({ ...prev, [vendor]: "" }));
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "登録に失敗しました");
+    } finally {
+      setManualBusyVendor(null);
     }
   }
 
@@ -158,6 +178,22 @@ export default function InvoiceNumberCandidatesPanel() {
                 </tbody>
               </table>
             )}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}>
+              <input
+                type="text"
+                placeholder="登録番号を手動入力(例: T1234567890123)"
+                value={manualInputs[vendor] ?? ""}
+                onChange={(e) => setManualInputs((prev) => ({ ...prev, [vendor]: e.target.value }))}
+                style={{ fontSize: 12, width: 220 }}
+              />
+              <button
+                onClick={() => void handleApplyManual(vendor)}
+                disabled={manualBusyVendor === vendor || !(manualInputs[vendor] ?? "").trim()}
+                style={{ fontSize: 11, padding: "2px 8px" }}
+              >
+                この番号を登録
+              </button>
+            </div>
           </div>
         );
       })}

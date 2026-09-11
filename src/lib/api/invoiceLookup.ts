@@ -77,3 +77,31 @@ export async function rejectAllCandidatesForVendor(vendor: string): Promise<void
     .eq("status", "pending");
   if (error) throw error;
 }
+
+/**
+ * 手動入力した登録番号を、その事業者名で登録番号が未入力の経費レコードすべてに反映する。
+ * 簡易バリデーション(T+13桁数字)のみ行う。反映後、同じ事業者の候補行があれば却下扱いにする。
+ */
+export async function applyManualInvoiceNumber(vendor: string, regNo: string): Promise<number> {
+  const trimmed = regNo.trim().toUpperCase();
+  if (!/^T\d{13}$/.test(trimmed)) {
+    throw new Error("登録番号は「T」+数字13桁の形式で入力してください(例: T1234567890123)");
+  }
+
+  const { data: updated, error: updateErr } = await supabase
+    .from("expenses")
+    .update({ invoice_registration_no: trimmed })
+    .eq("vendor", vendor)
+    .or("invoice_registration_no.is.null,invoice_registration_no.eq.")
+    .select("id");
+  if (updateErr) throw updateErr;
+
+  const { error: rejectErr } = await supabase
+    .from("invoice_number_candidates")
+    .update({ status: "rejected" })
+    .eq("vendor", vendor)
+    .eq("status", "pending");
+  if (rejectErr) throw rejectErr;
+
+  return (updated as { id: string }[]).length;
+}
