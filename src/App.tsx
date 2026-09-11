@@ -17,6 +17,7 @@ import TodoPage from "./pages/TodoPage";
 import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
 import { establishMarketingSession } from "./lib/api/auth";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
+import { checkTodoDueAlertsAndNotify, fetchOverdueTodoCount } from "./lib/api/todos";
 import logo from "./assets/logo.png";
 
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "eventLog" | "ledgerImport";
@@ -79,6 +80,8 @@ export default function App() {
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
   const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
+  const [overdueTodoCount, setOverdueTodoCount] = useState(0);
+  const [overdueTodoDismissed, setOverdueTodoDismissed] = useState(false);
   // ?view=account-security でこの画面を直接開けるようにする(2026-09-11追加、
   // マーケティング側「ログイン情報再設定」リンクからの誘導先。ユーザー指示「販売管理の
   // ほうと同じにすべき」により、マーケティング固有の自己サービス型パスワード変更画面を
@@ -152,6 +155,17 @@ export default function App() {
       .catch(() => {
         /* バナー表示のための取得失敗は致命的でないため無視 */
       });
+    // To Doに期限切れ(due_atを過ぎても未完了)の項目があれば、画面上部バナー表示用の件数を取得し、
+    // あわせてGmail通知(Edge Function側でメール未送信のもののみ送る、二重送信防止済み)を行う
+    // (2026-09-12追加、在庫アラート・レポート取込アラートと同じ方式)。
+    fetchOverdueTodoCount()
+      .then(setOverdueTodoCount)
+      .catch(() => {
+        /* バナー表示のための取得失敗は致命的でないため無視 */
+      });
+    checkTodoDueAlertsAndNotify().catch(() => {
+      /* メール送信設定が未完了の場合は静かに失敗させる */
+    });
   }, [session]);
 
   if (!checked) {
@@ -346,6 +360,32 @@ export default function App() {
           </button>
           <button
             onClick={() => setReportImportAlertDismissed(true)}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
+          >
+            隠す
+          </button>
+        </div>
+      )}
+
+      {overdueTodoCount > 0 && !overdueTodoDismissed && (
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "var(--danger-bg)",
+            borderBottom: "0.5px solid var(--danger-text)",
+            fontSize: 12,
+            color: "var(--danger-text)",
+          }}
+        >
+          期限切れの未完了To Doが{overdueTodoCount}件あります
+          <button
+            onClick={() => window.open("/?view=todo", "soulmen_todo_window")}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
+          >
+            To Doを開く
+          </button>
+          <button
+            onClick={() => setOverdueTodoDismissed(true)}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
           >
             隠す

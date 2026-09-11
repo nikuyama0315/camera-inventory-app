@@ -7,6 +7,7 @@ import {
   moveTodoToParent,
   setTodoDone,
   setTodoImportant,
+  setTodoDueAt,
   deleteTodo,
   buildTodosBackup,
   restoreTodosFromBackup,
@@ -51,6 +52,12 @@ export default function TodoPage() {
   const uploadTargetIdRef = useRef<string | null>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
 
+  // 期限日時(2026-09-12追加)
+  const [editingDueForId, setEditingDueForId] = useState<string | null>(null);
+  const [editingDueValue, setEditingDueValue] = useState("");
+  // 期限切れ判定用の「現在時刻」。1分ごとに更新し、ページを開きっぱなしでも期限切れ表示が追従するようにする。
+  const [now, setNow] = useState(() => new Date());
+
   /**
    * 日時を"yyyy/mm/dd hh:mm"形式・日本時間(JST)で表示するためのフォーマッタ(追加日時・完了日時共通)。
    * 閲覧者のブラウザのタイムゾーン設定に依らず、常に日本時間で表示する
@@ -68,6 +75,56 @@ export default function TodoPage() {
     }).formatToParts(new Date(iso));
     const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
     return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
+  }
+
+  /**
+   * <input type="datetime-local">用に、ISO文字列をその入力欄が要求する"yyyy-MM-ddTHH:mm"形式
+   * (ブラウザのローカル時刻表現)に変換する。datetime-local入力欄はブラウザのローカルタイムゾーンでしか
+   * 値を扱えない仕様のため、表示側のformatDateTime()のように常に日本時間へ変換する手段が無い
+   * (この業務システムは日本国内での利用を前提としているため実用上は問題にならない想定)。
+   */
+  function toDatetimeLocalValue(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function startEditDue(todo: Todo) {
+    setEditingDueForId(todo.id);
+    setEditingDueValue(todo.due_at ? toDatetimeLocalValue(todo.due_at) : "");
+  }
+
+  async function commitDueEdit(todoId: string) {
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      const dueAt = editingDueValue ? new Date(editingDueValue).toISOString() : null;
+      await setTodoDueAt(todoId, dueAt);
+      setEditingDueForId(null);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "期限の更新に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearDue(todoId: string) {
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await setTodoDueAt(todoId, null);
+      setEditingDueForId(null);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "期限の解除に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function isTodoOverdue(todo: Todo): boolean {
+    return !todo.done && !!todo.due_at && new Date(todo.due_at).getTime() < now.getTime();
   }
 
   async function reload() {
@@ -88,6 +145,11 @@ export default function TodoPage() {
     void reload();
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, Todo[]>();
     for (const t of todos) {
@@ -98,6 +160,11 @@ export default function TodoPage() {
     }
     return map;
   }, [todos]);
+
+  const overdueTodos = useMemo(
+    () => todos.filter((t) => !t.done && t.due_at && new Date(t.due_at).getTime() < now.getTime()),
+    [todos, now],
+  );
 
   function toggleCollapse(id: string) {
     setCollapsedIds((prev) => {
@@ -479,6 +546,8 @@ export default function TodoPage() {
     const todoAttachments = attachmentsFor(todo.id);
     const attachmentsExpanded = expandedAttachmentsFor.has(todo.id);
     const isDragOver = dragOverId === todo.id;
+    const overdue = isTodoOverdue(todo);
+    const isEditingDue = editingDueForId === todo.id;
 
     return (
       <div key={todo.id}>
@@ -585,6 +654,21 @@ export default function TodoPage() {
                   重要
                 </span>
               )}
+              {overdue && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: "#d32f2f",
+                    borderRadius: 4,
+                    padding: "1px 5px",
+                  }}
+                >
+                  期限切れ
+                </span>
+              )}
               <span
                 style={{
                   marginLeft: 8,
@@ -595,6 +679,65 @@ export default function TodoPage() {
               >
                 (追加日時: {formatDateTime(todo.created_at)})
               </span>
+              {isEditingDue ? (
+                <span
+                  style={{ marginLeft: 8, display: "inline-flex", gap: 4, alignItems: "center" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="datetime-local"
+                    autoFocus
+                    value={editingDueValue}
+                    onChange={(e) => setEditingDueValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitDueEdit(todo.id);
+                      if (e.key === "Escape") setEditingDueForId(null);
+                    }}
+                    style={{ fontSize: 11 }}
+                  />
+                  <button
+                    onClick={() => void commitDueEdit(todo.id)}
+                    disabled={busy}
+                    style={{ fontSize: 10, padding: "1px 6px" }}
+                  >
+                    保存
+                  </button>
+                  {todo.due_at && (
+                    <button
+                      onClick={() => void clearDue(todo.id)}
+                      disabled={busy}
+                      style={{ fontSize: 10, padding: "1px 6px" }}
+                    >
+                      解除
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditingDueForId(null)}
+                    style={{ fontSize: 10, padding: "1px 6px" }}
+                  >
+                    キャンセル
+                  </button>
+                </span>
+              ) : (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditDue(todo);
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  title="クリックして期限日時を設定・変更"
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 11,
+                    cursor: "pointer",
+                    textDecoration: "underline dotted",
+                    color: overdue ? "#d32f2f" : todo.due_at ? "var(--text-secondary)" : "var(--text-muted)",
+                    fontWeight: overdue ? 700 : 400,
+                  }}
+                >
+                  {todo.due_at ? `期限: ${formatDateTime(todo.due_at)}` : "＋期限を設定"}
+                </span>
+              )}
               {todo.done && todo.completed_at && (
                 <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)" }}>
                   (完了日時: {formatDateTime(todo.completed_at)})
@@ -772,6 +915,29 @@ export default function TodoPage() {
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         ツリー構造で管理できるTo Doリストです。項目をダブルクリックすると内容を編集できます。
       </p>
+
+      {overdueTodos.length > 0 && (
+        <div
+          style={{
+            background: "var(--danger-bg)",
+            border: "0.5px solid var(--danger-text)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            color: "var(--danger-text)",
+            fontSize: 13,
+          }}
+        >
+          <strong>期限切れの未完了To Doが{overdueTodos.length}件あります</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 20 }}>
+            {overdueTodos.map((t) => (
+              <li key={t.id}>
+                {t.title}(期限: {formatDateTime(t.due_at as string)})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <input

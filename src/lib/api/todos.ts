@@ -10,6 +10,7 @@ export interface Todo {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  due_at: string | null;
 }
 
 export async function fetchAllTodos(): Promise<Todo[]> {
@@ -57,6 +58,9 @@ export async function setTodoDone(id: string, done: boolean): Promise<void> {
     .update({
       done,
       completed_at: done ? new Date().toISOString() : null,
+      // 完了を取り消した場合、期限切れ警告メールを再度送れるようにリセットする
+      // (再オープンしたタスクが引き続き/再び期限切れのままなら、次回チェック時に再通知されるべきため)。
+      ...(done ? {} : { due_alert_sent_at: null }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -70,6 +74,35 @@ export async function setTodoImportant(id: string, isImportant: boolean): Promis
     .update({ is_important: isImportant, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+/** 期限日時を設定・変更・解除する(dueAt=nullで期限なしに戻す)。 */
+export async function setTodoDueAt(id: string, dueAt: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("todos")
+    // 期限日時を変更(延長・繰り下げ含む)するたびに通知済みフラグをリセットする。新しい期限を
+    // 過ぎたときに改めてメール警告できるようにするため。
+    .update({ due_at: dueAt, due_alert_sent_at: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Edge Functionを呼び出し、期限切れなのに未完了のTo Doがあればまとめてメール通知する。 */
+export async function checkTodoDueAlertsAndNotify(): Promise<{ notified: string[] } | null> {
+  const { data, error } = await supabase.functions.invoke("check-todo-due-alerts");
+  if (error) throw error;
+  return data as { notified: string[] };
+}
+
+/** 期限切れ(due_atを過ぎているのに未完了)のTo Do件数を取得する(ヘッダーの警告バナー用の軽量クエリ)。 */
+export async function fetchOverdueTodoCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("todos")
+    .select("id", { count: "exact", head: true })
+    .eq("done", false)
+    .lt("due_at", new Date().toISOString());
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /** 削除すると配下(子孫)もDB側のON DELETE CASCADEで一緒に削除される。 */
@@ -131,6 +164,7 @@ export async function restoreTodosFromBackup(backup: TodoBackupFile): Promise<nu
     created_at: r.created_at,
     updated_at: r.updated_at,
     completed_at: r.completed_at,
+    due_at: r.due_at ?? null,
   }));
   const { error: insError } = await supabase.from("todos").insert(insertRows);
   if (insError) throw insError;
