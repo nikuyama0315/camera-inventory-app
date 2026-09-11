@@ -13,6 +13,7 @@ import SalesPage from "./pages/SalesPage";
 import LedgerImportPage from "./pages/LedgerImportPage";
 import ExchangeRatePage from "./pages/ExchangeRatePage";
 import EventLogPage from "./pages/EventLogPage";
+import TodoPage from "./pages/TodoPage";
 import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow } from "./lib/api/stockAlerts";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import logo from "./assets/logo.png";
@@ -138,6 +139,12 @@ export default function App() {
     return <LoginPage onLoggedIn={() => {}} />;
   }
 
+  // ヘッダーの「To Do →」ボタンから新規ウィンドウ(?view=todo)で開かれた場合は、
+  // 通常のタブ画面ではなくTo Doリスト単体ページを描画する(2026-09-11追加)。
+  if (new URLSearchParams(window.location.search).get("view") === "todo") {
+    return <TodoPage />;
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <div
@@ -202,6 +209,24 @@ export default function App() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a
+            href="/?view=todo"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 12,
+              padding: "4px 10px",
+              border: "0.5px solid var(--border-strong)",
+              borderRadius: 6,
+              background: "var(--surface-2)",
+              color: "var(--text-primary)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            To Do →
+          </a>
           <a
             href={marketingHref}
             style={{
