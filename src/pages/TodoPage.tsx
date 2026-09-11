@@ -382,10 +382,14 @@ export default function TodoPage() {
   }
 
   function handleAttachFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
+    // e.target.filesは入力欄の状態と連動した"生きた"FileListのため、配列にコピーして
+    // ファイル本体(File)を確保してからでないと、直後のe.target.value=""でリストの中身が
+    // 消えてしまう(実機で確認: filesはlength=1で来ているのに、e.target.value=""の後に
+    // 参照すると0件になっていた)。
+    const files = e.target.files ? Array.from(e.target.files) : [];
     const todoId = uploadTargetIdRef.current;
     e.target.value = "";
-    if (files && todoId) void uploadFilesToTodo(todoId, files);
+    if (files.length > 0 && todoId) void uploadFilesToTodo(todoId, files);
   }
 
   function handleRowDragOver(todoId: string, e: React.DragEvent) {
