@@ -34,9 +34,23 @@ export default function TodoPage() {
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
-  /** 追加日を日本時間(JST)で表示するためのフォーマッタ。閲覧者のブラウザのタイムゾーン設定に依らず、常に日本時間で表示する。 */
+  /**
+   * 追加日時を"yyyy/mm/dd hh:mm"形式・日本時間(JST)で表示するためのフォーマッタ。
+   * 閲覧者のブラウザのタイムゾーン設定に依らず、常に日本時間で表示する
+   * (ロケール依存の区切り文字ゆらぎを避けるため、パーツを個別に取り出して手動で組み立てる)。
+   */
   function formatAddedDate(createdAt: string): string {
-    return new Date(createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
+    const parts = new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(createdAt));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    return `${get("year")}/${get("month")}/${get("day")} ${get("hour")}:${get("minute")}`;
   }
 
   async function reload() {
@@ -374,7 +388,7 @@ export default function TodoPage() {
             >
               {todo.title}
               <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)", textDecoration: "none" }}>
-                (追加日: {formatAddedDate(todo.created_at)})
+                (追加日時: {formatAddedDate(todo.created_at)})
               </span>
             </span>
           )}
