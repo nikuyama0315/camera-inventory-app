@@ -12,46 +12,21 @@ import {
   type ChecklistType,
   type ChecklistCheck,
 } from "../../lib/api/checklist";
+import { windowsPathToOpenFolderUrl } from "../../lib/constants";
 
 /**
- * PC側の原票保管フォルダのパス(2026-09-11追加、2026-09-11修正)。G:ドライブ(Google Drive
- * デスクトップ同期)配下の固定パターン「経費\YYYY原票\種別名」を種別名から自動生成する
- * (YYYYは進行年=現在の年)。
- * 【修正理由】当初file://リンクで直接開けるようにしたが、多くのブラウザはhttp(s)ページから
- * file://への遷移をセキュリティ上ブロックするため実際には開けなかった(ユーザー報告により
- * 発覚)。そのため、パスをテキスト表示してコピーする方式に変更し、エクスプローラーの
- * アドレスバーに貼り付けて開いてもらう形にした。
+ * PC側の原票保管フォルダへのopenfolder://URLを組み立てる(2026-09-11追加、2026-09-11修正)。
+ * G:ドライブ(Google Driveデスクトップ同期)配下の固定パターン「経費\YYYY原票\種別名」を
+ * 種別名から自動生成する(YYYYは進行年=現在の年)。
+ * 【修正理由】2026-09-11: 当初file://リンクで開けるようにしたが、多くのブラウザはhttp(s)ページから
+ * file://への遷移をセキュリティ上ブロックするため開けなかった(ユーザー報告)。仕入・在庫・販売タブの
+ * 一覧表示「フォルダを開く」で既に使われている openfolder:// ハンドラ(各PCにインストール済み)
+ * を同様に使う方式に変更した(windowsPathToOpenFolderUrlを共通化)。
  */
-function buildPcFolderPath(typeName: string): string {
+function buildPcFolderOpenUrl(typeName: string): string {
   const year = new Date().getFullYear();
-  return `G:\\マイドライブ\\@個人事業\\@会計・税務\\会計\\記帳\\経費\\${year}原票\\${typeName}`;
-}
-
-/** クリップボードへのコピー(このアプリはプレーンHTTP配信のためnavigator.clipboardが
- *  使えない環境向けに、非表示textarea+execCommandのフォールバックも用意する)。 */
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    /* フォールバックへ */
-  }
-  try {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(textarea);
-    return ok;
-  } catch {
-    return false;
-  }
+  const windowsPath = `G:\\マイドライブ\\@個人事業\\@会計・税務\\会計\\記帳\\経費\\${year}原票\\${typeName}\\`;
+  return windowsPathToOpenFolderUrl(windowsPath);
 }
 
 /**
@@ -77,7 +52,6 @@ export default function ReportChecklistPanel() {
   const [newSourceUrl, setNewSourceUrl] = useState("");
   const [newFolderUrl, setNewFolderUrl] = useState("");
   const [adding, setAdding] = useState(false);
-  const [copiedTypeId, setCopiedTypeId] = useState<string | null>(null);
 
   const months = checklistMonthRange();
 
@@ -181,16 +155,6 @@ export default function ReportChecklistPanel() {
       await reload();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "並び替えに失敗しました");
-    }
-  }
-
-  async function handleCopyPcPath(typeId: string, typeName: string) {
-    const ok = await copyToClipboard(buildPcFolderPath(typeName));
-    if (ok) {
-      setCopiedTypeId(typeId);
-      setTimeout(() => setCopiedTypeId((cur) => (cur === typeId ? null : cur)), 2000);
-    } else {
-      setErrorMessage("パスのコピーに失敗しました(ブラウザがクリップボードアクセスを許可していない可能性があります)");
     }
   }
 
@@ -305,11 +269,10 @@ export default function ReportChecklistPanel() {
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
                         <button
-                          onClick={() => void handleCopyPcPath(t.id, t.name)}
-                          title={buildPcFolderPath(t.name)}
+                          onClick={() => window.open(buildPcFolderOpenUrl(t.name), "_blank", "noopener,noreferrer")}
                           style={{ fontSize: 11, padding: "1px 6px" }}
                         >
-                          {copiedTypeId === t.id ? "コピーしました" : "PCフォルダのパスをコピー"}
+                          PCフォルダを開く
                         </button>
                         {t.storage_folder_url ? (
                           <a href={t.storage_folder_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>

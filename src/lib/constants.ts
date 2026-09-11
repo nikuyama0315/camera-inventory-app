@@ -37,6 +37,23 @@ export const DRIVE_BASE_PATH_SOLD = "G:\\マイドライブ\\@個人事業\\@カ
  * 無条件には使わず、現在のステージに応じて必要な場合のみ使用する。
  * 戻り値がnullの場合、フォルダの場所を特定できない(情報不足)ことを示す。
  */
+/**
+ * Windowsのフルパス(バックスラッシュ区切り)を、独自プロトコル openfolder:// のURLに変換する。
+ * ブラウザの file:// リンクではWindowsのエクスプローラーを直接起動できない(ブラウザ内蔵の
+ * ファイル一覧表示になってしまう、またはhttp(s)ページからのfile://遷移自体がブロックされる)ため、
+ * 各PCにインストールする openfolder:// ハンドラ経由でエクスプローラーを起動する方式にしている
+ * (仕入・在庫・販売タブの一覧表示「フォルダを開く」で採用済みの方式を共通化)。
+ * 例: "G:\\マイドライブ\\Foo\\Bar\\" -> "openfolder://G/%E3%83%9E...%2FFoo/Bar/"
+ * 先頭のドライブ文字(例: G)はそのまま、それ以外の各階層名はURLエンコードする。
+ */
+export function windowsPathToOpenFolderUrl(windowsPath: string): string {
+  const segments = windowsPath.split("\\").filter(Boolean);
+  if (segments.length === 0) return "";
+  const [driveWithColon, ...rest] = segments;
+  const drive = driveWithColon.replace(/:$/, "");
+  return `openfolder://${drive}/${rest.map((s) => encodeURIComponent(s)).join("/")}/`;
+}
+
 export function computeDriveLocalPath(
   currentStage: string | null,
   modelFolderName: string | null,

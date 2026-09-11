@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS, ITEM_STATUS_LABELS, type ItemStatus } from "../../lib/types";
 import { deleteItem, updateItemBasicInfo, updateItemStatus, type ItemWithPurchase } from "../../lib/api/items";
-import { computeDriveLocalPath, SOURCE_TYPE_OPTIONS } from "../../lib/constants";
+import { computeDriveLocalPath, SOURCE_TYPE_OPTIONS, windowsPathToOpenFolderUrl } from "../../lib/constants";
 
 interface Props {
   items: ItemWithPurchase[];
@@ -93,22 +93,6 @@ function sortValue(item: ItemWithPurchase, column: SortColumn): string {
 interface FolderLink {
   url: string;
   title: string;
-}
-
-/**
- * Windowsのフルパス(バックスラッシュ区切り)を、独自プロトコル openfolder:// のURLに変換する。
- * ブラウザの file:// リンクではWindowsのエクスプローラーを直接起動できない(ブラウザ内蔵の
- * ファイル一覧表示になってしまう)ため、各PCにインストールする openfolder:// ハンドラ経由で
- * エクスプローラーを起動する方式にしている。
- * 例: "G:\\マイドライブ\\Foo\\Bar\\" → "openfolder://G/%E3%83%9E...%2FFoo/Bar/"
- * 先頭のドライブ文字(例: G)はそのまま、それ以外の各階層名はURLエンコードする。
- */
-function windowsPathToOpenFolderUrl(windowsPath: string): string {
-  const segments = windowsPath.split("\\").filter(Boolean);
-  if (segments.length === 0) return "";
-  const [driveWithColon, ...rest] = segments;
-  const drive = driveWithColon.replace(/:$/, "");
-  return `openfolder://${drive}/${rest.map((s) => encodeURIComponent(s)).join("/")}/`;
 }
 
 /**
