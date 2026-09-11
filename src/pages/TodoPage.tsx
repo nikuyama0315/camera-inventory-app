@@ -6,6 +6,7 @@ import {
   updateTodoSortOrder,
   moveTodoToParent,
   setTodoDone,
+  setTodoImportant,
   deleteTodo,
   buildTodosBackup,
   restoreTodosFromBackup,
@@ -151,6 +152,19 @@ export default function TodoPage() {
     setErrorMessage(null);
     try {
       await setTodoDone(todo.id, !todo.done);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "更新に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleImportant(todo: Todo) {
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await setTodoImportant(todo.id, !todo.is_important);
       await reload();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "更新に失敗しました");
@@ -510,6 +524,26 @@ export default function TodoPage() {
             style={{ flexShrink: 0 }}
           />
 
+          <button
+            onClick={() => void handleToggleImportant(todo)}
+            disabled={busy}
+            title={todo.is_important ? "重要を解除" : "重要にする"}
+            style={{
+              width: 20,
+              height: 20,
+              padding: 0,
+              fontSize: 14,
+              lineHeight: "20px",
+              border: "none",
+              background: "transparent",
+              color: todo.is_important ? "#d32f2f" : "var(--text-muted)",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {todo.is_important ? "★" : "☆"}
+          </button>
+
           {isEditing ? (
             <input
               type="text"
@@ -536,6 +570,21 @@ export default function TodoPage() {
               }}
             >
               <span style={{ textDecoration: todo.done ? "line-through" : "none" }}>{todo.title}</span>
+              {todo.is_important && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: "#d32f2f",
+                    borderRadius: 4,
+                    padding: "1px 5px",
+                  }}
+                >
+                  重要
+                </span>
+              )}
               <span
                 style={{
                   marginLeft: 8,

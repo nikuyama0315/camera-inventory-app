@@ -5,6 +5,7 @@ export interface Todo {
   parent_id: string | null;
   title: string;
   done: boolean;
+  is_important: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -58,6 +59,15 @@ export async function setTodoDone(id: string, done: boolean): Promise<void> {
       completed_at: done ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** 「重要」マーク(赤バッジ表示)のON/OFFを切り替える。 */
+export async function setTodoImportant(id: string, isImportant: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("todos")
+    .update({ is_important: isImportant, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }
@@ -116,6 +126,7 @@ export async function restoreTodosFromBackup(backup: TodoBackupFile): Promise<nu
     parent_id: null,
     title: r.title,
     done: r.done,
+    is_important: r.is_important ?? false,
     sort_order: r.sort_order,
     created_at: r.created_at,
     updated_at: r.updated_at,
