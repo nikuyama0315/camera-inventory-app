@@ -5,6 +5,7 @@ import { fetchLatestMufgTtm, fetchMufgCrossRate } from "../lib/api/mufgRate";
 import { detectUnfilledMonths, fillMissingLedgerRates, updateMonthlyLedgerWorkbook } from "../lib/api/monthlyLedger";
 import ElogiShippingImportPanel from "../components/expenses/ElogiShippingImportPanel";
 import CpassInvoiceImportPanel from "../components/expenses/CpassInvoiceImportPanel";
+import ReportChecklistPanel from "../components/reportImport/ReportChecklistPanel";
 import {
   clearScopedImportData,
   fetchImportHistory,
@@ -112,7 +113,7 @@ export default function ImportPage() {
         各レポートのCSVは実データで列名・ヘッダー行の位置(先頭の請求書番号等のメタデータ行を自動で読み飛ばします)を確認済みです。それでも取込件数が0件、または想定と異なる場合はCSVの列名をご確認ください。
       </p>
 
-      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>取込状況(当年1月〜前月)</h3>
+      <h3 style={{ fontSize: 14, fontWeight: 500, marginTop: 0 }}>レポート取込状況(当年1月〜前月)</h3>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
         各レポート・アカウントについて、月ごとに取込済みかどうかを表示します(対象月とデータ期間が重なる取込が1件でもあれば「済」。eBay Financial StatementのみPayout/Closing fundsを実際に保存した月のみ「済」)。
         各レポートは月が閉まってから翌月7日頃までに提供されるため、前月分が当月7日を過ぎても未取込の場合に行に警告(⚠)を表示します。
@@ -182,6 +183,8 @@ export default function ImportPage() {
           })()}
         </tbody>
       </table>
+
+      <ReportChecklistPanel />
 
       <TransactionReportSection onImported={reloadHistory} />
       <TaxInvoiceSection onImported={reloadHistory} />
