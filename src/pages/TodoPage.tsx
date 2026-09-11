@@ -953,12 +953,6 @@ export default function TodoPage() {
         <button onClick={() => void handleAddRoot()} disabled={busy}>
           追加
         </button>
-        <button onClick={() => void reload()} disabled={loading} style={{ marginLeft: "auto" }}>
-          {loading ? "更新中..." : "更新"}
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
         <button onClick={() => void handleBackup()} disabled={backupBusy}>
           {backupBusy ? "バックアップ中..." : "バックアップ(ダウンロード)"}
         </button>
@@ -976,7 +970,6 @@ export default function TodoPage() {
             if (file) void handleRestoreFileSelected(file);
           }}
         />
-        {backupMessage && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{backupMessage}</span>}
         <input
           ref={attachFileInputRef}
           type="file"
@@ -984,7 +977,16 @@ export default function TodoPage() {
           style={{ display: "none" }}
           onChange={handleAttachFileInputChange}
         />
+        <button onClick={() => void reload()} disabled={loading} style={{ marginLeft: "auto" }}>
+          {loading ? "更新中..." : "更新"}
+        </button>
       </div>
+
+      {backupMessage && (
+        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: -8, marginBottom: 16 }}>
+          {backupMessage}
+        </p>
+      )}
 
       {attachmentMessage && (
         <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>{attachmentMessage}</p>
