@@ -213,7 +213,7 @@ export default function App() {
           {TABS.map((t) => (
             <Fragment key={t.key}>
               {(t.key === "skuLookup" || t.key === "exchangeRate") && (
-                <span style={{ color: "var(--border-strong)", fontSize: 13 }}>｜</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 13, margin: "0 4px" }}>｜</span>
               )}
               <button
                 onClick={() => {
