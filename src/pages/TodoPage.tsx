@@ -9,8 +9,14 @@ import {
   deleteTodo,
   buildTodosBackup,
   restoreTodosFromBackup,
+  fetchAttachmentsForTodoIds,
+  uploadTodoAttachment,
+  deleteTodoAttachment,
+  deleteAttachmentsForTodoIds,
+  getAttachmentSignedUrl,
   type Todo,
   type TodoBackupFile,
+  type TodoAttachment,
 } from "../lib/api/todos";
 
 /** ヘッダーの「To Do」ボタンから新規ウィンドウで開かれる、ツリー構造のTo Doリスト単体ページ(2026-09-11追加)。
@@ -33,6 +39,15 @@ export default function TodoPage() {
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 添付ファイル(2026-09-12追加)
+  const [attachments, setAttachments] = useState<TodoAttachment[]>([]);
+  const [expandedAttachmentsFor, setExpandedAttachmentsFor] = useState<Set<string>>(new Set());
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const uploadTargetIdRef = useRef<string | null>(null);
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
 
   /**
    * 日時を"yyyy/mm/dd hh:mm"形式・日本時間(JST)で表示するためのフォーマッタ(追加日時・完了日時共通)。
@@ -59,6 +74,7 @@ export default function TodoPage() {
     try {
       const rows = await fetchAllTodos();
       setTodos(rows);
+      setAttachments(await fetchAttachmentsForTodoIds(rows.map((r) => r.id)));
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -167,15 +183,30 @@ export default function TodoPage() {
     }
   }
 
+  /** 指定したTo Do自身と、その配下(子孫)すべてのIDを列挙する(添付ファイルのカスケード削除用)。 */
+  function collectSelfAndDescendantIds(id: string): string[] {
+    const result: string[] = [id];
+    const children = childrenByParent.get(id) ?? [];
+    for (const c of children) {
+      result.push(...collectSelfAndDescendantIds(c.id));
+    }
+    return result;
+  }
+
   async function handleDelete(todo: Todo) {
     const hasChildren = (childrenByParent.get(todo.id)?.length ?? 0) > 0;
     const confirmMessage = hasChildren
-      ? `「${todo.title}」を削除します。配下の項目もすべて削除されますがよろしいですか？`
-      : `「${todo.title}」を削除しますか？`;
+      ? `「${todo.title}」を削除します。配下の項目・添付ファイルもすべて削除されますがよろしいですか？`
+      : `「${todo.title}」を削除しますか？(添付ファイルがあれば、それも削除されます)`;
     if (!window.confirm(confirmMessage)) return;
     setBusy(true);
     setErrorMessage(null);
     try {
+      // todosのDB行自体(と、それに紐づくtodo_attachmentsのDB行)はON DELETE CASCADEで
+      // 自動的に消えるが、ストレージ上の実ファイルはそれとは別に明示的に削除する必要がある
+      // ため、削除対象(自分+配下すべて)を先に洗い出してから削除する。
+      const targetIds = collectSelfAndDescendantIds(todo.id);
+      await deleteAttachmentsForTodoIds(targetIds);
       await deleteTodo(todo.id);
       await reload();
     } catch (err) {
@@ -308,6 +339,99 @@ export default function TodoPage() {
     }
   }
 
+  function toggleAttachments(todoId: string) {
+    setExpandedAttachmentsFor((prev) => {
+      const next = new Set(prev);
+      if (next.has(todoId)) next.delete(todoId);
+      else next.add(todoId);
+      return next;
+    });
+  }
+
+  function attachmentsFor(todoId: string): TodoAttachment[] {
+    return attachments.filter((a) => a.todo_id === todoId);
+  }
+
+  async function uploadFilesToTodo(todoId: string, files: FileList | File[]) {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+    setUploadingFor(todoId);
+    setErrorMessage(null);
+    try {
+      for (const file of fileArray) {
+        await uploadTodoAttachment(todoId, file);
+      }
+      setExpandedAttachmentsFor((prev) => new Set(prev).add(todoId));
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "添付ファイルのアップロードに失敗しました");
+    } finally {
+      setUploadingFor(null);
+    }
+  }
+
+  function handleAttachButtonClick(todoId: string) {
+    uploadTargetIdRef.current = todoId;
+    attachFileInputRef.current?.click();
+  }
+
+  function handleAttachFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    const todoId = uploadTargetIdRef.current;
+    e.target.value = "";
+    if (files && todoId) void uploadFilesToTodo(todoId, files);
+  }
+
+  function handleRowDragOver(todoId: string, e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(todoId);
+  }
+
+  function handleRowDragLeave(todoId: string) {
+    setDragOverId((cur) => (cur === todoId ? null : cur));
+  }
+
+  function handleRowDrop(todoId: string, e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverId(null);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      void uploadFilesToTodo(todoId, e.dataTransfer.files);
+    }
+  }
+
+  async function handleOpenAttachment(attachment: TodoAttachment) {
+    setErrorMessage(null);
+    try {
+      const url = await getAttachmentSignedUrl(attachment.storage_path);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "添付ファイルを開けませんでした");
+    }
+  }
+
+  async function handleDeleteAttachment(attachment: TodoAttachment) {
+    if (!window.confirm(`「${attachment.file_name}」を削除しますか？`)) return;
+    setDeletingAttachmentId(attachment.id);
+    setErrorMessage(null);
+    try {
+      await deleteTodoAttachment(attachment);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "添付ファイルの削除に失敗しました");
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  }
+
+  function formatFileSize(bytes: number | null): string {
+    if (bytes == null) return "";
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  }
+
   function renderNode(todo: Todo, depth: number) {
     const children = childrenByParent.get(todo.id) ?? [];
     const hasChildren = children.length > 0;
@@ -321,10 +445,16 @@ export default function TodoPage() {
     const canMoveDown = siblingIdx >= 0 && siblingIdx < siblings.length - 1;
     const canPromote = todo.parent_id !== null;
     const canDemote = siblingIdx > 0;
+    const todoAttachments = attachmentsFor(todo.id);
+    const attachmentsExpanded = expandedAttachmentsFor.has(todo.id);
+    const isDragOver = dragOverId === todo.id;
 
     return (
       <div key={todo.id}>
         <div
+          onDragOver={(e) => handleRowDragOver(todo.id, e)}
+          onDragLeave={() => handleRowDragLeave(todo.id)}
+          onDrop={(e) => handleRowDrop(todo.id, e)}
           style={{
             display: "flex",
             alignItems: "center",
@@ -332,6 +462,8 @@ export default function TodoPage() {
             padding: "5px 4px",
             marginLeft: depth * 22,
             borderRadius: 6,
+            background: isDragOver ? "var(--surface-1)" : undefined,
+            outline: isDragOver ? "2px dashed var(--accent, #185fa5)" : "none",
           }}
         >
           <button
@@ -446,6 +578,13 @@ export default function TodoPage() {
             ＋子を追加
           </button>
           <button
+            onClick={() => toggleAttachments(todo.id)}
+            title="添付ファイル"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            📎{todoAttachments.length > 0 ? todoAttachments.length : ""}
+          </button>
+          <button
             onClick={() => startEdit(todo)}
             style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
           >
@@ -458,6 +597,51 @@ export default function TodoPage() {
             削除
           </button>
         </div>
+
+        {attachmentsExpanded && (
+          <div
+            style={{
+              marginLeft: (depth + 1) * 22 + 24,
+              marginBottom: 6,
+              padding: "6px 8px",
+              border: "0.5px dashed var(--border)",
+              borderRadius: 6,
+              background: "var(--surface-1)",
+            }}
+          >
+            {todoAttachments.length === 0 && (
+              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
+                添付ファイルはありません(ここへドラッグ&ドロップ、または下のボタンで追加できます)
+              </p>
+            )}
+            {todoAttachments.map((a) => (
+              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                <button
+                  onClick={() => void handleOpenAttachment(a)}
+                  style={{ fontSize: 11, padding: "1px 6px", textAlign: "left" }}
+                  title={a.file_name}
+                >
+                  {a.file_name}
+                </button>
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatFileSize(a.size_bytes)}</span>
+                <button
+                  onClick={() => void handleDeleteAttachment(a)}
+                  disabled={deletingAttachmentId === a.id}
+                  style={{ fontSize: 10, padding: "1px 6px", marginLeft: "auto" }}
+                >
+                  削除
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => handleAttachButtonClick(todo.id)}
+              disabled={uploadingFor === todo.id}
+              style={{ fontSize: 11, padding: "2px 8px" }}
+            >
+              {uploadingFor === todo.id ? "アップロード中..." : "ファイルを選択して添付"}
+            </button>
+          </div>
+        )}
 
         {isAddingChild && (
           <div
@@ -541,6 +725,13 @@ export default function TodoPage() {
           }}
         />
         {backupMessage && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{backupMessage}</span>}
+        <input
+          ref={attachFileInputRef}
+          type="file"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleAttachFileInputChange}
+        />
       </div>
 
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}

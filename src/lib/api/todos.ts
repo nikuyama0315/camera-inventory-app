@@ -132,3 +132,80 @@ export async function restoreTodosFromBackup(backup: TodoBackupFile): Promise<nu
 
   return rows.length;
 }
+
+// ---------------------------------------------------------------
+// 添付ファイル(2026-09-12追加)
+// ---------------------------------------------------------------
+
+const ATTACHMENT_BUCKET = "todo-attachments";
+
+export interface TodoAttachment {
+  id: string;
+  todo_id: string;
+  file_name: string;
+  storage_path: string;
+  size_bytes: number | null;
+  content_type: string | null;
+  created_at: string;
+}
+
+/** 複数のTo Do IDに紐づく添付ファイルをまとめて取得する(一覧表示・階層丸ごと削除時の対象洗い出し用)。 */
+export async function fetchAttachmentsForTodoIds(todoIds: string[]): Promise<TodoAttachment[]> {
+  if (todoIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("todo_attachments")
+    .select("*")
+    .in("todo_id", todoIds)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data as TodoAttachment[];
+}
+
+/** 添付ファイルをアップロードし、todo_attachmentsに行を作成する。 */
+export async function uploadTodoAttachment(todoId: string, file: File): Promise<TodoAttachment> {
+  const storagePath = `${todoId}/${crypto.randomUUID()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(storagePath, file);
+  if (uploadError) throw uploadError;
+
+  const { data, error: insertError } = await supabase
+    .from("todo_attachments")
+    .insert({
+      todo_id: todoId,
+      file_name: file.name,
+      storage_path: storagePath,
+      size_bytes: file.size,
+      content_type: file.type || null,
+    })
+    .select("*")
+    .single();
+  if (insertError) throw insertError;
+  return data as TodoAttachment;
+}
+
+/** 添付ファイル1件を削除する(ストレージの実ファイル→DB行の順)。 */
+export async function deleteTodoAttachment(attachment: TodoAttachment): Promise<void> {
+  const { error: storageError } = await supabase.storage.from(ATTACHMENT_BUCKET).remove([attachment.storage_path]);
+  if (storageError) throw storageError;
+  const { error: dbError } = await supabase.from("todo_attachments").delete().eq("id", attachment.id);
+  if (dbError) throw dbError;
+}
+
+/**
+ * 指定したTo Do ID群に紐づく添付ファイルのストレージ実体をまとめて削除する
+ * (todo_attachmentsのDB行自体はtodosのON DELETE CASCADEで自動削除されるため、
+ * ここではストレージ側の実ファイルの削除のみを担当する。To Do削除前に呼ぶこと)。
+ */
+export async function deleteAttachmentsForTodoIds(todoIds: string[]): Promise<void> {
+  const attachments = await fetchAttachmentsForTodoIds(todoIds);
+  if (attachments.length === 0) return;
+  const paths = attachments.map((a) => a.storage_path);
+  const { error } = await supabase.storage.from(ATTACHMENT_BUCKET).remove(paths);
+  if (error) throw error;
+}
+
+/** 非公開バケットのため、ダウンロード/表示用の署名付きURLを発行する(1時間有効)。 */
+export async function getAttachmentSignedUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(ATTACHMENT_BUCKET).createSignedUrl(storagePath, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
