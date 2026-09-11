@@ -14,6 +14,17 @@ import {
 } from "../../lib/api/checklist";
 
 /**
+ * PC側の原票保管フォルダ(2026-09-11追加)。G:ドライブ(Google Driveデスクトップ同期)配下の
+ * 固定パターン「経費/YYYY原票/種別名」で、種別ごとに登録不要で自動的にリンクを生成する
+ * (YYYYは進行年=現在の年。file://リンクのためブラウザ設定によっては開けない場合がある)。
+ */
+function buildPcFolderUrl(typeName: string): string {
+  const year = new Date().getFullYear();
+  const path = `G:/マイドライブ/@個人事業/@会計・税務/会計/記帳/経費/${year}原票/${typeName}`;
+  return "file:///" + encodeURI(path);
+}
+
+/**
  * 「請求書・領収書 月次取込チェック」(2026-09-11新規)。
  * 月次で取り込んでおく請求書・領収書(freee外部の各種サービスからダウンロードするものなど)の
  * 取込忘れを防ぐための、種別×年月のチェック表。レポート取込状況(自動判定)とは異なり、
@@ -184,7 +195,7 @@ export default function ReportChecklistPanel() {
                 </th>
               ))}
               <th style={{ padding: "6px 4px", fontWeight: 500 }}>取込先URL</th>
-              <th style={{ padding: "6px 4px", fontWeight: 500 }}>保管フォルダ</th>
+              <th style={{ padding: "6px 4px", fontWeight: 500 }}>保管フォルダ(PC/Web)</th>
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
             </tr>
           </thead>
@@ -245,17 +256,24 @@ export default function ReportChecklistPanel() {
                     {isEditing ? (
                       <input
                         type="text"
-                        placeholder="保管フォルダURL(Google Drive)"
+                        placeholder="WebフォルダURL(Google Drive)"
                         value={editFolderUrl}
                         onChange={(e) => setEditFolderUrl(e.target.value)}
                         style={{ width: 180, fontSize: 12 }}
                       />
-                    ) : t.storage_folder_url ? (
-                      <a href={t.storage_folder_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-                        フォルダを開く
-                      </a>
                     ) : (
-                      <span style={{ color: "var(--text-muted)" }}>-</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <a href={buildPcFolderUrl(t.name)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                          PCフォルダを開く
+                        </a>
+                        {t.storage_folder_url ? (
+                          <a href={t.storage_folder_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                            Webフォルダを開く
+                          </a>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>Web: 未登録</span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td style={{ padding: "6px 4px", whiteSpace: "nowrap" }}>
@@ -333,7 +351,7 @@ export default function ReportChecklistPanel() {
         />
         <input
           type="text"
-          placeholder="保管フォルダURL(Google Drive)"
+          placeholder="WebフォルダURL(Google Drive)"
           value={newFolderUrl}
           onChange={(e) => setNewFolderUrl(e.target.value)}
           style={{ width: 200, fontSize: 12 }}
