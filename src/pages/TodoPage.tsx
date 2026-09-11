@@ -385,8 +385,15 @@ export default function TodoPage() {
                 overflowWrap: "anywhere",
               }}
             >
-              {todo.title}
-              <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)" }}>
+              <span style={{ textDecoration: todo.done ? "line-through" : "none" }}>{todo.title}</span>
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  textDecoration: todo.done ? "line-through" : "none",
+                }}
+              >
                 (追加日時: {formatDateTime(todo.created_at)})
               </span>
               {todo.done && todo.completed_at && (
