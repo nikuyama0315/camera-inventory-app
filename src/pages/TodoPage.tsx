@@ -145,6 +145,13 @@ export default function TodoPage() {
     void reload();
   }, []);
 
+  // このページは独立したウィンドウ(named window "soulmen_todo_window")で開かれるため、
+  // メインアプリ(index.htmlの<title>「Soulmen Japan Business Portal」)とは別に
+  // タブタイトルを上書きする(2026-09-12追加)。
+  useEffect(() => {
+    document.title = "Soulmen Japan To Do";
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
