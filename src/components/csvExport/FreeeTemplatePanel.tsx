@@ -89,7 +89,6 @@ export default function FreeeTemplatePanel() {
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 10px" }}>
         対象月のeBay Transaction Report・Tax Invoicesの取込済みデータ(Soulcamera・Soulmenjapan)と、
         メルカリ・ヤフーフリマの登録済み売上データから、freee取引テンプレートの売上高・販売手数料・広告宣伝費(I〜K列)を自動計算して埋め、ダウンロードします。
-        eBayのSubscription and onetime fees(通信費、不課税)はL列に新設して計上します(freee側の取引テンプレート設定で、この列を勘定科目「通信費」・税区分「不課税」としてマッピング登録してください)。
       </p>
       <div style={{ marginBottom: 10 }}>
         <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
@@ -116,7 +115,6 @@ export default function FreeeTemplatePanel() {
                 <th style={{ padding: "4px" }}>売上高(円)</th>
                 <th style={{ padding: "4px" }}>販売手数料(円)</th>
                 <th style={{ padding: "4px" }}>広告宣伝費(円)</th>
-                <th style={{ padding: "4px" }}>通信費(円)</th>
               </tr>
             </thead>
             <tbody>
@@ -127,7 +125,6 @@ export default function FreeeTemplatePanel() {
                   <ValueCell value={fmtYen(r.salesJpy)} width={100} />
                   <ValueCell value={fmtYen(r.feeJpy)} width={100} />
                   <ValueCell value={fmtYen(r.adFeeJpy)} width={100} />
-                  <ValueCell value={fmtYen(r.subscriptionFeeJpy)} width={100} />
                 </tr>
               ))}
             </tbody>
