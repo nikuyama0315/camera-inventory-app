@@ -307,7 +307,7 @@ export default function App() {
             onClick={() => setShowAccountSecurity(true)}
             style={{ fontSize: 12, padding: "4px 10px" }}
           >
-            ログイン情報再設定
+            環境復帰
           </button>
           <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: "4px 10px" }}>
             ログアウト

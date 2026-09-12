@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { changeSharedPassword, notifyPasswordChanged, reissueRecoveryCode } from "../lib/api/auth";
+import {
+  fetchAvailableBackups,
+  fetchLatestRestoreRequest,
+  requestDbRestore,
+  type DbBackupFile,
+  type DbRestoreRequest,
+} from "../lib/api/dbRestore";
 
 interface Props {
   onBack: () => void;
@@ -32,6 +39,68 @@ export default function AccountSecurityPage({ onBack }: Props) {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [issuedRecoveryCode, setIssuedRecoveryCode] = useState<string | null>(null);
+
+  // DBリストア(2026-09-13追加)
+  const [backups, setBackups] = useState<DbBackupFile[]>([]);
+  const [selectedBackup, setSelectedBackup] = useState<string>("");
+  const [confirmText, setConfirmText] = useState("");
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [latestRestoreRequest, setLatestRestoreRequest] = useState<DbRestoreRequest | null>(null);
+
+  useEffect(() => {
+    fetchAvailableBackups()
+      .then((rows) => {
+        setBackups(rows);
+        if (rows.length > 0) setSelectedBackup(rows[0].filename);
+      })
+      .catch(() => {
+        /* バックアップ一覧の取得失敗は致命的でないため無視 */
+      });
+    fetchLatestRestoreRequest()
+      .then(setLatestRestoreRequest)
+      .catch(() => {
+        /* 状態表示の取得失敗は致命的でないため無視 */
+      });
+  }, []);
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  }
+
+  function restoreStatusText(req: DbRestoreRequest | null): string {
+    if (!req) return "";
+    const requestedAt = new Date(req.requested_at).toLocaleString("ja-JP");
+    if (req.status === "pending") return `依頼中(${requestedAt}、${req.backup_filename}) — 実行はまだ行われていません`;
+    if (req.status === "running") return `復元処理を実行中です(${requestedAt}、${req.backup_filename})`;
+    if (req.status === "error") return `復元に失敗しました(${req.backup_filename}): ${req.error_message ?? ""}`;
+    return `復元が完了しました(${req.backup_filename})`;
+  }
+
+  const CONFIRM_PHRASE = "復元する";
+
+  async function handleRequestRestore() {
+    setRestoreError(null);
+    if (!selectedBackup) {
+      setRestoreError("バックアップを選択してください");
+      return;
+    }
+    if (confirmText !== CONFIRM_PHRASE) {
+      setRestoreError(`確認のため「${CONFIRM_PHRASE}」と入力してください`);
+      return;
+    }
+    setRestoreBusy(true);
+    try {
+      const req = await requestDbRestore(selectedBackup);
+      setLatestRestoreRequest(req);
+      setConfirmText("");
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : "依頼の送信に失敗しました");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -92,7 +161,7 @@ export default function AccountSecurityPage({ onBack }: Props) {
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "1.5rem", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <p style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>ログイン情報再設定</p>
+        <p style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>環境復帰</p>
         <button type="button" onClick={onBack} style={{ fontSize: 12, padding: "4px 10px" }}>
           戻る
         </button>
@@ -195,6 +264,74 @@ export default function AccountSecurityPage({ onBack }: Props) {
           {recoveryBusy ? "発行中..." : "リカバリーコードを再発行"}
         </button>
       </form>
+
+      <div style={{ ...SECTION_STYLE, borderColor: "var(--danger-text)" }}>
+        <p style={{ fontSize: 14, fontWeight: 500, marginTop: 0, marginBottom: 8 }}>
+          DBリストア(緊急時のみ)
+        </p>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
+          誤操作やバグでデータが失われた場合に、VPS上の日次バックアップ(pg_dump、毎日4:00作成、
+          30日分保持)から復元します。<strong style={{ color: "var(--danger-text)" }}>
+          復元すると、現在のデータは全て失われ、選択した時点の状態に戻ります。この操作は取り消せません。
+          </strong>
+          また、依頼を出しただけでは自動実行されません。依頼後、担当者(Claude)に実行を依頼してください。
+        </p>
+
+        {backups.length === 0 ? (
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>利用可能なバックアップがまだありません。</p>
+        ) : (
+          <>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+                復元するバックアップ
+              </label>
+              <select
+                value={selectedBackup}
+                onChange={(e) => setSelectedBackup(e.target.value)}
+                style={{ width: "100%" }}
+              >
+                {backups.map((b) => (
+                  <option key={b.id} value={b.filename}>
+                    {new Date(b.created_at).toLocaleString("ja-JP")}({formatBytes(b.size_bytes)})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+                確認のため「{CONFIRM_PHRASE}」と入力してください
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            {restoreError && (
+              <p style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 10 }}>{restoreError}</p>
+            )}
+            {latestRestoreRequest && (
+              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+                {restoreStatusText(latestRestoreRequest)}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleRequestRestore()}
+              disabled={
+                restoreBusy ||
+                confirmText !== CONFIRM_PHRASE ||
+                latestRestoreRequest?.status === "pending" ||
+                latestRestoreRequest?.status === "running"
+              }
+              style={{ background: "var(--danger-text)", color: "#fff", borderColor: "var(--danger-text)" }}
+            >
+              {restoreBusy ? "依頼中..." : "このバックアップに復元する"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
