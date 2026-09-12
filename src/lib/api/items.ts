@@ -356,8 +356,36 @@ export async function updateItemBasicInfo(itemId: string, patch: ItemBasicInfoPa
 }
 
 export async function updateItemStatus(itemId: string, status: ItemStatus): Promise<void> {
+  const { data: current, error: fetchError } = await supabase
+    .from("items")
+    .select("status")
+    .eq("id", itemId)
+    .single();
+  if (fetchError) throw fetchError;
+
   const { error } = await supabase.from("items").update({ status }).eq("id", itemId);
   if (error) throw error;
+
+  // 「販売済み」から「検品済・出品待ち」「出品中」へ戻す場合(=販売の取り消し)は、
+  // 紐づくsalesの金額系項目(販売価格・送料・手数料)を0にリセットする(ユーザー指示、2026-09-12)。
+  // 追跡情報(tracking_info)は履歴として残すため変更しない。
+  if (current?.status === "sold" && INVENTORY_VALUATION_STATUSES.includes(status)) {
+    const { error: salesError } = await supabase
+      .from("sales")
+      .update({
+        jp_platform_price: 0,
+        jp_platform_fee: 0,
+        jp_platform_shipping_collected: 0,
+        shipping_cost_paid: 0,
+        ebay_price_usd: 0,
+        ebay_shipping_collected_usd: 0,
+        ebay_handling_fee_usd: 0,
+        ebay_ad_fee_usd: 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("item_id", itemId);
+    if (salesError) throw salesError;
+  }
 }
 
 export async function markItemArrived(itemId: string): Promise<void> {
