@@ -5,3 +5,5 @@ dist/
 *.tsbuildinfo
 *.bak-*
 .DS_Store
+backups/
+logs/
