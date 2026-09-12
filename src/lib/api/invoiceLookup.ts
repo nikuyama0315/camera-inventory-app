@@ -105,3 +105,49 @@ export async function applyManualInvoiceNumber(vendor: string, regNo: string): P
 
   return (updated as { id: string }[]).length;
 }
+
+
+export interface InvoiceNumberScanRequest {
+  id: string;
+  status: "pending" | "running" | "done" | "error";
+  requested_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  vendors_scanned: number | null;
+  vendors_matched: number | null;
+  candidates_found: number | null;
+  error_message: string | null;
+}
+
+/** 最新のスキャン依頼(1件)を取得する。ボタンの状態表示用。 */
+export async function fetchLatestScanRequest(): Promise<InvoiceNumberScanRequest | null> {
+  const { data, error } = await supabase
+    .from("invoice_number_scan_requests")
+    .select("*")
+    .order("requested_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return (data as InvoiceNumberScanRequest[])[0] ?? null;
+}
+
+/**
+ * 未登録(登録番号未設定かつ未スキャン)の事業者をスキャンする依頼を出す。
+ * 実際の処理(国税庁の全件データダウンロード・突合)はVPS側のcronジョブ(scan_invoice_numbers.py、
+ * 10分おき)が非同期で行う。ブラウザ側では一切重い処理を行わない
+ * (2026-09-12設計変更: 当初Supabase Edge Function内で処理しようとしたが、国税庁の全件データ
+ * [法人分、圧縮20MB超]の展開処理がEdge FunctionのCPU時間上限[約2秒]を超えるため断念した)。
+ * 既にpending/runningの依頼がある場合は新規に依頼を作らず、その依頼をそのまま返す。
+ */
+export async function requestInvoiceNumberScan(): Promise<InvoiceNumberScanRequest> {
+  const existing = await fetchLatestScanRequest();
+  if (existing && (existing.status === "pending" || existing.status === "running")) {
+    return existing;
+  }
+  const { data, error } = await supabase
+    .from("invoice_number_scan_requests")
+    .insert({ status: "pending" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as InvoiceNumberScanRequest;
+}

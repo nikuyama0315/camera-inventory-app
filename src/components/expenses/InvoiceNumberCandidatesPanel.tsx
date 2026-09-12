@@ -5,7 +5,10 @@ import {
   rejectInvoiceNumberCandidate,
   rejectAllCandidatesForVendor,
   applyManualInvoiceNumber,
+  fetchLatestScanRequest,
+  requestInvoiceNumberScan,
   type InvoiceNumberCandidate,
+  type InvoiceNumberScanRequest,
 } from "../../lib/api/invoiceLookup";
 
 /**
@@ -26,6 +29,11 @@ export default function InvoiceNumberCandidatesPanel() {
   const [manualBusyVendor, setManualBusyVendor] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // 未登録事業者の自動スキャン(2026-09-12追加)。実際の処理はVPS側cronジョブが非同期で行うため、
+  // ここでは依頼を出して状態を表示するのみ(重い処理は一切ブラウザ側で行わない)。
+  const [scanRequest, setScanRequest] = useState<InvoiceNumberScanRequest | null>(null);
+  const [scanRequesting, setScanRequesting] = useState(false);
+
   async function reload() {
     setLoading(true);
     setErrorMessage(null);
@@ -40,6 +48,14 @@ export default function InvoiceNumberCandidatesPanel() {
 
   useEffect(() => {
     void reload();
+  }, []);
+
+  useEffect(() => {
+    fetchLatestScanRequest()
+      .then(setScanRequest)
+      .catch(() => {
+        /* スキャン状態表示の取得失敗は致命的でないため無視 */
+      });
   }, []);
 
   const byVendor = useMemo(() => {
@@ -93,6 +109,32 @@ export default function InvoiceNumberCandidatesPanel() {
     }
   }
 
+  async function handleScanRequest() {
+    setScanRequesting(true);
+    setErrorMessage(null);
+    try {
+      const req = await requestInvoiceNumberScan();
+      setScanRequest(req);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "スキャン依頼に失敗しました");
+    } finally {
+      setScanRequesting(false);
+    }
+  }
+
+  function scanStatusText(req: InvoiceNumberScanRequest | null): string {
+    if (!req) return "";
+    if (req.status === "pending") return "スキャン待ち(数分以内に開始されます)";
+    if (req.status === "running") return "スキャン中...";
+    if (req.status === "error") return `前回のスキャンでエラーが発生しました: ${req.error_message ?? ""}`;
+    // done
+    const scanned = req.vendors_scanned ?? 0;
+    const matched = req.vendors_matched ?? 0;
+    const finishedAt = req.finished_at ? new Date(req.finished_at).toLocaleString("ja-JP") : "";
+    if (scanned === 0) return `前回のスキャン(${finishedAt}): 対象事業者はありませんでした`;
+    return `前回のスキャン(${finishedAt}): 対象${scanned}件中${matched}件で候補が見つかりました`;
+  }
+
   async function handleApplyManual(vendor: string) {
     const value = manualInputs[vendor] ?? "";
     setManualBusyVendor(vendor);
@@ -110,8 +152,6 @@ export default function InvoiceNumberCandidatesPanel() {
     }
   }
 
-  if (!loading && rows.length === 0) return null;
-
   return (
     <div
       style={{
@@ -125,8 +165,15 @@ export default function InvoiceNumberCandidatesPanel() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>適格請求書番号 候補{rows.length > 0 ? `(${byVendor.size}件)` : ""}</p>
         <button
-          onClick={() => setIsCollapsed((v) => !v)}
+          onClick={() => void handleScanRequest()}
+          disabled={scanRequesting || scanRequest?.status === "pending" || scanRequest?.status === "running"}
           style={{ fontSize: 11, padding: "2px 8px", marginLeft: "auto" }}
+        >
+          {scanRequesting ? "依頼中..." : "未登録をスキャンする"}
+        </button>
+        <button
+          onClick={() => setIsCollapsed((v) => !v)}
+          style={{ fontSize: 11, padding: "2px 8px" }}
         >
           {isCollapsed ? "展開する" : "折りたたむ"}
         </button>
@@ -135,7 +182,12 @@ export default function InvoiceNumberCandidatesPanel() {
         経費の事業者名から、国税庁の適格請求書発行事業者公表サイトの全件データ(法人・人格のない社団等分)を名称検索した候補です。
         採用すると、その事業者名で登録番号が未入力の経費レコードすべてに反映されます。個人事業主は全件データで氏名が非公開のため検出できません
         (国税庁側に名称検索機能自体が無く、登録番号での検索のみのため、全件データをダウンロードして名称一致を検索しています)。
+        「未登録をスキャンする」を押すと、登録番号が未設定かつ未スキャンの事業者を対象に検索依頼を出します
+        (実際の処理はサーバー側で数分以内にバックグラウンド実行されるため、ブラウザやPCへの負荷はありません)。
       </p>
+      {scanRequest && (
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", margin: "0 0 10px" }}>{scanStatusText(scanRequest)}</p>
+      )}
       {message && <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 8px" }}>{message}</p>}
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13 }}>{errorMessage}</p>}
       {loading && <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>読み込み中...</p>}
