@@ -321,6 +321,30 @@ export default function TodoPage() {
     }
   }
 
+  /** 同じ親を持つ兄弟の中で、一番上/一番下へ一気に移動する(全兄弟のsort_orderを新しい順序で振り直す)。 */
+  async function handleMoveToEdge(todo: Todo, edge: "top" | "bottom") {
+    const siblings = childrenByParent.get(todo.parent_id) ?? [];
+    const idx = siblings.findIndex((t) => t.id === todo.id);
+    if (idx === -1) return;
+    if (edge === "top" && idx === 0) return;
+    if (edge === "bottom" && idx === siblings.length - 1) return;
+
+    const reordered = siblings.filter((t) => t.id !== todo.id);
+    if (edge === "top") reordered.unshift(todo);
+    else reordered.push(todo);
+
+    setBusy(true);
+    setErrorMessage(null);
+    try {
+      await Promise.all(reordered.map((t, i) => updateTodoSortOrder(t.id, i)));
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "並び替えに失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /** 階層を1つ上げる(親の階層へ、親と同じ兄弟レベルの末尾へ移動)。ルート直下の項目には適用不可。 */
   async function handlePromote(todo: Todo) {
     if (!todo.parent_id) return;
@@ -747,6 +771,14 @@ export default function TodoPage() {
           )}
 
           <button
+            onClick={() => void handleMoveToEdge(todo, "top")}
+            disabled={!canMoveUp || busy}
+            title="一番上へ移動"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            ⏫
+          </button>
+          <button
             onClick={() => void handleMove(todo, "up")}
             disabled={!canMoveUp || busy}
             title="上へ移動"
@@ -761,6 +793,14 @@ export default function TodoPage() {
             style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
           >
             ▼
+          </button>
+          <button
+            onClick={() => void handleMoveToEdge(todo, "bottom")}
+            disabled={!canMoveDown || busy}
+            title="一番下へ移動"
+            style={{ fontSize: 11, padding: "2px 6px", flexShrink: 0 }}
+          >
+            ⏬
           </button>
           <button
             onClick={() => void handlePromote(todo)}
