@@ -167,6 +167,7 @@ export default function AccountSecurityPage({ onBack }: Props) {
         </button>
       </div>
 
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
       <form onSubmit={handleChangePassword} style={SECTION_STYLE}>
         <p style={{ fontSize: 14, fontWeight: 500, marginTop: 0, marginBottom: 12 }}>パスワード変更</p>
         <div style={{ marginBottom: 10 }}>
@@ -215,53 +216,6 @@ export default function AccountSecurityPage({ onBack }: Props) {
         )}
         <button type="submit" disabled={passwordBusy}>
           {passwordBusy ? "変更中..." : "パスワードを変更"}
-        </button>
-      </form>
-
-      <form onSubmit={handleReissueRecoveryCode} style={SECTION_STYLE}>
-        <p style={{ fontSize: 14, fontWeight: 500, marginTop: 0, marginBottom: 8 }}>リカバリーコード再発行</p>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
-          ログイン画面の「パスワードをお忘れの方はこちら」で使う、メール不要の第二の鍵です。紛失した場合や、
-          念のため入れ替えたい場合にここで再発行してください。
-        </p>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-            現在のパスワード
-          </label>
-          <input
-            type="password"
-            value={recoveryCurrentPassword}
-            onChange={(e) => setRecoveryCurrentPassword(e.target.value)}
-            style={{ width: "100%" }}
-            autoComplete="current-password"
-          />
-        </div>
-        {recoveryError && (
-          <p style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 10 }}>{recoveryError}</p>
-        )}
-        {issuedRecoveryCode && (
-          <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>
-              新しいリカバリーコードです。今だけ表示されます。必ず控えてください。
-            </p>
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                fontFamily: "monospace",
-                wordBreak: "break-all",
-                padding: "10px 12px",
-                border: "0.5px solid var(--border-strong)",
-                borderRadius: 8,
-                margin: 0,
-              }}
-            >
-              {issuedRecoveryCode}
-            </p>
-          </div>
-        )}
-        <button type="submit" disabled={recoveryBusy}>
-          {recoveryBusy ? "発行中..." : "リカバリーコードを再発行"}
         </button>
       </form>
 
@@ -332,6 +286,55 @@ export default function AccountSecurityPage({ onBack }: Props) {
           </>
         )}
       </div>
+      </div>
+
+      <form onSubmit={handleReissueRecoveryCode} style={SECTION_STYLE}>
+        <p style={{ fontSize: 14, fontWeight: 500, marginTop: 0, marginBottom: 8 }}>リカバリーコード再発行</p>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
+          ログイン画面の「パスワードをお忘れの方はこちら」で使う、メール不要の第二の鍵です。紛失した場合や、
+          念のため入れ替えたい場合にここで再発行してください。
+        </p>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+            現在のパスワード
+          </label>
+          <input
+            type="password"
+            value={recoveryCurrentPassword}
+            onChange={(e) => setRecoveryCurrentPassword(e.target.value)}
+            style={{ width: "100%" }}
+            autoComplete="current-password"
+          />
+        </div>
+        {recoveryError && (
+          <p style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 10 }}>{recoveryError}</p>
+        )}
+        {issuedRecoveryCode && (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>
+              新しいリカバリーコードです。今だけ表示されます。必ず控えてください。
+            </p>
+            <p
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: "monospace",
+                wordBreak: "break-all",
+                padding: "10px 12px",
+                border: "0.5px solid var(--border-strong)",
+                borderRadius: 8,
+                margin: 0,
+              }}
+            >
+              {issuedRecoveryCode}
+            </p>
+          </div>
+        )}
+        <button type="submit" disabled={recoveryBusy}>
+          {recoveryBusy ? "発行中..." : "リカバリーコードを再発行"}
+        </button>
+      </form>
+
     </div>
   );
 }
