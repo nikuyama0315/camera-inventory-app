@@ -265,6 +265,12 @@ function classifyFeeCategory(feeType: string | null, feeGroup: string | null): "
   return "other";
 }
 
+// Tax Invoice内のFee Group「Subscription and onetime fees」(Storeサブスク料金等)を経費として
+// 自動登録する際に使う定数(2026-09-12追加)。fee_category上は"other"に分類されるため、
+// 生のfee_groupで個別に判定する。
+const SUBSCRIPTION_FEE_GROUP = "Subscription and onetime fees";
+const SUBSCRIPTION_EXPENSE_SOURCE = "ebay_tax_invoice_subscription";
+
 interface TaxInvoiceRawRow {
   line_date: string | null;
   description: string | null;
@@ -511,6 +517,45 @@ export async function importEbayTaxInvoiceRows(
     { onConflict: "year_month,ebay_account" },
   );
   if (reconError) throw reconError;
+
+  // Subscription and onetime fees(Storeサブスク料金等)を「経費」(通信費・不課税)として自動登録する
+  // (2026-09-12追加、ユーザー指示)。経費データCSV作成(freeeExport.ts)は既存のexpenses.category/
+  // tax_categoryをそのままfreeeの勘定科目・税区分にマッピングする仕組みのため、ここでexpenses行を
+  // 作っておくだけで追加のCSV側の実装なしにfreee出力へ反映される。再取込時に重複登録しないよう、
+  // (source, vendor, expense_date)の組み合わせで洗い替え(削除→再挿入)する。
+  const subscriptionRows = validRows.filter((r) => r.fee_group === SUBSCRIPTION_FEE_GROUP);
+  const subscriptionFeeTotalUsd = subscriptionRows.reduce((sum, r) => sum + r.net_amount_usd, 0);
+  if (subscriptionFeeTotalUsd > 0) {
+    const subscriptionDate = subscriptionRows[subscriptionRows.length - 1]?.line_date ?? periodEnd;
+    const ttmRate = await fetchTtmRate(yearMonth);
+    const vendorLabel = `eBay (${ebayAccount})`;
+    if (ttmRate != null) {
+      const amountJpy = Math.round(subscriptionFeeTotalUsd * ttmRate);
+      const { error: deleteOldError } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("source", SUBSCRIPTION_EXPENSE_SOURCE)
+        .eq("vendor", vendorLabel)
+        .eq("expense_date", subscriptionDate);
+      if (deleteOldError) throw deleteOldError;
+
+      const { error: insertExpenseError } = await supabase.from("expenses").insert({
+        expense_date: subscriptionDate,
+        category: "通信費",
+        vendor: vendorLabel,
+        description: `Subscription and onetime fees(Tax Invoice自動登録、USD ${subscriptionFeeTotalUsd.toFixed(2)} × TTM ${ttmRate})`,
+        amount: amountJpy,
+        tax_category: "不課税",
+        taxable: false,
+        source: SUBSCRIPTION_EXPENSE_SOURCE,
+      });
+      if (insertExpenseError) throw insertExpenseError;
+    } else {
+      unconvertedWarnings.push(
+        `Subscription and onetime fees(USD ${subscriptionFeeTotalUsd.toFixed(2)})は${yearMonth}のTTMレートが「月次為替レート」に未登録のため、経費(通信費)として自動登録できませんでした。レートを保存後、このTax Invoiceを再取込してください。`,
+      );
+    }
+  }
 
   return { importId: importRow.id, rowCount: validRows.length, periodStart, periodEnd, unconvertedWarnings };
 }
