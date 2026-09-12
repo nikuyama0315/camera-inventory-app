@@ -14,7 +14,7 @@ import {
 import ExpensesDataManagementPanel from "../components/expenses/ExpensesDataManagementPanel";
 import InvoiceNumberCandidatesPanel from "../components/expenses/InvoiceNumberCandidatesPanel";
 
-type SubTab = "register" | "data";
+type SubTab = "register" | "invoiceNumbers" | "data";
 
 interface FormState {
   expense_date: string;
@@ -203,6 +203,20 @@ export default function ExpensesPage() {
           経費を登録
         </button>
         <button
+          onClick={() => setSubTab("invoiceNumbers")}
+          style={{
+            fontSize: 12,
+            padding: "4px 10px",
+            border: "none",
+            borderBottom: subTab === "invoiceNumbers" ? "2px solid var(--accent)" : "2px solid transparent",
+            borderRadius: 0,
+            background: "transparent",
+            color: subTab === "invoiceNumbers" ? "var(--accent)" : "var(--text-secondary)",
+          }}
+        >
+          適格請求書番号(候補)
+        </button>
+        <button
           onClick={() => setSubTab("data")}
           style={{
             fontSize: 12,
@@ -220,6 +234,10 @@ export default function ExpensesPage() {
 
       {subTab === "data" ? (
         <ExpensesDataManagementPanel onDataChanged={reload} />
+      ) : subTab === "invoiceNumbers" ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "1rem 1.5rem" }}>
+          <InvoiceNumberCandidatesPanel />
+        </div>
       ) : (
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <div style={{ width: "33%", borderRight: "0.5px solid var(--border)", overflowY: "auto", padding: "1rem 1.25rem" }}>
@@ -353,7 +371,6 @@ export default function ExpensesPage() {
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "1rem 1.5rem" }}>
-            <InvoiceNumberCandidatesPanel />
             <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
               <input
                 type="date"
