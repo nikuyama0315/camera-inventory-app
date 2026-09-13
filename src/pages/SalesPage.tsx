@@ -952,8 +952,14 @@ export default function SalesPage() {
               </tr>
             </thead>
             <tbody>
-              {sortedList.map((s) => (
-                <tr key={s.id} style={{ borderTop: "0.5px solid var(--border)" }}>
+              {sortedList.map((s, rowIndex) => (
+                <tr
+                  key={s.id}
+                  style={{
+                    borderTop: "0.5px solid var(--border)",
+                    background: rowIndex % 2 === 1 ? "var(--surface-1)" : undefined,
+                  }}
+                >
                   <td style={{ padding: "8px" }}>{s.sale_date}</td>
                   <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
                     <div>{s.items?.management_no ?? "-"}</div>
@@ -1089,8 +1095,14 @@ export default function SalesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cpassPreview.slice(0, 50).map((r) => (
-                    <tr key={r.raw.rowNumber} style={{ borderTop: "0.5px solid var(--border)" }}>
+                  {cpassPreview.slice(0, 50).map((r, rowIndex) => (
+                    <tr
+                      key={r.raw.rowNumber}
+                      style={{
+                        borderTop: "0.5px solid var(--border)",
+                        background: rowIndex % 2 === 1 ? "var(--surface-1)" : undefined,
+                      }}
+                    >
                       <td style={{ padding: "4px 6px", whiteSpace: "nowrap" }}>
                         {r.outcome === "matched" ? "OK" : r.outcome === "unmatched_order" ? "未突合" : "エラー"}
                       </td>
@@ -1140,14 +1152,18 @@ export default function SalesPage() {
                 </tr>
               </thead>
               <tbody>
-                {reviewQueue.map((row) => {
+                {reviewQueue.map((row, rowIndex) => {
+                  const zebraBackground = rowIndex % 2 === 1 ? "var(--surface-1)" : undefined;
                   const cur = row.transaction_currency === "USD" ? "$" : row.transaction_currency + " ";
                   const isUsd = row.transaction_currency === "USD";
                   // USD以外の通貨の場合、原文通貨の金額に加えてUSD換算額(そのeBay取引自体のexchange_rateを使用)を併記する。
                   const usdSuffix = (localValue: number) =>
                     isUsd ? "" : ` (≈$${ebayRowToUsd(row, localValue).toFixed(2)})`;
                   return (
-                    <tr key={row.id} style={{ borderTop: "0.5px solid var(--border)" }}>
+                    <tr
+                      key={row.id}
+                      style={{ borderTop: "0.5px solid var(--border)", background: zebraBackground }}
+                    >
                       <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                         {row.account ? EBAY_ACCOUNT_LABELS[row.account as keyof typeof EBAY_ACCOUNT_LABELS] ?? row.account : "-"}
                       </td>
