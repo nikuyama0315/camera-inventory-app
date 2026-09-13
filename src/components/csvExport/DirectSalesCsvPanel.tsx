@@ -175,26 +175,6 @@ export default function DirectSalesCsvPanel() {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>管理番号</label>
-          <input
-            type="text"
-            placeholder="部分一致"
-            value={filters.managementNo}
-            onChange={(e) => updateFilter("managementNo", e.target.value)}
-            style={{ width: 120 }}
-          />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ブランド/機種</label>
-          <input
-            type="text"
-            placeholder="部分一致"
-            value={filters.brandModel}
-            onChange={(e) => updateFilter("brandModel", e.target.value)}
-            style={{ width: 160 }}
-          />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>カテゴリ</label>
           <select value={filters.category} onChange={(e) => updateFilter("category", e.target.value)}>
             <option value="">すべて</option>
@@ -235,6 +215,26 @@ export default function DirectSalesCsvPanel() {
               onChange={(e) => updateFilter("purchaseDateTo", e.target.value)}
             />
           </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>管理番号</label>
+          <input
+            type="text"
+            placeholder="部分一致"
+            value={filters.managementNo}
+            onChange={(e) => updateFilter("managementNo", e.target.value)}
+            style={{ width: 120 }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ブランド/機種</label>
+          <input
+            type="text"
+            placeholder="部分一致"
+            value={filters.brandModel}
+            onChange={(e) => updateFilter("brandModel", e.target.value)}
+            style={{ width: 160 }}
+          />
         </div>
         {hasActiveFilters && (
           <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ fontSize: 12, padding: "4px 10px" }}>
