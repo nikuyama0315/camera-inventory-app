@@ -366,6 +366,59 @@ export default function PurchaseTab({ isCreatingNew, detail, onCreated, initialC
             style={{ width: "100%" }}
           />
         </Field>
+        <Field label="仕入日">
+          <input
+            type="date"
+            value={form.purchase_date}
+            onChange={(e) => update("purchase_date", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </Field>
+        <Field label="仕入先種別">
+          <select
+            value={form.source_type}
+            onChange={(e) => update("source_type", e.target.value)}
+            style={{ width: "100%" }}
+          >
+            {SOURCE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="仕入先・出品者名">
+          <input
+            type="text"
+            value={form.source_name}
+            onChange={(e) => update("source_name", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </Field>
+        <Field label="購入元URL">
+          <input
+            type="text"
+            value={form.source_url}
+            onChange={(e) => update("source_url", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </Field>
+        <Field label="仕入高(円)">
+          <input
+            type="number"
+            value={form.purchase_price}
+            onChange={(e) => update("purchase_price", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </Field>
+        <Field label="数量">
+          <input
+            type="number"
+            value={form.quantity}
+            onChange={(e) => update("quantity", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </Field>
         <Field label="新古判定">
           <select
             value={form.is_used_goods}
@@ -507,59 +560,6 @@ export default function PurchaseTab({ isCreatingNew, detail, onCreated, initialC
           </div>
         </div>
 
-        <Field label="仕入日">
-          <input
-            type="date"
-            value={form.purchase_date}
-            onChange={(e) => update("purchase_date", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </Field>
-        <Field label="仕入先種別">
-          <select
-            value={form.source_type}
-            onChange={(e) => update("source_type", e.target.value)}
-            style={{ width: "100%" }}
-          >
-            {SOURCE_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="仕入先・出品者名">
-          <input
-            type="text"
-            value={form.source_name}
-            onChange={(e) => update("source_name", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </Field>
-        <Field label="購入元URL">
-          <input
-            type="text"
-            value={form.source_url}
-            onChange={(e) => update("source_url", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </Field>
-        <Field label="仕入高(円)">
-          <input
-            type="number"
-            value={form.purchase_price}
-            onChange={(e) => update("purchase_price", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </Field>
-        <Field label="数量">
-          <input
-            type="number"
-            value={form.quantity}
-            onChange={(e) => update("quantity", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </Field>
         <Field label="カテゴリ">
           <input
             type="text"
