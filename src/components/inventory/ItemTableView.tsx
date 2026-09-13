@@ -566,11 +566,15 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
             </tr>
           </thead>
           <tbody>
-            {sortedItems.map((item) => (
+            {sortedItems.map((item, rowIndex) => (
               <tr
                 key={item.id}
                 onClick={() => onSelectItem(item.id)}
-                style={{ borderTop: "0.5px solid var(--border)", cursor: "pointer" }}
+                style={{
+                  borderTop: "0.5px solid var(--border)",
+                  cursor: "pointer",
+                  background: rowIndex % 2 === 1 ? "var(--surface-1)" : undefined,
+                }}
               >
                 <td style={{ padding: "8px", fontWeight: 500 }}>{item.management_no}</td>
                 <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
