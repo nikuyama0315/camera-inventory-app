@@ -475,6 +475,60 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             style={{ width: "100%" }}
           />
         </EditField>
+        <EditField label="仕入日">
+          <input
+            type="date"
+            value={editForm.purchase_date}
+            onChange={(e) => updateEdit("purchase_date", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="仕入先種別">
+          <select
+            value={editForm.source_type}
+            onChange={(e) => updateEdit("source_type", e.target.value)}
+            style={{ width: "100%" }}
+          >
+            {SOURCE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </EditField>
+        <EditField label="仕入先・出品者名">
+          <input
+            type="text"
+            value={editForm.source_name}
+            onChange={(e) => updateEdit("source_name", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="購入元URL">
+          <input
+            type="text"
+            value={editForm.source_url}
+            onChange={(e) => updateEdit("source_url", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="仕入高(円)">
+          <input
+            type="number"
+            value={editForm.purchase_price}
+            onChange={(e) => updateEdit("purchase_price", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="数量">
+          <input
+            type="number"
+            value={editForm.quantity}
+            onChange={(e) => updateEdit("quantity", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+
         <EditField label="新古判定">
           <select
             value={editForm.is_used_goods}
@@ -560,60 +614,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             value={editForm.accessories_included}
             onChange={(e) => updateEdit("accessories_included", e.target.value)}
             placeholder="自由記述で入力"
-            style={{ width: "100%" }}
-          />
-        </EditField>
-
-        <EditField label="仕入日">
-          <input
-            type="date"
-            value={editForm.purchase_date}
-            onChange={(e) => updateEdit("purchase_date", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </EditField>
-        <EditField label="仕入先種別">
-          <select
-            value={editForm.source_type}
-            onChange={(e) => updateEdit("source_type", e.target.value)}
-            style={{ width: "100%" }}
-          >
-            {SOURCE_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </EditField>
-        <EditField label="仕入先・出品者名">
-          <input
-            type="text"
-            value={editForm.source_name}
-            onChange={(e) => updateEdit("source_name", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </EditField>
-        <EditField label="購入元URL">
-          <input
-            type="text"
-            value={editForm.source_url}
-            onChange={(e) => updateEdit("source_url", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </EditField>
-        <EditField label="仕入高(円)">
-          <input
-            type="number"
-            value={editForm.purchase_price}
-            onChange={(e) => updateEdit("purchase_price", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </EditField>
-        <EditField label="数量">
-          <input
-            type="number"
-            value={editForm.quantity}
-            onChange={(e) => updateEdit("quantity", e.target.value)}
             style={{ width: "100%" }}
           />
         </EditField>
@@ -838,6 +838,37 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span style={LABEL_STYLE}>仕入品名</span>
         <span>{item.title ?? "-"}</span>
       </div>
+      {purchase && (
+        <>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>仕入日</span>
+            <span>{purchase.purchase_date}</span>
+          </div>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>仕入先種別</span>
+            <span>
+              {SOURCE_TYPE_OPTIONS.find((o) => o.value === purchase.source_type)?.label ?? purchase.source_type}
+            </span>
+          </div>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>仕入先・出品者名</span>
+            <span>{purchase.source_name ?? "-"}</span>
+          </div>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>購入元URL</span>
+            <span>{purchase.source_url ?? "-"}</span>
+          </div>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>仕入高(円)</span>
+            <span>{purchase.purchase_price.toLocaleString()}</span>
+          </div>
+          <div style={ROW_STYLE}>
+            <span style={LABEL_STYLE}>数量</span>
+            <span>{purchase.quantity}</span>
+          </div>
+        </>
+      )}
+
       <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>新古判定</span>
         <span>{purchase ? (purchase.is_used_goods ? "古物" : "新品") : "-"}</span>
@@ -884,37 +915,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span style={LABEL_STYLE}>付属品</span>
         <span>{item.accessories_included ?? "-"}</span>
       </div>
-
-      {purchase && (
-        <>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>仕入日</span>
-            <span>{purchase.purchase_date}</span>
-          </div>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>仕入先種別</span>
-            <span>
-              {SOURCE_TYPE_OPTIONS.find((o) => o.value === purchase.source_type)?.label ?? purchase.source_type}
-            </span>
-          </div>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>仕入先・出品者名</span>
-            <span>{purchase.source_name ?? "-"}</span>
-          </div>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>購入元URL</span>
-            <span>{purchase.source_url ?? "-"}</span>
-          </div>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>仕入高(円)</span>
-            <span>{purchase.purchase_price.toLocaleString()}</span>
-          </div>
-          <div style={ROW_STYLE}>
-            <span style={LABEL_STYLE}>数量</span>
-            <span>{purchase.quantity}</span>
-          </div>
-        </>
-      )}
 
       {driveFolder && (
         <div style={ROW_STYLE}>
