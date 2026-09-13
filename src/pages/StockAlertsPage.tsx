@@ -321,7 +321,8 @@ export default function StockAlertsPage() {
             </tr>
           </thead>
           <tbody>
-            {displayRows.map((r) => {
+            {displayRows.map((r, rowIndex) => {
+              const zebraBackground = rowIndex % 2 === 1 ? "var(--surface-1)" : undefined;
               const editValue = editValues[r.model_folder_name] ?? String(r.threshold);
               const isDirty = editValue !== String(r.threshold);
               const isSaving = savingModel === r.model_folder_name;
@@ -330,7 +331,10 @@ export default function StockAlertsPage() {
               const isSavingPurchasing = savingPurchasing === r.model_folder_name;
               const isDirtyPurchasing = purchasingValue !== String(r.purchasing_count);
               return (
-                <tr key={r.model_folder_name} style={{ borderTop: "0.5px solid var(--border)" }}>
+                <tr
+                  key={r.model_folder_name}
+                  style={{ borderTop: "0.5px solid var(--border)", background: zebraBackground }}
+                >
                   <td style={{ padding: "8px 4px" }}>{r.model_folder_name}</td>
                   <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: 500 }}>{r.in_stock_count}</td>
                   <td style={{ padding: "8px 4px", textAlign: "right" }}>
