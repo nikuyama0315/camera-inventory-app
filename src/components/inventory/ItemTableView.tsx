@@ -364,24 +364,16 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>管理番号</label>
-          <input
-            type="text"
-            placeholder="部分一致"
-            value={filters.managementNo}
-            onChange={(e) => updateFilter("managementNo", e.target.value)}
-            style={{ width: 120 }}
-          />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ブランド/機種</label>
-          <input
-            type="text"
-            placeholder="部分一致"
-            value={filters.brandModel}
-            onChange={(e) => updateFilter("brandModel", e.target.value)}
-            style={{ width: 160 }}
-          />
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>アカウント</label>
+          <select value={filters.account} onChange={(e) => updateFilter("account", e.target.value)}>
+            <option value="">すべて</option>
+            <option value="unset">未設定</option>
+            {EBAY_ACCOUNT_OPTIONS.map((a) => (
+              <option key={a} value={a}>
+                {EBAY_ACCOUNT_LABELS[a]}
+              </option>
+            ))}
+          </select>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>カテゴリ</label>
@@ -390,18 +382,6 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
             {categoryOptions.map((c) => (
               <option key={c} value={c}>
                 {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>アカウント</label>
-          <select value={filters.account} onChange={(e) => updateFilter("account", e.target.value)}>
-            <option value="">すべて</option>
-            <option value="unset">未設定</option>
-            {EBAY_ACCOUNT_OPTIONS.map((a) => (
-              <option key={a} value={a}>
-                {EBAY_ACCOUNT_LABELS[a]}
               </option>
             ))}
           </select>
@@ -426,6 +406,36 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
               </option>
             ))}
           </select>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>管理番号</label>
+          <input
+            type="text"
+            placeholder="部分一致"
+            value={filters.managementNo}
+            onChange={(e) => updateFilter("managementNo", e.target.value)}
+            style={{ width: 120 }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>追跡番号</label>
+          <input
+            type="text"
+            placeholder="部分一致"
+            value={filters.trackingNumber}
+            onChange={(e) => updateFilter("trackingNumber", e.target.value)}
+            style={{ width: 160 }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ブランド/機種</label>
+          <input
+            type="text"
+            placeholder="部分一致"
+            value={filters.brandModel}
+            onChange={(e) => updateFilter("brandModel", e.target.value)}
+            style={{ width: 160 }}
+          />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>仕入日</label>
@@ -489,16 +499,6 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
               onChange={(e) => updateFilter("saleDateTo", e.target.value)}
             />
           </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>追跡番号</label>
-          <input
-            type="text"
-            placeholder="部分一致"
-            value={filters.trackingNumber}
-            onChange={(e) => updateFilter("trackingNumber", e.target.value)}
-            style={{ width: 160 }}
-          />
         </div>
         {hasActiveFilters && (
           <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ fontSize: 12, padding: "4px 10px" }}>
