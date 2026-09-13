@@ -13,6 +13,7 @@ export interface ModelStockAlertSetting {
   notify_email: string;
   last_alert_sent_at: string | null;
   last_known_count: number | null;
+  purchasing_count: number;
 }
 
 export interface ModelStockRow {
@@ -22,6 +23,8 @@ export interface ModelStockRow {
   belowThreshold: boolean;
   /** Google Driveから在庫数を最後に取得した日時。まだ一度も取得していない機種はnull(2026-08-31追加) */
   checked_at: string | null;
+  /** 仕入中(発注済み・未入荷)の数量。機種名フォルダに紐づけて手動入力する(2026-09-13追加) */
+  purchasing_count: number;
 }
 
 /** 機種名の表記ゆれ(大文字小文字・前後の空白)を吸収するための正規化キー */
@@ -47,7 +50,7 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
 
   const { data: settings, error: settingsError } = await supabase
     .from("model_stock_alert_settings")
-    .select("model_folder_name, threshold")
+    .select("model_folder_name, threshold, purchasing_count")
     .order("model_folder_name");
   if (settingsError) throw settingsError;
 
@@ -58,10 +61,12 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
     countMap.set(normalizeModelName(c.model_folder_name), c);
   }
   const thresholdMap = new Map<string, number>();
+  const purchasingMap = new Map<string, number>();
   const displayNameMap = new Map<string, string>();
-  for (const s of settings as { model_folder_name: string; threshold: number }[]) {
+  for (const s of settings as { model_folder_name: string; threshold: number; purchasing_count: number }[]) {
     const key = normalizeModelName(s.model_folder_name);
     thresholdMap.set(key, s.threshold);
+    purchasingMap.set(key, s.purchasing_count);
     displayNameMap.set(key, s.model_folder_name);
   }
   // しきい値設定がまだ無い機種(Drive上のフォルダのみ存在)は、Drive側の表記をそのまま表示名に使う。
@@ -85,6 +90,7 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
         threshold,
         belowThreshold: inStockCount < threshold,
         checked_at: count?.checked_at ?? null,
+        purchasing_count: purchasingMap.get(key) ?? 0,
       };
     })
     .sort((a, b) => a.model_folder_name.localeCompare(b.model_folder_name));
@@ -109,6 +115,22 @@ export async function upsertStockThreshold(modelFolderName: string, threshold: n
     .from("model_stock_alert_settings")
     .upsert(
       { model_folder_name: modelFolderName, threshold, last_known_count: null },
+      { onConflict: "model_folder_name" },
+    );
+  if (error) throw error;
+}
+
+/**
+ * 仕入中(発注済み・未入荷)の数量を機種名フォルダに紐づけて保存する(2026-09-13追加)。
+ * しきい値設定が未登録の機種名でも保存できるよう、model_stock_alert_settingsにupsertする
+ * (threshold等の他の列は指定しないため、既存行があれば変更されない。新規行の場合はDBの
+ * デフォルト値(threshold=1等)が使われる)。
+ */
+export async function upsertPurchasingCount(modelFolderName: string, purchasingCount: number): Promise<void> {
+  const { error } = await supabase
+    .from("model_stock_alert_settings")
+    .upsert(
+      { model_folder_name: modelFolderName, purchasing_count: purchasingCount },
       { onConflict: "model_folder_name" },
     );
   if (error) throw error;

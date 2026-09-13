@@ -3,6 +3,7 @@ import {
   checkStockAlertsAndNotify,
   fetchModelStockOverview,
   syncDriveStockCounts,
+  upsertPurchasingCount,
   upsertStockThreshold,
   type ModelStockRow,
 } from "../lib/api/stockAlerts";
@@ -22,6 +23,10 @@ export default function StockAlertsPage() {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [savingModel, setSavingModel] = useState<string | null>(null);
   const [savedModel, setSavedModel] = useState<string | null>(null);
+
+  // 機種名フォルダごとの編集中「仕入中」数量・保存状態(2026-09-13追加)
+  const [purchasingValues, setPurchasingValues] = useState<Record<string, string>>({});
+  const [savingPurchasing, setSavingPurchasing] = useState<string | null>(null);
 
   // 新規機種名(在庫0件でも先にしきい値を登録できる)
   const [newModelName, setNewModelName] = useState("");
@@ -45,6 +50,13 @@ export default function StockAlertsPage() {
           if (next[r.model_folder_name] === undefined) {
             next[r.model_folder_name] = String(r.threshold);
           }
+        }
+        return next;
+      });
+      setPurchasingValues((prev) => {
+        const next = { ...prev };
+        for (const r of data) {
+          next[r.model_folder_name] = String(r.purchasing_count);
         }
         return next;
       });
@@ -82,6 +94,31 @@ export default function StockAlertsPage() {
       setErrorMessage(err instanceof Error ? err.message : "しきい値の保存に失敗しました");
     } finally {
       setSavingModel(null);
+    }
+  }
+
+  function updatePurchasingValue(modelFolderName: string, value: string) {
+    setPurchasingValues((prev) => ({ ...prev, [modelFolderName]: value }));
+  }
+
+  async function handleSavePurchasing(modelFolderName: string, currentSavedValue: number) {
+    const value = purchasingValues[modelFolderName];
+    const count = Number(value);
+    if (String(count) === String(currentSavedValue)) return; // 未変更なら何もしない
+    if (Number.isNaN(count) || count < 0) {
+      setErrorMessage("仕入中の数量は0以上の数値で入力してください");
+      setPurchasingValues((prev) => ({ ...prev, [modelFolderName]: String(currentSavedValue) }));
+      return;
+    }
+    setSavingPurchasing(modelFolderName);
+    setErrorMessage(null);
+    try {
+      await upsertPurchasingCount(modelFolderName, count);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "仕入中の数量の保存に失敗しました");
+    } finally {
+      setSavingPurchasing(null);
     }
   }
 
@@ -280,6 +317,7 @@ export default function StockAlertsPage() {
               <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>しきい値</th>
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
+              <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>仕入中</th>
             </tr>
           </thead>
           <tbody>
@@ -288,6 +326,8 @@ export default function StockAlertsPage() {
               const isDirty = editValue !== String(r.threshold);
               const isSaving = savingModel === r.model_folder_name;
               const isSaved = savedModel === r.model_folder_name;
+              const purchasingValue = purchasingValues[r.model_folder_name] ?? String(r.purchasing_count);
+              const isSavingPurchasing = savingPurchasing === r.model_folder_name;
               return (
                 <tr key={r.model_folder_name} style={{ borderTop: "0.5px solid var(--border)" }}>
                   <td style={{ padding: "8px 4px" }}>{r.model_folder_name}</td>
@@ -330,6 +370,16 @@ export default function StockAlertsPage() {
                         しきい値割れ
                       </span>
                     )}
+                  </td>
+                  <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                    <input
+                      type="number"
+                      value={purchasingValue}
+                      onChange={(e) => updatePurchasingValue(r.model_folder_name, e.target.value)}
+                      onBlur={() => handleSavePurchasing(r.model_folder_name, r.purchasing_count)}
+                      disabled={isSavingPurchasing}
+                      style={{ width: 60, textAlign: "right" }}
+                    />
                   </td>
                 </tr>
               );
