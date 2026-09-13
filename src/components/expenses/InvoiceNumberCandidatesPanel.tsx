@@ -59,6 +59,34 @@ export default function InvoiceNumberCandidatesPanel() {
       });
   }, []);
 
+  // pending/running中は15秒おきに状態を再取得する(VPS側cronが非同期で処理するため、
+  // ブラウザを開いたまま待っていても自動的に完了を検知できるようにする、2026-09-13追加)。
+  // done/errorに変わった瞬間に一度だけ候補一覧もreloadし、ポーリングは停止する。
+  useEffect(() => {
+    if (scanRequest?.status !== "pending" && scanRequest?.status !== "running") return;
+    const timer = setInterval(() => {
+      fetchLatestScanRequest()
+        .then((req) => {
+          setScanRequest((prev) => {
+            if (
+              prev &&
+              prev.status !== "done" &&
+              prev.status !== "error" &&
+              req &&
+              (req.status === "done" || req.status === "error")
+            ) {
+              void reload();
+            }
+            return req;
+          });
+        })
+        .catch(() => {
+          /* ポーリング失敗は致命的でないため無視 */
+        });
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [scanRequest?.status]);
+
   const byVendor = useMemo(() => {
     const map = new Map<string, InvoiceNumberCandidate[]>();
     for (const r of rows) {
