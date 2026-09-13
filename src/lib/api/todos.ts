@@ -11,6 +11,7 @@ export interface Todo {
   updated_at: string;
   completed_at: string | null;
   due_at: string | null;
+  memo: string | null;
 }
 
 export async function fetchAllTodos(): Promise<Todo[]> {
@@ -48,6 +49,15 @@ export async function updateTodoTitle(id: string, title: string): Promise<void> 
   const { error } = await supabase
     .from("todos")
     .update({ title, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** アイテムごとのテキストメモを保存する(添付ファイルパネル内、2026-09-13追加)。 */
+export async function updateTodoMemo(id: string, memo: string): Promise<void> {
+  const { error } = await supabase
+    .from("todos")
+    .update({ memo, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }

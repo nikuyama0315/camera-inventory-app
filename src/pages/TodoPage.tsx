@@ -16,6 +16,7 @@ import {
   deleteTodoAttachment,
   deleteAttachmentsForTodoIds,
   getAttachmentSignedUrl,
+  updateTodoMemo,
   type Todo,
   type TodoBackupFile,
   type TodoAttachment,
@@ -51,6 +52,10 @@ export default function TodoPage() {
   const [attachmentMessage, setAttachmentMessage] = useState<string | null>(null);
   const uploadTargetIdRef = useRef<string | null>(null);
   const attachFileInputRef = useRef<HTMLInputElement>(null);
+
+  // アイテムごとのメモ(添付ファイルパネル内、2026-09-13追加)
+  const [memoValues, setMemoValues] = useState<Record<string, string>>({});
+  const [savingMemoFor, setSavingMemoFor] = useState<string | null>(null);
 
   // 期限日時(2026-09-12追加)
   const [editingDueForId, setEditingDueForId] = useState<string | null>(null);
@@ -134,6 +139,13 @@ export default function TodoPage() {
       const rows = await fetchAllTodos();
       setTodos(rows);
       setAttachments(await fetchAttachmentsForTodoIds(rows.map((r) => r.id)));
+      setMemoValues((prev) => {
+        const next = { ...prev };
+        for (const r of rows) {
+          if (next[r.id] === undefined) next[r.id] = r.memo ?? "";
+        }
+        return next;
+      });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
@@ -561,6 +573,20 @@ export default function TodoPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   }
 
+  async function handleSaveMemo(todoId: string, currentSavedValue: string | null) {
+    const value = memoValues[todoId] ?? "";
+    setSavingMemoFor(todoId);
+    setErrorMessage(null);
+    try {
+      await updateTodoMemo(todoId, value);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "メモの保存に失敗しました");
+    } finally {
+      setSavingMemoFor(null);
+    }
+  }
+
   function renderNode(todo: Todo, depth: number) {
     const children = childrenByParent.get(todo.id) ?? [];
     const hasChildren = children.length > 0;
@@ -578,6 +604,9 @@ export default function TodoPage() {
     const attachmentsExpanded = expandedAttachmentsFor.has(todo.id);
     const isDragOver = dragOverId === todo.id;
     const overdue = isTodoOverdue(todo);
+    const memoValue = memoValues[todo.id] ?? (todo.memo ?? "");
+    const isMemoDirty = memoValue !== (todo.memo ?? "");
+    const isSavingMemo = savingMemoFor === todo.id;
     const isEditingDue = editingDueForId === todo.id;
 
     return (
@@ -869,39 +898,63 @@ export default function TodoPage() {
               border: "0.5px dashed var(--border)",
               borderRadius: 6,
               background: "var(--surface-1)",
+              display: "flex",
+              gap: 12,
             }}
           >
-            {todoAttachments.length === 0 && (
-              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
-                添付ファイルはありません(タスク行の上へドラッグ&ドロップ、または下のボタンで追加できます)
-              </p>
-            )}
-            {todoAttachments.map((a) => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {todoAttachments.length === 0 && (
+                <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 6px" }}>
+                  添付ファイルはありません(タスク行の上へドラッグ&ドロップ、または下のボタンで追加できます)
+                </p>
+              )}
+              {todoAttachments.map((a) => (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <button
+                    onClick={() => void handleOpenAttachment(a)}
+                    style={{ fontSize: 11, padding: "1px 6px", textAlign: "left" }}
+                    title={a.file_name}
+                  >
+                    {a.file_name}
+                  </button>
+                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatFileSize(a.size_bytes)}</span>
+                  <button
+                    onClick={() => void handleDeleteAttachment(a)}
+                    disabled={deletingAttachmentId === a.id}
+                    style={{ fontSize: 10, padding: "1px 6px", marginLeft: "auto" }}
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => handleAttachButtonClick(todo.id)}
+                disabled={uploadingFor === todo.id}
+                style={{ fontSize: 11, padding: "2px 8px" }}
+              >
+                {uploadingFor === todo.id ? "アップロード中..." : "ファイルを選択して添付"}
+              </button>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+              <textarea
+                value={memoValue}
+                onChange={(e) =>
+                  setMemoValues((prev) => ({ ...prev, [todo.id]: e.target.value }))
+                }
+                placeholder="メモ"
+                disabled={isSavingMemo}
+                style={{ fontSize: 12, width: "100%", minHeight: 60, resize: "vertical", boxSizing: "border-box" }}
+              />
+              {isMemoDirty && (
                 <button
-                  onClick={() => void handleOpenAttachment(a)}
-                  style={{ fontSize: 11, padding: "1px 6px", textAlign: "left" }}
-                  title={a.file_name}
+                  onClick={() => void handleSaveMemo(todo.id, todo.memo)}
+                  disabled={isSavingMemo}
+                  style={{ fontSize: 11, padding: "2px 8px", alignSelf: "flex-start" }}
                 >
-                  {a.file_name}
+                  {isSavingMemo ? "保存中..." : "保存"}
                 </button>
-                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatFileSize(a.size_bytes)}</span>
-                <button
-                  onClick={() => void handleDeleteAttachment(a)}
-                  disabled={deletingAttachmentId === a.id}
-                  style={{ fontSize: 10, padding: "1px 6px", marginLeft: "auto" }}
-                >
-                  削除
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => handleAttachButtonClick(todo.id)}
-              disabled={uploadingFor === todo.id}
-              style={{ fontSize: 11, padding: "2px 8px" }}
-            >
-              {uploadingFor === todo.id ? "アップロード中..." : "ファイルを選択して添付"}
-            </button>
+              )}
+            </div>
           </div>
         )}
 
