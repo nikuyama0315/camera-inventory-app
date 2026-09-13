@@ -347,6 +347,28 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
   if (editing && editForm) {
     return (
       <div>
+        <EditField label="アカウント">
+          <select
+            value={editForm.account}
+            onChange={(e) => updateEdit("account", e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <option value="">未設定</option>
+            {EBAY_ACCOUNT_OPTIONS.map((a) => (
+              <option key={a} value={a}>
+                {EBAY_ACCOUNT_LABELS[a]}
+              </option>
+            ))}
+          </select>
+        </EditField>
+        <EditField label="カテゴリ">
+          <input
+            type="text"
+            value={editForm.category}
+            onChange={(e) => updateEdit("category", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
         <EditField label="管理番号">
           <input
             type="text"
@@ -445,20 +467,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             eBayの実注文番号(レポート取込・eBay受注同期で取り込まれた値)を自動表示します。ここでは編集できません。
           </p>
         </EditField>
-        <EditField label="アカウント">
-          <select
-            value={editForm.account}
-            onChange={(e) => updateEdit("account", e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <option value="">未設定</option>
-            {EBAY_ACCOUNT_OPTIONS.map((a) => (
-              <option key={a} value={a}>
-                {EBAY_ACCOUNT_LABELS[a]}
-              </option>
-            ))}
-          </select>
-        </EditField>
         <EditField label="仕入品名">
           <input
             type="text"
@@ -494,14 +502,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
           </select>
         </EditField>
         <DeductionBadge counterpartyType={editForm.counterparty_type} />
-        <EditField label="カテゴリ">
-          <input
-            type="text"
-            value={editForm.category}
-            onChange={(e) => updateEdit("category", e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </EditField>
         <EditField label="ブランド">
           <input
             type="text"
@@ -786,6 +786,14 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
   return (
     <div>
       <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>アカウント</span>
+        <span>{item.account ? (EBAY_ACCOUNT_LABELS[item.account as EbayAccount] ?? item.account) : "未設定"}</span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>カテゴリ</span>
+        <span>{item.category}</span>
+      </div>
+      <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>管理番号</span>
         <span>{item.management_no}</span>
       </div>
@@ -827,10 +835,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span>{orderNumberDisplay}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>アカウント</span>
-        <span>{item.account ? (EBAY_ACCOUNT_LABELS[item.account as EbayAccount] ?? item.account) : "未設定"}</span>
-      </div>
-      <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>仕入品名</span>
         <span>{item.title ?? "-"}</span>
       </div>
@@ -846,10 +850,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
               purchase.counterparty_type
             : "-"}
         </span>
-      </div>
-      <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>カテゴリ</span>
-        <span>{item.category}</span>
       </div>
       <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>ブランド / 機種</span>
