@@ -14,7 +14,7 @@ camera-inventory-appの「経費」タブ「適格請求書番号(候補)」サ�
 cron実行例(10分おき):
   */10 * * * * cd /opt/camera-inventory-app-src && python3 scripts/scan_invoice_numbers.py >> logs/scan_invoice_numbers.log 2>&1
 
-必要な環境変数(このスクリブトと同じ階層の親ディレクトリの .env から読み込む):
+必要な環境変数(このスクリプトと同じ階層の親ディレクトリの .env から読み込む):
   VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
   (SUPABASE_SERVICE_ROLE_KEYはRLSを越えてDBへ書き込むために必要。ブラウザ側には一切含めない)
 """
@@ -23,6 +23,7 @@ import io
 import os
 import re
 import sys
+import time
 import zipfile
 from datetime import datetime, timezone
 
@@ -88,71 +89,79 @@ def log(msg: str) -> None:
     print(f"[{datetime.now(timezone.utc).isoformat()}] {msg}", flush=True)
 
 
+def supabase_request(method: str, url: str, **kwargs):
+    """SupabaseのREST APIは稀に504 Gateway Timeout等の一時的なエラーを返すことがある
+    (2026-09-13、cronが1回丸ごとクラッシュし依頼が最大10分取りこぼされる事故を確認)。
+    このAPIへの呼び出しはすべてこの関数を経由し、一時的なエラーは短い間隔でリトライすることで、
+    1回のcron実行内で吸収できるようにする。"""
+    attempts = 3
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            resp = requests.request(method, url, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+            if attempt < attempts:
+                log(f"Supabase APIへの接続に失敗(試行{attempt}/{attempts}): {exc} - 3秒後に再試行します")
+                time.sleep(3)
+    raise last_exc
+
+
 def fetch_pending_request():
-    resp = requests.get(
+    resp = supabase_request(
+        "GET",
         f"{REST_URL}/invoice_number_scan_requests",
         headers=HEADERS,
         params={"status": "eq.pending", "order": "requested_at.asc", "limit": 1},
         timeout=30,
     )
-    resp.raise_for_status()
     rows = resp.json()
     return rows[0] if rows else None
 
 
 def mark_request(request_id: str, patch: dict) -> None:
-    resp = requests.patch(
+    supabase_request(
+        "PATCH",
         f"{REST_URL}/invoice_number_scan_requests",
         headers=HEADERS,
         params={"id": f"eq.{request_id}"},
         json=patch,
         timeout=30,
     )
-    resp.raise_for_status()
 
 
 def fetch_target_vendors() -> list:
     """invoice_registration_noが未設定のexpenses.vendor・purchases.source_name(仕入先・出品者名、
     2026-09-13対象拡大)のうち、まだ一度もinvoice_number_candidatesに現れていないものだけを対象にする。"""
-    resp = requests.get(
+    resp = supabase_request(
+        "GET",
         f"{REST_URL}/expenses",
         headers=HEADERS,
-        params={
-            "select": "vendor",
-            "or": "(invoice_registration_no.is.null,invoice_registration_no.eq.)",
-        },
+        params={"select": "vendor", "or": "(invoice_registration_no.is.null,invoice_registration_no.eq.)"},
         timeout=60,
     )
-    resp.raise_for_status()
-    expense_vendors = {
-        (row.get("vendor") or "").strip()
-        for row in resp.json()
-        if (row.get("vendor") or "").strip()
-    }
+    expense_vendors = {(row.get("vendor") or "").strip() for row in resp.json() if (row.get("vendor") or "").strip()}
 
-    resp_purchases = requests.get(
+    resp_purchases = supabase_request(
+        "GET",
         f"{REST_URL}/purchases",
         headers=HEADERS,
-        params={
-            "select": "source_name",
-            "or": "(invoice_registration_no.is.null,invoice_registration_no.eq.)",
-        },
+        params={"select": "source_name", "or": "(invoice_registration_no.is.null,invoice_registration_no.eq.)"},
         timeout=60,
     )
-    resp_purchases.raise_for_status()
     purchase_vendors = {
-        (row.get("source_name") or "").strip()
-        for row in resp_purchases.json()
-        if (row.get("source_name") or "").strip()
+        (row.get("source_name") or "").strip() for row in resp_purchases.json() if (row.get("source_name") or "").strip()
     }
 
-    resp2 = requests.get(
+    resp2 = supabase_request(
+        "GET",
         f"{REST_URL}/invoice_number_candidates",
         headers=HEADERS,
         params={"select": "vendor"},
         timeout=60,
     )
-    resp2.raise_for_status()
     scanned_vendors = {row["vendor"] for row in resp2.json()}
 
     return sorted((expense_vendors | purchase_vendors) - scanned_vendors)
@@ -213,13 +222,13 @@ def scan_file(dl_id: str, kbn: str, vendor_norms: dict) -> dict:
 def insert_candidates(rows: list) -> None:
     if not rows:
         return
-    resp = requests.post(
+    supabase_request(
+        "POST",
         f"{REST_URL}/invoice_number_candidates",
         headers=HEADERS,
         json=rows,
         timeout=60,
     )
-    resp.raise_for_status()
 
 
 def main() -> None:
