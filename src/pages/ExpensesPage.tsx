@@ -429,12 +429,14 @@ export default function ExpensesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedExpenses.map((e) => (
+                  {sortedExpenses.map((e, rowIndex) => {
+                    const zebraBackground = rowIndex % 2 === 1 ? "var(--surface-1)" : undefined;
+                    return (
                     <tr
                       key={e.id}
                       style={{
                         borderTop: "0.5px solid var(--border)",
-                        background: editingId === e.id ? "var(--surface-1)" : undefined,
+                        background: editingId === e.id ? "var(--surface-1)" : zebraBackground,
                       }}
                     >
                       <td style={{ padding: "8px 4px" }}>{e.expense_date}</td>
@@ -494,7 +496,8 @@ export default function ExpensesPage() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               </div>
