@@ -3,6 +3,7 @@ import {
   checkStockAlertsAndNotify,
   fetchModelStockOverview,
   syncDriveStockCounts,
+  deleteStockThreshold,
   upsertPurchasingCount,
   upsertStockThreshold,
   type ModelStockRow,
@@ -27,6 +28,7 @@ export default function StockAlertsPage() {
   // 機種名フォルダごとの編集中「仕入中」数量・保存状態(2026-09-13追加)
   const [purchasingValues, setPurchasingValues] = useState<Record<string, string>>({});
   const [savingPurchasing, setSavingPurchasing] = useState<string | null>(null);
+  const [deletingModel, setDeletingModel] = useState<string | null>(null);
 
   // 新規機種名(在庫0件でも先にしきい値を登録できる)
   const [newModelName, setNewModelName] = useState("");
@@ -119,6 +121,26 @@ export default function StockAlertsPage() {
       setErrorMessage(err instanceof Error ? err.message : "仕入中の数量の保存に失敗しました");
     } finally {
       setSavingPurchasing(null);
+    }
+  }
+
+  async function handleDeleteModel(modelFolderName: string) {
+    if (
+      !window.confirm(
+        `機種名「${modelFolderName}」のしきい値・仕入中の設定を削除します。よろしいですか?(在庫がGoogle Drive上に残っている場合、次回の在庫数取得で一覧に再表示されます)`,
+      )
+    ) {
+      return;
+    }
+    setDeletingModel(modelFolderName);
+    setErrorMessage(null);
+    try {
+      await deleteStockThreshold(modelFolderName);
+      await reload();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "削除に失敗しました");
+    } finally {
+      setDeletingModel(null);
     }
   }
 
@@ -318,6 +340,7 @@ export default function StockAlertsPage() {
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
               <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>仕入中</th>
+              <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -395,6 +418,15 @@ export default function StockAlertsPage() {
                         </button>
                       )}
                     </div>
+                  </td>
+                  <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                    <button
+                      onClick={() => void handleDeleteModel(r.model_folder_name)}
+                      disabled={deletingModel === r.model_folder_name}
+                      style={{ fontSize: 12, padding: "3px 10px" }}
+                    >
+                      {deletingModel === r.model_folder_name ? "削除中..." : "削除"}
+                    </button>
                   </td>
                 </tr>
               );

@@ -137,6 +137,19 @@ export async function upsertPurchasingCount(modelFolderName: string, purchasingC
 }
 
 /**
+ * 機種名フォルダのしきい値・仕入中設定を削除する(在庫アラート一覧の「削除」ボタン、2026-09-13追加)。
+ * model_drive_stock_countsのキャッシュ行はGoogle Drive側の実フォルダ構造から次回同期時に
+ * 再生成されるため削除しない(在庫が実在する限り一覧には再度表示される。しきい値・仕入中設定だけを消す)。
+ */
+export async function deleteStockThreshold(modelFolderName: string): Promise<void> {
+  const { error } = await supabase
+    .from("model_stock_alert_settings")
+    .delete()
+    .eq("model_folder_name", modelFolderName);
+  if (error) throw error;
+}
+
+/**
  * Google Drive上の実フォルダ構造をスキャンし、機種名フォルダごとの在庫数を
  * model_drive_stock_counts に再取得・保存する(sync-drive-stock-counts Edge Functionを呼び出す)。
  * 在庫アラート画面の「Google Driveから最新の在庫数を取得」ボタンから呼ばれる想定(2026-08-31追加)。
