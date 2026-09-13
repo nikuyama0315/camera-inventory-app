@@ -286,11 +286,15 @@ export default function DirectSalesCsvPanel() {
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => (
+              {filteredItems.map((item, rowIndex) => (
                 <tr
                   key={item.id}
                   onClick={() => toggleSelect(item.id)}
-                  style={{ borderTop: "0.5px solid var(--border)", cursor: "pointer" }}
+                  style={{
+                    borderTop: "0.5px solid var(--border)",
+                    cursor: "pointer",
+                    background: rowIndex % 2 === 1 ? "var(--surface-1)" : undefined,
+                  }}
                 >
                   <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
