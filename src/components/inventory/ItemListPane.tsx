@@ -126,7 +126,7 @@ export default function ItemListPane({
             style={{ flex: 1 }}
           />
         </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
           <input
             type="text"
             placeholder="追跡番号"
@@ -134,23 +134,23 @@ export default function ItemListPane({
             onChange={(e) => onFiltersChange({ ...filters, trackingNumber: e.target.value || undefined })}
             style={{ flex: 1 }}
           />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>販売日</label>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <input
-              type="date"
-              value={filters.saleDateFrom ?? ""}
-              onChange={(e) => onFiltersChange({ ...filters, saleDateFrom: e.target.value || undefined })}
-              style={{ flex: 1 }}
-            />
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>〜</span>
-            <input
-              type="date"
-              value={filters.saleDateTo ?? ""}
-              onChange={(e) => onFiltersChange({ ...filters, saleDateTo: e.target.value || undefined })}
-              style={{ flex: 1 }}
-            />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+            <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>販売日</label>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="date"
+                value={filters.saleDateFrom ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, saleDateFrom: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>〜</span>
+              <input
+                type="date"
+                value={filters.saleDateTo ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, saleDateTo: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
         </div>
         <button onClick={onStartNewItem} style={{ width: "100%" }}>
