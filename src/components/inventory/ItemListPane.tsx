@@ -50,6 +50,20 @@ export default function ItemListPane({
       <div style={{ padding: "12px", borderBottom: "0.5px solid var(--border)" }}>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <select
+            value={filters.account ?? ""}
+            onChange={(e) => onFiltersChange({ ...filters, account: e.target.value || undefined })}
+            style={{ flex: 1 }}
+          >
+            <option value="">アカウント(すべて)</option>
+            {EBAY_ACCOUNT_OPTIONS.map((a) => (
+              <option key={a} value={a}>
+                {EBAY_ACCOUNT_LABELS[a]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <select
             value={filters.status ?? ""}
             onChange={(e) =>
               onFiltersChange({
@@ -69,18 +83,6 @@ export default function ItemListPane({
             {STATUS_OPTIONS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.account ?? ""}
-            onChange={(e) => onFiltersChange({ ...filters, account: e.target.value || undefined })}
-            style={{ flex: 1 }}
-          >
-            <option value="">アカウント(すべて)</option>
-            {EBAY_ACCOUNT_OPTIONS.map((a) => (
-              <option key={a} value={a}>
-                {EBAY_ACCOUNT_LABELS[a]}
               </option>
             ))}
           </select>
