@@ -11,13 +11,14 @@ export interface InvoiceNumberCandidate {
 }
 
 /**
- * 「適格請求書発行事業者番号 候補」機能(2026-09-11新規)。
- * 経費に登録されている事業者名(vendor)から、国税庁の適格請求書発行事業者公表サイトが
- * 毎月公開する全件データ(法人・人格のない社団等分、CSV)をダウンロードして名称検索した結果を
- * 保存したもの。国税庁のWeb-APIには名称検索機能が無く(登録番号での検索のみ)、個人事業主の
- * 全件データは氏名が非公開のため、この方式で見つかるのは法人・人格のない社団等のみ。
- * 検索自体は都度VPS上でスクリプトを実行して行い(このテーブルへの投入は手動バッチ)、
- * ここでは候補の一覧表示・採用・却下のみを扱う。
+ * 「適格請求書発行事業者番号 候補」機能(2026-09-11新規、2026-09-13に仕入先・出品者名にも対象拡大)。
+ * 経費のvendor(事業者名)・仕入(purchases)のsource_name(仕入先・出品者名)から、国税庁の
+ * 適格請求書発行事業者公表サイトが毎月公開する全件データ(法人・人格のない社団等分、CSV)を
+ * ダウンロードして名称検索した結果を保存したもの。国税庁のWeb-APIには名称検索機能が無く
+ * (登録番号での検索のみ)、個人事業主の全件データは氏名が非公開のため、この方式で見つかるのは
+ * 法人・人格のない社団等のみ。検索自体は都度VPS上でスクリプトを実行して行う(scan_invoice_numbers.py)。
+ * 「採用」・手動登録時は、同じ事業者名を持つexpenses.vendor・purchases.source_nameの両方のうち、
+ * 登録番号が未入力の行すべてに反映する(1つの事業者名が経費・仕入の両方に登場しうるため)。
  */
 export async function fetchInvoiceNumberCandidates(): Promise<InvoiceNumberCandidate[]> {
   const { data, error } = await supabase
@@ -38,13 +39,21 @@ export async function fetchInvoiceNumberCandidates(): Promise<InvoiceNumberCandi
 export async function acceptInvoiceNumberCandidate(candidate: InvoiceNumberCandidate): Promise<number> {
   if (!candidate.candidate_reg_no) throw new Error("登録番号がありません");
 
-  const { data: updated, error: updateErr } = await supabase
+  const { data: updatedExpenses, error: updateExpensesErr } = await supabase
     .from("expenses")
     .update({ invoice_registration_no: candidate.candidate_reg_no })
     .eq("vendor", candidate.vendor)
     .or("invoice_registration_no.is.null,invoice_registration_no.eq.")
     .select("id");
-  if (updateErr) throw updateErr;
+  if (updateExpensesErr) throw updateExpensesErr;
+
+  const { data: updatedPurchases, error: updatePurchasesErr } = await supabase
+    .from("purchases")
+    .update({ invoice_registration_no: candidate.candidate_reg_no })
+    .eq("source_name", candidate.vendor)
+    .or("invoice_registration_no.is.null,invoice_registration_no.eq.")
+    .select("id");
+  if (updatePurchasesErr) throw updatePurchasesErr;
 
   const { error: acceptErr } = await supabase
     .from("invoice_number_candidates")
@@ -59,7 +68,7 @@ export async function acceptInvoiceNumberCandidate(candidate: InvoiceNumberCandi
     .eq("status", "pending");
   if (rejectSiblingsErr) throw rejectSiblingsErr;
 
-  return (updated as { id: string }[]).length;
+  return (updatedExpenses as { id: string }[]).length + (updatedPurchases as { id: string }[]).length;
 }
 
 /** 候補を却下する(一覧から外すのみ、経費データへの反映は無し)。 */
@@ -88,13 +97,21 @@ export async function applyManualInvoiceNumber(vendor: string, regNo: string): P
     throw new Error("登録番号は「T」+数字13桁の形式で入力してください(例: T1234567890123)");
   }
 
-  const { data: updated, error: updateErr } = await supabase
+  const { data: updatedExpenses, error: updateExpensesErr } = await supabase
     .from("expenses")
     .update({ invoice_registration_no: trimmed })
     .eq("vendor", vendor)
     .or("invoice_registration_no.is.null,invoice_registration_no.eq.")
     .select("id");
-  if (updateErr) throw updateErr;
+  if (updateExpensesErr) throw updateExpensesErr;
+
+  const { data: updatedPurchases, error: updatePurchasesErr } = await supabase
+    .from("purchases")
+    .update({ invoice_registration_no: trimmed })
+    .eq("source_name", vendor)
+    .or("invoice_registration_no.is.null,invoice_registration_no.eq.")
+    .select("id");
+  if (updatePurchasesErr) throw updatePurchasesErr;
 
   const { error: rejectErr } = await supabase
     .from("invoice_number_candidates")
@@ -103,7 +120,7 @@ export async function applyManualInvoiceNumber(vendor: string, regNo: string): P
     .eq("status", "pending");
   if (rejectErr) throw rejectErr;
 
-  return (updated as { id: string }[]).length;
+  return (updatedExpenses as { id: string }[]).length + (updatedPurchases as { id: string }[]).length;
 }
 
 

@@ -4,6 +4,7 @@ import ItemDetailPane from "../components/inventory/ItemDetailPane";
 import ItemTableView from "../components/inventory/ItemTableView";
 import InventoryBackupPanel from "../components/inventory/InventoryBackupPanel";
 import ListingCheckPanel from "../components/inventory/ListingCheckPanel";
+import InvoiceNumberCandidatesPanel from "../components/expenses/InvoiceNumberCandidatesPanel";
 import {
   fetchItemListWithPurchase,
   fetchInventoryValuationSummary,
@@ -13,7 +14,7 @@ import {
 } from "../lib/api/items";
 import type { ItemListFilters } from "../lib/types";
 
-type ViewMode = "split" | "table" | "listingCheck" | "backup";
+type ViewMode = "split" | "table" | "listingCheck" | "invoiceNumbers" | "backup";
 
 // 在庫マスター・ディテール画面(要件定義書v4 §6 / ワイヤーフレーム案A)
 // 左ペイン: 一覧+検索。右ペイン: 選択した商品の詳細(基本情報/仕入/検品タブ)。
@@ -167,6 +168,20 @@ export default function InventoryPage() {
           出品チェック
         </button>
         <button
+          onClick={() => setViewMode("invoiceNumbers")}
+          style={{
+            fontSize: 12,
+            padding: "4px 10px",
+            border: "none",
+            borderBottom: viewMode === "invoiceNumbers" ? "2px solid var(--accent)" : "2px solid transparent",
+            borderRadius: 0,
+            background: "transparent",
+            color: viewMode === "invoiceNumbers" ? "var(--accent)" : "var(--text-secondary)",
+          }}
+        >
+          適格請求書番号(候補)
+        </button>
+        <button
           onClick={() => setViewMode("backup")}
           style={{
             fontSize: 12,
@@ -198,6 +213,10 @@ export default function InventoryPage() {
         <InventoryBackupPanel onDataChanged={reloadList} />
       ) : viewMode === "listingCheck" ? (
         <ListingCheckPanel />
+      ) : viewMode === "invoiceNumbers" ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "1rem 1.5rem" }}>
+          <InvoiceNumberCandidatesPanel />
+        </div>
       ) : viewMode === "split" ? (
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <div style={{ width: "38%", borderRight: "0.5px solid var(--border)", overflowY: "auto" }}>

@@ -112,8 +112,8 @@ def mark_request(request_id: str, patch: dict) -> None:
 
 
 def fetch_target_vendors() -> list:
-    """invoice_registration_noが未設定のexpenses.vendorのうち、
-    まだ一度もinvoice_number_candidatesに現れていないものだけを対象にする。"""
+    """invoice_registration_noが未設定のexpenses.vendor・purchases.source_name(仕入先・出品者名、
+    2026-09-13対象拡大)のうち、まだ一度もinvoice_number_candidatesに現れていないものだけを対象にする。"""
     resp = requests.get(
         f"{REST_URL}/expenses",
         headers=HEADERS,
@@ -130,6 +130,22 @@ def fetch_target_vendors() -> list:
         if (row.get("vendor") or "").strip()
     }
 
+    resp_purchases = requests.get(
+        f"{REST_URL}/purchases",
+        headers=HEADERS,
+        params={
+            "select": "source_name",
+            "or": "(invoice_registration_no.is.null,invoice_registration_no.eq.)",
+        },
+        timeout=60,
+    )
+    resp_purchases.raise_for_status()
+    purchase_vendors = {
+        (row.get("source_name") or "").strip()
+        for row in resp_purchases.json()
+        if (row.get("source_name") or "").strip()
+    }
+
     resp2 = requests.get(
         f"{REST_URL}/invoice_number_candidates",
         headers=HEADERS,
@@ -139,7 +155,7 @@ def fetch_target_vendors() -> list:
     resp2.raise_for_status()
     scanned_vendors = {row["vendor"] for row in resp2.json()}
 
-    return sorted(expense_vendors - scanned_vendors)
+    return sorted((expense_vendors | purchase_vendors) - scanned_vendors)
 
 
 def fetch_download_files() -> list:
