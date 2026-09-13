@@ -61,8 +61,6 @@ export default function ItemListPane({
               </option>
             ))}
           </select>
-        </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <select
             value={filters.status ?? ""}
             onChange={(e) =>
@@ -100,8 +98,6 @@ export default function ItemListPane({
               </option>
             ))}
           </select>
-        </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <select
             value={sort}
             onChange={(e) => onSortChange(e.target.value as ItemSortOption)}
