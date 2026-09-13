@@ -328,6 +328,7 @@ export default function StockAlertsPage() {
               const isSaved = savedModel === r.model_folder_name;
               const purchasingValue = purchasingValues[r.model_folder_name] ?? String(r.purchasing_count);
               const isSavingPurchasing = savingPurchasing === r.model_folder_name;
+              const isDirtyPurchasing = purchasingValue !== String(r.purchasing_count);
               return (
                 <tr key={r.model_folder_name} style={{ borderTop: "0.5px solid var(--border)" }}>
                   <td style={{ padding: "8px 4px" }}>{r.model_folder_name}</td>
@@ -371,15 +372,25 @@ export default function StockAlertsPage() {
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: "8px 4px", textAlign: "right" }}>
-                    <input
-                      type="number"
-                      value={purchasingValue}
-                      onChange={(e) => updatePurchasingValue(r.model_folder_name, e.target.value)}
-                      onBlur={() => handleSavePurchasing(r.model_folder_name, r.purchasing_count)}
-                      disabled={isSavingPurchasing}
-                      style={{ width: 60, textAlign: "right" }}
-                    />
+                  <td style={{ padding: "8px 4px" }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
+                      <input
+                        type="number"
+                        value={purchasingValue}
+                        onChange={(e) => updatePurchasingValue(r.model_folder_name, e.target.value)}
+                        disabled={isSavingPurchasing}
+                        style={{ width: 60, textAlign: "right" }}
+                      />
+                      {isDirtyPurchasing && (
+                        <button
+                          onClick={() => handleSavePurchasing(r.model_folder_name, r.purchasing_count)}
+                          disabled={isSavingPurchasing}
+                          style={{ fontSize: 12, padding: "3px 10px" }}
+                        >
+                          {isSavingPurchasing ? "保存中..." : "保存"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
