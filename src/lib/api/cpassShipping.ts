@@ -1,12 +1,12 @@
 import { supabase } from "../supabaseClient";
 
-export interface CpassShippingRecord {
+export interface ShippingImportRecord {
   orderNo: string;
   trackingNumber: string;
   shippingFeeJpy: number;
 }
 
-export interface CpassShippingResult extends CpassShippingRecord {
+export interface ShippingImportResult extends ShippingImportRecord {
   status: "success" | "not_found" | "not_sold" | "no_sale" | "error";
   managementNo?: string;
   message: string;
@@ -20,16 +20,16 @@ const TRACKING_LENGTH = 29;
  * 1件の出荷ごとに「ORDER NO.」「EST. SHIPPING FEE」「APPLIED SHIPPING SERVICE」の
  * 各ラベル行の直後の行に値が来る固定フォーマットを前提とし、行単位でスキャンする。
  */
-export function parseCpassShippingText(text: string): CpassShippingRecord[] {
+export function parseCpassShippingText(text: string): ShippingImportRecord[] {
   const lines = text.split(/\r\n|\r|\n/);
-  const records: CpassShippingRecord[] = [];
+  const records: ShippingImportRecord[] = [];
   let orderNo: string | null = null;
   let shippingFeeJpy: number | null = null;
   let appliedLine: string | null = null;
 
   function flush() {
     if (orderNo && shippingFeeJpy !== null && appliedLine) {
-      const trackingNumber = extractTrackingNumber(appliedLine);
+      const trackingNumber = extractCpassTrackingNumber(appliedLine);
       if (trackingNumber) {
         records.push({ orderNo, trackingNumber, shippingFeeJpy });
       }
@@ -57,7 +57,7 @@ export function parseCpassShippingText(text: string): CpassShippingRecord[] {
 
 /** 「Orange Connex (Japan) – FedEx XXXXXXXXXXXXXXXXXXXXXXXXXXXXX 」形式の行から、
  *  配送業者名(FedEx/DHL)+半角スペース1つの直後29文字を追跡番号として取り出す。 */
-function extractTrackingNumber(line: string): string | null {
+function extractCpassTrackingNumber(line: string): string | null {
   for (const carrier of CARRIERS) {
     const marker = `${carrier} `;
     const idx = line.indexOf(marker);
@@ -69,11 +69,106 @@ function extractTrackingNumber(line: string): string | null {
   return null;
 }
 
+/** RFC4180ライクな簡易CSVパーサ(ダブルクォート囲み・エスケープ""・フィールド内カンマ/改行に対応)。
+ *  eLogi出力CSVの「氏名」「ラベル用商品詳細」等、カンマや括弧を含む値がクォートされているため必要。 */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let field = "";
+  let row: string[] = [];
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (char === ",") {
+      row.push(field);
+      field = "";
+      i++;
+      continue;
+    }
+    if (char === "\r") {
+      i++;
+      continue;
+    }
+    if (char === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      i++;
+      continue;
+    }
+    field += char;
+    i++;
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((r) => !(r.length === 1 && r[0] === ""));
+}
+
+/**
+ * eLogi(送料支払CSVエクスポート)の「発送済一覧」CSVを解析する(送料登録タブ、2026-09-14新規)。
+ * 「eBayオーダー番号」列が空の行(複数商品まとめ発送等)は対象外とする。
+ * 追跡番号はCSVの「追跡番号」列の値をそのまま使用し(CPaSSの抽出値とは別物)、
+ * 送料支払額(円)は「初回請求金額」+「追加請求/返金金額」の合計とする。
+ */
+export function parseElogiCsv(text: string): ShippingImportRecord[] {
+  const rows = parseCsv(text.replace(/^﻿/, ""));
+  if (rows.length === 0) return [];
+  const header = rows[0];
+  const idx = (name: string) => header.indexOf(name);
+
+  const trackingIdx = idx("追跡番号");
+  const orderNoIdx = idx("eBayオーダー番号");
+  const firstFeeIdx = idx("初回請求金額");
+  const extraFeeIdx = idx("追加請求/返金金額");
+
+  if (trackingIdx === -1 || orderNoIdx === -1 || firstFeeIdx === -1 || extraFeeIdx === -1) {
+    throw new Error(
+      "CSVのヘッダーに「追跡番号」「eBayオーダー番号」「初回請求金額」「追加請求/返金金額」のいずれかが見つかりません",
+    );
+  }
+
+  const records: ShippingImportRecord[] = [];
+  for (const row of rows.slice(1)) {
+    const orderNo = (row[orderNoIdx] ?? "").trim();
+    const trackingNumber = (row[trackingIdx] ?? "").trim();
+    if (!orderNo || !trackingNumber) continue;
+
+    const firstFee = Number((row[firstFeeIdx] ?? "0").replace(/,/g, "").trim() || "0");
+    const extraFee = Number((row[extraFeeIdx] ?? "0").replace(/,/g, "").trim() || "0");
+    if (Number.isNaN(firstFee) || Number.isNaN(extraFee)) continue;
+
+    records.push({ orderNo, trackingNumber, shippingFeeJpy: firstFee + extraFee });
+  }
+  return records;
+}
+
 /** 解析結果を、eBay取引明細(ebay_transaction_lines.order_number)経由で販売済み商品と突合し、
- *  該当するsalesレコードのtracking_info・shipping_cost_paidを更新する。 */
-export async function registerCpassShipping(text: string): Promise<CpassShippingResult[]> {
-  const records = parseCpassShippingText(text);
-  const results: CpassShippingResult[] = [];
+ *  該当するsalesレコードのtracking_info・shipping_cost_paidを更新する(CPaSS・eLogi共通処理)。 */
+export async function applyShippingRecords(records: ShippingImportRecord[]): Promise<ShippingImportResult[]> {
+  const results: ShippingImportResult[] = [];
 
   for (const record of records) {
     const { data: line, error: lineError } = await supabase
@@ -139,4 +234,12 @@ export async function registerCpassShipping(text: string): Promise<CpassShipping
   }
 
   return results;
+}
+
+export async function registerCpassShipping(text: string): Promise<ShippingImportResult[]> {
+  return applyShippingRecords(parseCpassShippingText(text));
+}
+
+export async function registerElogiShipping(text: string): Promise<ShippingImportResult[]> {
+  return applyShippingRecords(parseElogiCsv(text));
 }

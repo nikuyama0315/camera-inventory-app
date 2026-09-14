@@ -1,7 +1,11 @@
-import { useState } from "react";
-import { registerCpassShipping, type CpassShippingResult } from "../../lib/api/cpassShipping";
+import { useRef, useState } from "react";
+import {
+  registerCpassShipping,
+  registerElogiShipping,
+  type ShippingImportResult,
+} from "../../lib/api/cpassShipping";
 
-const STATUS_LABELS: Record<CpassShippingResult["status"], string> = {
+const STATUS_LABELS: Record<ShippingImportResult["status"], string> = {
   success: "登録しました",
   not_found: "商品が見つかりません",
   not_sold: "販売済みではありません",
@@ -10,16 +14,20 @@ const STATUS_LABELS: Record<CpassShippingResult["status"], string> = {
 };
 
 /**
- * 「送料登録」タブ(2026-09-14新規)。CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面を
- * コピー&ペーストすると、ORDER NO.単位でeBay取引明細(ebay_transaction_lines)経由で
- * 販売済み商品と突合し、追跡番号(sales.tracking_info)・送料支払額(sales.shipping_cost_paid)を
- * 一括登録する。
+ * 「送料登録」タブ(2026-09-14新規)。
+ * ①CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面をコピー&ペーストすると、ORDER NO.単位で
+ *   eBay取引明細(ebay_transaction_lines)経由で販売済み商品と突合し、追跡番号(sales.tracking_info)・
+ *   送料支払額(sales.shipping_cost_paid)を一括登録する。
+ * ②eLogiの「発送済一覧」CSVを選択すると、同様にeBayオーダー番号列で突合し、CSVの「追跡番号」列を
+ *   tracking_infoに、「初回請求金額」+「追加請求/返金金額」の合計をshipping_cost_paidに登録する
+ *   (2026-09-14追加)。
  */
 export default function ShippingRegisterPanel() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [results, setResults] = useState<CpassShippingResult[] | null>(null);
+  const [results, setResults] = useState<ShippingImportResult[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleRegister() {
     setBusy(true);
@@ -35,6 +43,28 @@ export default function ShippingRegisterPanel() {
     }
   }
 
+  function handleElogiFileClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleElogiFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setErrorMessage(null);
+    setResults(null);
+    try {
+      const csvText = await file.text();
+      const r = await registerElogiShipping(csvText);
+      setResults(r);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "eLogiファイルの取り込みに失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const successCount = results?.filter((r) => r.status === "success").length ?? 0;
 
   return (
@@ -42,28 +72,45 @@ export default function ShippingRegisterPanel() {
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>送料登録</h3>
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面の内容をコピーして下のテキストボックスに貼り付け、
-        「CPaSS送料登録」を押してください。ORDER NO.をeBay取引明細と突合し、販売済みステータスの商品について
-        追跡番号・送料支払額(円)を一括登録します。
+        「CPaSS送料登録」を押してください。または、eLogiの発送済一覧CSVを「eLogiファイル選択」から取り込むこともできます。
+        いずれもeBayオーダー番号でeBay取引明細と突合し、販売済みステータスの商品について追跡番号・送料支払額(円)を一括登録します。
       </p>
 
-      <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-        CPaSS出荷画面貼付け
-      </label>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={16}
-        placeholder="CPaSSの出荷画面を全選択してコピーし、ここに貼り付けてください"
-        style={{ width: "100%", maxWidth: 720, fontSize: 12, fontFamily: "monospace", boxSizing: "border-box" }}
-      />
-      <div style={{ marginTop: 8 }}>
-        <button
-          onClick={() => void handleRegister()}
-          disabled={busy || !text.trim()}
-          style={{ fontSize: 12, padding: "4px 12px" }}
-        >
-          {busy ? "登録中..." : "CPaSS送料登録"}
-        </button>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+            CPaSS出荷画面貼付け
+          </label>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={16}
+            placeholder="CPaSSの出荷画面を全選択してコピーし、ここに貼り付けてください"
+            style={{ width: "100%", maxWidth: 720, fontSize: 12, fontFamily: "monospace", boxSizing: "border-box" }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={() => void handleRegister()}
+              disabled={busy || !text.trim()}
+              style={{ fontSize: 12, padding: "4px 12px" }}
+            >
+              {busy ? "登録中..." : "CPaSS送料登録"}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={(e) => void handleElogiFileChange(e)}
+            style={{ display: "none" }}
+          />
+          <button onClick={handleElogiFileClick} disabled={busy} style={{ fontSize: 12, padding: "4px 12px" }}>
+            eLogiファイル選択
+          </button>
+        </div>
       </div>
 
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 12 }}>{errorMessage}</p>}
@@ -75,7 +122,7 @@ export default function ShippingRegisterPanel() {
           </p>
           {results.length === 0 ? (
             <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              ORDER NO.を含む出荷情報が見つかりませんでした。貼り付け内容をご確認ください。
+              対象データが見つかりませんでした。貼り付け内容・ファイルの内容をご確認ください。
             </p>
           ) : (
             <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
