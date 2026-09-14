@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ExcelJS from "exceljs";
 import { lookupEbayOrdersLive } from "../../lib/api/ebaySync";
+import { fetchShippingCostByOrderNos } from "../../lib/api/sales";
 
 // テンプレート「利益管理表」の実データ範囲(既存の数式がF13:F302等を参照しているのに合わせる)
 const DATA_START_ROW = 13;
@@ -43,6 +44,10 @@ interface RowValuesResult {
   feesBasedOnUsd: number | null;
   plFeeUsd: number | null;
   purchasePriceJpy: number | null;
+  /** 送料・クーリエ・日本郵便(円)。eBay APIではなく当アプリのDB登録データ(送料登録タブ等)から
+   *  Order No突合で取得する。登録データがなければnull(画面・Excelともブランク表示)。
+   *  2026-09-14追加。 */
+  courierShippingJpy: number | null;
   listingStartDate: Date | null;
   purchaseDate: Date | null;
   buyerCountry: string | null;
@@ -166,6 +171,7 @@ export default function EbayXlsxFillPanel() {
 
       const lookups = await lookupEbayOrdersLive(targetOrderNos, "soulcamera");
       const lookupByOrderNo = new Map(lookups.map((l) => [l.orderNo, l]));
+      const courierShippingByOrderNo = await fetchShippingCostByOrderNos(targetOrderNos);
 
       const rowResults: RowFillResult[] = [];
       const rowValues: RowValuesResult[] = [];
@@ -198,6 +204,7 @@ export default function EbayXlsxFillPanel() {
           feesBasedOnUsd: lookup.orderTotalUsd ?? null,
           plFeeUsd: lookup.adFeeUsd ?? null,
           purchasePriceJpy: sku ? skuPurchasePrice(sku) : null,
+          courierShippingJpy: courierShippingByOrderNo.get(orderNo) ?? null,
           listingStartDate: sku ? parseSkuDate(sku, 10) : null,
           purchaseDate: sku ? parseSkuDate(sku, 0) : null,
           buyerCountry: lookup.buyerCountry ?? null,
@@ -251,6 +258,9 @@ export default function EbayXlsxFillPanel() {
           const purchasePrice = skuPurchasePrice(sku);
           if (purchasePrice != null) ws.getCell(`R${row}`).value = purchasePrice;
           else warnings.push("仕入値(R列)");
+
+          const courierShipping = courierShippingByOrderNo.get(orderNo);
+          if (courierShipping != null) ws.getCell(`S${row}`).value = courierShipping;
 
           const listingDate = parseSkuDate(sku, 10);
           if (listingDate) ws.getCell(`AA${row}`).value = listingDate;
@@ -364,6 +374,7 @@ export default function EbayXlsxFillPanel() {
                 <th style={{ padding: "4px" }}>Fees Based on</th>
                 <th style={{ padding: "4px" }}>PL手数料</th>
                 <th style={{ padding: "4px" }}>仕入値(税込)</th>
+                <th style={{ padding: "4px" }}>送料・クーリエ・日本郵便</th>
                 <th style={{ padding: "4px" }}>出品Start日</th>
                 <th style={{ padding: "4px" }}>仕入日</th>
                 <th style={{ padding: "4px" }}>発送先</th>
@@ -381,6 +392,7 @@ export default function EbayXlsxFillPanel() {
                   <ValueCell value={fmtNum(v.feesBasedOnUsd, 2)} width={95} />
                   <ValueCell value={fmtNum(v.plFeeUsd, 2)} width={85} />
                   <ValueCell value={fmtNum(v.purchasePriceJpy, 0)} width={95} />
+                  <ValueCell value={v.courierShippingJpy != null ? fmtNum(v.courierShippingJpy, 0) : ""} width={95} />
                   <ValueCell value={fmtDate(v.listingStartDate)} width={90} />
                   <ValueCell value={fmtDate(v.purchaseDate)} width={90} />
                   <ValueCell value={v.buyerCountry ?? "-"} width={70} />

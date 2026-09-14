@@ -459,3 +459,50 @@ export async function fetchSalesSummaryBreakdown(
 
   return { months, total: aggregateRows(rows) };
 }
+
+/**
+ * 指定したeBayオーダー番号のリストについて、eBay取引明細(ebay_transaction_lines.order_number)
+ * 経由で突合した商品のsales.shipping_cost_paid(送料・クーリエ・日本郵便)を取得する
+ * (利益管理票更新用データ作成、2026-09-14追加)。
+ * eBayのAPIには依らず、当アプリのDB登録データ(送料登録タブでの登録結果等)のみを参照する。
+ * 未突合、または登録額が0円(未登録扱い)の場合はMapにキーを含めない(呼び出し側でブランク表示する)。
+ */
+export async function fetchShippingCostByOrderNos(orderNos: string[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (orderNos.length === 0) return result;
+
+  const { data: lines, error: linesError } = await supabase
+    .from("ebay_transaction_lines")
+    .select("order_number, matched_item_id")
+    .in("order_number", orderNos)
+    .not("matched_item_id", "is", null);
+  if (linesError) throw linesError;
+
+  const itemIdByOrderNo = new Map<string, string>();
+  for (const l of lines ?? []) {
+    if (l.matched_item_id) itemIdByOrderNo.set(l.order_number, l.matched_item_id);
+  }
+  const itemIds = Array.from(new Set(itemIdByOrderNo.values()));
+  if (itemIds.length === 0) return result;
+
+  const { data: sales, error: salesError } = await supabase
+    .from("sales")
+    .select("item_id, shipping_cost_paid, created_at")
+    .in("item_id", itemIds)
+    .order("created_at", { ascending: false });
+  if (salesError) throw salesError;
+
+  const shippingByItemId = new Map<string, number>();
+  for (const s of sales ?? []) {
+    if (!shippingByItemId.has(s.item_id)) {
+      shippingByItemId.set(s.item_id, Number(s.shipping_cost_paid));
+    }
+  }
+
+  for (const [orderNo, itemId] of itemIdByOrderNo) {
+    const fee = shippingByItemId.get(itemId);
+    if (fee != null && fee > 0) result.set(orderNo, fee);
+  }
+  return result;
+}
+
