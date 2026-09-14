@@ -241,12 +241,35 @@ export async function createSale(input: CreateSaleInput, purchasePriceSnapshot: 
   // console.warnに留め、createSale自体は成功として扱う(triggerDriveFolderMove自体が元々持つ
   // 「ベストエフォート・エラーを外に投げない」方針と揃えた)。
   try {
-    const { error: statusError } = await supabase
+    const { data: updatedItem, error: statusError } = await supabase
       .from("items")
       .update({ status: "sold" })
-      .eq("id", input.item_id);
+      .eq("id", input.item_id)
+      .select("management_no")
+      .single();
     if (statusError) throw statusError;
     await triggerDriveFolderMove(input.item_id);
+
+    // 2026-09-15追加: his50s.com(Japan Retro Camera Wholesale)にも同じ商品が出品されている場合、
+    // 「売れた」をAPI通知し先方の在庫を減らす(保留中の見積があれば自動declineされる)。他プラット
+    // フォーム(eBay/メルカリ等)経由の売上も含め、当アプリで販売済みになった時点で必ず呼ぶ。
+    // his50sに出品していない商品がほとんどのため、not_listed応答は正常系(エラーではない)。
+    if (updatedItem?.management_no) {
+      supabase.functions
+        .invoke("notify-his50s-sold", {
+          body: { managementNo: updatedItem.management_no, saleId: data.id },
+        })
+        .then(({ error: notifyError }) => {
+          if (notifyError) {
+            // eslint-disable-next-line no-console
+            console.warn("his50sへの「売れた」通知に失敗しました(売上自体は登録済みです):", notifyError);
+          }
+        })
+        .catch((notifyErr) => {
+          // eslint-disable-next-line no-console
+          console.warn("his50sへの「売れた」通知に失敗しました(売上自体は登録済みです):", notifyErr);
+        });
+    }
   } catch (statusErr) {
     // eslint-disable-next-line no-console
     console.warn("売上登録後の商品ステータス自動更新に失敗しました(売上自体は登録済みです):", statusErr);
