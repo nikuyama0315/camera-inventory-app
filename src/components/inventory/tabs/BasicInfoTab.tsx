@@ -1,6 +1,6 @@
 import { ITEM_STATUS_LABELS, EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS } from "../../../lib/types";
 import type { ItemDetail, ItemStatus, EbayAccount } from "../../../lib/types";
-import { markItemArrived, updateItemBasicInfo } from "../../../lib/api/items";
+import { markItemArrived, updateItemBasicInfo, fetchDistinctBrandsAndModels } from "../../../lib/api/items";
 import { updatePurchase } from "../../../lib/api/purchases";
 import { updateSale } from "../../../lib/api/sales";
 import { upsertItemDriveFolder, fetchDriveFolderInfo } from "../../../lib/api/driveFolders";
@@ -78,6 +78,20 @@ interface EditForm {
 }
 
 export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingChange }: Props) {
+  // ブランド・機種名の入力候補(datalist、2026-09-15追加)。登録済み商品から一覧を1回だけ取得し、
+  // 既存候補から選択しつつ自由入力(新規登録)も可能にする(input list=属性によるネイティブcombobox)。
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  useEffect(() => {
+    fetchDistinctBrandsAndModels()
+      .then((opts) => {
+        setBrandOptions(opts.brands);
+        setModelOptions(opts.models);
+      })
+      .catch(() => {
+        /* 候補取得の失敗は致命的でないため無視(自由入力は引き続き可能) */
+      });
+  }, []);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -559,18 +573,30 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <EditField label="ブランド">
           <input
             type="text"
+            list="brand-options"
             value={editForm.brand}
             onChange={(e) => updateEdit("brand", e.target.value)}
             style={{ width: "100%" }}
           />
+          <datalist id="brand-options">
+            {brandOptions.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
         </EditField>
         <EditField label="機種名">
           <input
             type="text"
+            list="model-options"
             value={editForm.model}
             onChange={(e) => updateEdit("model", e.target.value)}
             style={{ width: "100%" }}
           />
+          <datalist id="model-options">
+            {modelOptions.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
         </EditField>
         <EditField label="シリアル番号">
           <input

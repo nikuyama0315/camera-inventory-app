@@ -484,3 +484,35 @@ export async function deleteItem(itemId: string): Promise<void> {
   const { error } = await supabase.from("items").delete().eq("id", itemId);
   if (error) throw error;
 }
+
+export interface BrandModelOptions {
+  brands: string[];
+  models: string[];
+}
+
+/** ブランド・機種名の入力候補(datalist用)を、登録済み商品から重複無しで取得する(2026-09-15追加)。
+ *  itemsは1000件を超えるため、PostgRESTのデフォルト上限を回避するrangeページネーションで全件走査する
+ *  (ebay-listing-check Edge Functionのfetch AllItems()と同じ対策)。 */
+export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions> {
+  const pageSize = 1000;
+  const brands = new Set<string>();
+  const models = new Set<string>();
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase.from("items").select("brand, model").range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    for (const row of rows) {
+      const b = (row.brand ?? "").trim();
+      if (b) brands.add(b);
+      const m = (row.model ?? "").trim();
+      if (m) models.add(m);
+    }
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return {
+    brands: Array.from(brands).sort((a, b) => a.localeCompare(b, "ja")),
+    models: Array.from(models).sort((a, b) => a.localeCompare(b, "ja")),
+  };
+}
