@@ -136,10 +136,17 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   const salesEmbed = needsSalesInnerJoin
     ? "sales!inner(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)"
     : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)";
+  // 出品者名・仕入日での絞り込み指定時のみ purchases を !inner 結合にする(2026-09-15追加、salesと同じ理由)。
+  const needsPurchasesInnerJoin = Boolean(
+    filters.sellerName || filters.purchaseDateFrom || filters.purchaseDateTo,
+  );
+  const purchasesEmbed = needsPurchasesInnerJoin
+    ? "purchases!inner(purchase_date, purchase_price, source_type, source_name)"
+    : "purchases(purchase_date, purchase_price, source_type, source_name)";
   let query = supabase
     .from("items")
     .select(
-      `id, management_no, category, brand, model, serial_number, title, status, created_at, updated_at, account, purchases(purchase_date, purchase_price, source_type, source_name), ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage)`,
+      `id, management_no, category, brand, model, serial_number, title, status, created_at, updated_at, account, ${purchasesEmbed}, ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage)`,
     );
 
   if (sort === "model_asc") {
@@ -194,6 +201,18 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   }
   if (filters.saleDateTo) {
     query = query.lte("sales.sale_date", filters.saleDateTo);
+  }
+  if (filters.purchaseTitle) {
+    query = query.ilike("title", `%${filters.purchaseTitle}%`);
+  }
+  if (filters.sellerName) {
+    query = query.ilike("purchases.source_name", `%${filters.sellerName}%`);
+  }
+  if (filters.purchaseDateFrom) {
+    query = query.gte("purchases.purchase_date", filters.purchaseDateFrom);
+  }
+  if (filters.purchaseDateTo) {
+    query = query.lte("purchases.purchase_date", filters.purchaseDateTo);
   }
   return query;
 }

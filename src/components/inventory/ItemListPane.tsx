@@ -153,6 +153,43 @@ export default function ItemListPane({
             </div>
           </div>
         </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input
+            type="text"
+            placeholder="仕入品名"
+            value={filters.purchaseTitle ?? ""}
+            onChange={(e) => onFiltersChange({ ...filters, purchaseTitle: e.target.value || undefined })}
+            style={{ flex: 1 }}
+          />
+          <input
+            type="text"
+            placeholder="出品者名"
+            value={filters.sellerName ?? ""}
+            onChange={(e) => onFiltersChange({ ...filters, sellerName: e.target.value || undefined })}
+            style={{ flex: 1 }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+            <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>仕入日</label>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="date"
+                value={filters.purchaseDateFrom ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, purchaseDateFrom: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>〜</span>
+              <input
+                type="date"
+                value={filters.purchaseDateTo ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, purchaseDateTo: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+            </div>
+          </div>
+          <div style={{ flex: 1 }} />
+        </div>
         <button onClick={onStartNewItem} style={{ width: "100%" }}>
           + 新規登録
         </button>
