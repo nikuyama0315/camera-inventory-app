@@ -4,6 +4,8 @@ export interface ModelDriveStockCount {
   model_folder_name: string;
   in_stock_count: number;
   checked_at: string;
+  /** Google Drive上の機種名フォルダ自体のフォルダID(sync-drive-stock-countsが在庫数取得時に記録) */
+  drive_folder_id: string | null;
 }
 
 export interface ModelStockAlertSetting {
@@ -25,7 +27,12 @@ export interface ModelStockRow {
   checked_at: string | null;
   /** 仕入中(発注済み・未入荷)の数量。機種名フォルダに紐づけて手動入力する(2026-09-13追加) */
   purchasing_count: number;
-  /** 機種名フォルダに対応するGoogle DriveフォルダのURL。未登録ならnull(2026-09-15追加) */
+  /**
+   * 機種名フォルダに対応するGoogle DriveフォルダのURL。
+   * model_stock_alert_settingsに手動登録されたURLがあればそれを優先し、無ければ
+   * model_drive_stock_counts.drive_folder_id(Google Drive実フォルダのスキャンで自動取得した
+   * フォルダID)から組み立てたURLを使う。どちらも無ければnull(2026-09-15追加)。
+   */
   drive_folder_url: string | null;
 }
 
@@ -93,6 +100,10 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
       const count = countMap.get(key);
       const threshold = thresholdMap.get(key) ?? 1;
       const inStockCount = count?.in_stock_count ?? 0;
+      const manualDriveUrl = driveUrlMap.get(key);
+      const autoDriveUrl = count?.drive_folder_id
+        ? `https://drive.google.com/drive/folders/${count.drive_folder_id}`
+        : null;
       return {
         model_folder_name: displayNameMap.get(key) ?? key,
         in_stock_count: inStockCount,
@@ -100,7 +111,7 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
         belowThreshold: inStockCount < threshold,
         checked_at: count?.checked_at ?? null,
         purchasing_count: purchasingMap.get(key) ?? 0,
-        drive_folder_url: driveUrlMap.get(key) ?? null,
+        drive_folder_url: (manualDriveUrl && manualDriveUrl.trim()) ? manualDriveUrl : autoDriveUrl,
       };
     })
     .sort((a, b) => a.model_folder_name.localeCompare(b.model_folder_name));
