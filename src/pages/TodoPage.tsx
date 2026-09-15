@@ -26,6 +26,9 @@ import {
  *  App.tsx側でURLクエリ`?view=todo`を検出したとき、通常のタブ画面の代わりにこのページを描画する
  *  (認証セッションはSupabaseクライアントのlocalStorage永続化により同一オリジンの別ウィンドウでも共有される)。 */
 export default function TodoPage() {
+  // 件名一覧のゼブラ表示用(2026-09-15追加)。renderNode内で参照するカウンタ(親子構造を無視し、
+  // 画面表示順に1行ごとインクリメントする)。毎レンダーの描画直前にrootTodosの手前で0にリセットする。
+  const zebraIndexRef = useRef(0);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -608,6 +611,10 @@ export default function TodoPage() {
     const isMemoDirty = memoValue !== (todo.memo ?? "");
     const isSavingMemo = savingMemoFor === todo.id;
     const isEditingDue = editingDueForId === todo.id;
+    // 件名一覧のゼブラ表示用(2026-09-15追加)。階層(親子)構造を無視し、実際に画面へ表示される
+    // 行の上から順番(深さ優先)で1行ごとに背景色を交互にする。
+    const zebraRowIndex = zebraIndexRef.current++;
+    const isZebraRow = zebraRowIndex % 2 === 1;
 
     return (
       <div key={todo.id}>
@@ -623,7 +630,7 @@ export default function TodoPage() {
             padding: "5px 4px",
             marginLeft: depth * 22,
             borderRadius: 6,
-            background: isDragOver ? "var(--surface-1)" : undefined,
+            background: isDragOver ? "var(--surface-1)" : isZebraRow ? "var(--surface-1)" : undefined,
             outline: isDragOver ? "2px dashed var(--accent, #185fa5)" : "none",
           }}
         >
@@ -993,6 +1000,7 @@ export default function TodoPage() {
     );
   }
 
+  zebraIndexRef.current = 0;
   const rootTodos = childrenByParent.get(null) ?? [];
 
   return (
