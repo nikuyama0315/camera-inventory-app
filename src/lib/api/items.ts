@@ -138,7 +138,7 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
     : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)";
   // 出品者名・仕入日での絞り込み指定時のみ purchases を !inner 結合にする(2026-09-15追加、salesと同じ理由)。
   const needsPurchasesInnerJoin = Boolean(
-    filters.sellerName || filters.purchaseDateFrom || filters.purchaseDateTo,
+    filters.sourceType || filters.sellerName || filters.purchaseDateFrom || filters.purchaseDateTo,
   );
   const purchasesEmbed = needsPurchasesInnerJoin
     ? "purchases!inner(purchase_date, purchase_price, source_type, source_name)"
@@ -204,6 +204,9 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   }
   if (filters.purchaseTitle) {
     query = query.ilike("title", `%${filters.purchaseTitle}%`);
+  }
+  if (filters.sourceType) {
+    query = query.eq("purchases.source_type", filters.sourceType);
   }
   if (filters.sellerName) {
     query = query.ilike("purchases.source_name", `%${filters.sellerName}%`);

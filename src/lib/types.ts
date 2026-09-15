@@ -175,6 +175,9 @@ export interface ItemListFilters {
   saleDateTo?: string;
   /** 仕入品名(items.title)での絞り込み(部分一致、2026-09-15追加)。 */
   purchaseTitle?: string;
+  /** 仕入先種別(purchases.source_type、SOURCE_TYPE_OPTIONSの値)での絞り込み(完全一致、2026-09-15追加)。
+   *  指定時は仕入(purchases)が登録済みの商品のみが対象になる(未仕入の商品は結果から除外される)。 */
+  sourceType?: string;
   /** 仕入先・出品者名(purchases.source_name)での絞り込み(部分一致、2026-09-15追加)。指定時は
    *  仕入(purchases)が登録済みの商品のみが対象になる(未仕入の商品は結果から除外される)。 */
   sellerName?: string;
