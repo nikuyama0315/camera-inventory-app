@@ -25,6 +25,8 @@ export interface ModelStockRow {
   checked_at: string | null;
   /** 仕入中(発注済み・未入荷)の数量。機種名フォルダに紐づけて手動入力する(2026-09-13追加) */
   purchasing_count: number;
+  /** 機種名フォルダに対応するGoogle DriveフォルダのURL。未登録ならnull(2026-09-15追加) */
+  drive_folder_url: string | null;
 }
 
 /** 機種名の表記ゆれ(大文字小文字・前後の空白)を吸収するための正規化キー */
@@ -50,7 +52,7 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
 
   const { data: settings, error: settingsError } = await supabase
     .from("model_stock_alert_settings")
-    .select("model_folder_name, threshold, purchasing_count")
+    .select("model_folder_name, threshold, purchasing_count, drive_folder_url")
     .order("model_folder_name");
   if (settingsError) throw settingsError;
 
@@ -62,11 +64,18 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
   }
   const thresholdMap = new Map<string, number>();
   const purchasingMap = new Map<string, number>();
+  const driveUrlMap = new Map<string, string | null>();
   const displayNameMap = new Map<string, string>();
-  for (const s of settings as { model_folder_name: string; threshold: number; purchasing_count: number }[]) {
+  for (const s of settings as {
+    model_folder_name: string;
+    threshold: number;
+    purchasing_count: number;
+    drive_folder_url: string | null;
+  }[]) {
     const key = normalizeModelName(s.model_folder_name);
     thresholdMap.set(key, s.threshold);
     purchasingMap.set(key, s.purchasing_count);
+    driveUrlMap.set(key, s.drive_folder_url);
     displayNameMap.set(key, s.model_folder_name);
   }
   // しきい値設定がまだ無い機種(Drive上のフォルダのみ存在)は、Drive側の表記をそのまま表示名に使う。
@@ -91,6 +100,7 @@ export async function fetchModelStockOverview(): Promise<ModelStockRow[]> {
         belowThreshold: inStockCount < threshold,
         checked_at: count?.checked_at ?? null,
         purchasing_count: purchasingMap.get(key) ?? 0,
+        drive_folder_url: driveUrlMap.get(key) ?? null,
       };
     })
     .sort((a, b) => a.model_folder_name.localeCompare(b.model_folder_name));
@@ -134,6 +144,63 @@ export async function upsertPurchasingCount(modelFolderName: string, purchasingC
       { onConflict: "model_folder_name" },
     );
   if (error) throw error;
+}
+
+/**
+ * 機種名フォルダに対応するGoogle DriveフォルダのURLを保存する(在庫アラート画面、2026-09-15追加)。
+ * しきい値設定が未登録の機種名でも保存できるよう、model_stock_alert_settingsにupsertする。
+ */
+export async function upsertDriveFolderUrl(modelFolderName: string, driveFolderUrl: string): Promise<void> {
+  const { error } = await supabase
+    .from("model_stock_alert_settings")
+    .upsert(
+      { model_folder_name: modelFolderName, drive_folder_url: driveFolderUrl || null },
+      { onConflict: "model_folder_name" },
+    );
+  if (error) throw error;
+}
+
+/**
+ * 機種名フォルダ名自体を変更する(在庫アラート画面、2026-09-15追加)。
+ * model_stock_alert_settingsの主キー(model_folder_name)を直接UPDATEするのではなく、
+ * 現在表示されているしきい値・仕入中・Driveフォルダ URLを新しい名前でupsertしたうえで
+ * 旧い名前の行を削除する(旧名の設定行がまだ無い場合=Drive在庫側にしか存在しない機種の削除は
+ * 0件ヒットで無害に終わる)。
+ *
+ * 【注意】ここで変更されるのはアプリ内の管理名(しきい値・仕入中設定のキー)のみであり、
+ * Google Drive上の実フォルダ名は変更しない。在庫数はGoogle Drive側の実フォルダ名と
+ * 完全一致した場合のみ連動するため、実フォルダ名も合わせて変更しないと、次回の
+ * 「Google Driveから最新の在庫数を取得」時に在庫数が0件表示に戻る可能性がある
+ * (新規機種を在庫0件で先に登録できる仕様と同じ挙動)。
+ */
+export async function renameModelFolder(
+  oldName: string,
+  newName: string,
+  currentThreshold: number,
+  currentPurchasingCount: number,
+  currentDriveFolderUrl: string | null,
+): Promise<void> {
+  const { error: upsertError } = await supabase
+    .from("model_stock_alert_settings")
+    .upsert(
+      {
+        model_folder_name: newName,
+        threshold: currentThreshold,
+        purchasing_count: currentPurchasingCount,
+        drive_folder_url: currentDriveFolderUrl,
+        last_known_count: null,
+      },
+      { onConflict: "model_folder_name" },
+    );
+  if (upsertError) throw upsertError;
+
+  if (oldName !== newName) {
+    const { error: deleteError } = await supabase
+      .from("model_stock_alert_settings")
+      .delete()
+      .eq("model_folder_name", oldName);
+    if (deleteError) throw deleteError;
+  }
 }
 
 /**

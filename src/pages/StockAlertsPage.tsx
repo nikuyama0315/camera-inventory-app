@@ -4,6 +4,8 @@ import {
   fetchModelStockOverview,
   syncDriveStockCounts,
   deleteStockThreshold,
+  renameModelFolder,
+  upsertDriveFolderUrl,
   upsertPurchasingCount,
   upsertStockThreshold,
   type ModelStockRow,
@@ -29,6 +31,16 @@ export default function StockAlertsPage() {
   const [purchasingValues, setPurchasingValues] = useState<Record<string, string>>({});
   const [savingPurchasing, setSavingPurchasing] = useState<string | null>(null);
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
+
+  // 機種名フォルダ名自体の編集中の値・保存状態(2026-09-15追加)
+  const [modelNameEditValues, setModelNameEditValues] = useState<Record<string, string>>({});
+  const [savingModelName, setSavingModelName] = useState<string | null>(null);
+  const [savedModelName, setSavedModelName] = useState<string | null>(null);
+
+  // 機種名フォルダごとの編集中Google DriveフォルダURL・保存状態(2026-09-15追加)
+  const [driveUrlValues, setDriveUrlValues] = useState<Record<string, string>>({});
+  const [savingDriveUrl, setSavingDriveUrl] = useState<string | null>(null);
+  const [savedDriveUrl, setSavedDriveUrl] = useState<string | null>(null);
 
   // 新規機種名(在庫0件でも先にしきい値を登録できる)
   const [newModelName, setNewModelName] = useState("");
@@ -59,6 +71,22 @@ export default function StockAlertsPage() {
         const next = { ...prev };
         for (const r of data) {
           next[r.model_folder_name] = String(r.purchasing_count);
+        }
+        return next;
+      });
+      setModelNameEditValues((prev) => {
+        const next = { ...prev };
+        for (const r of data) {
+          if (next[r.model_folder_name] === undefined) {
+            next[r.model_folder_name] = r.model_folder_name;
+          }
+        }
+        return next;
+      });
+      setDriveUrlValues((prev) => {
+        const next = { ...prev };
+        for (const r of data) {
+          next[r.model_folder_name] = r.drive_folder_url ?? "";
         }
         return next;
       });
@@ -97,6 +125,64 @@ export default function StockAlertsPage() {
     } finally {
       setSavingModel(null);
     }
+  }
+
+  function updateModelNameValue(modelFolderName: string, value: string) {
+    setModelNameEditValues((prev) => ({ ...prev, [modelFolderName]: value }));
+    setSavedModelName(null);
+  }
+
+  async function handleSaveModelName(oldName: string) {
+    const newName = (modelNameEditValues[oldName] ?? oldName).trim();
+    if (!newName) {
+      setErrorMessage("機種名フォルダ名を入力してください");
+      return;
+    }
+    if (newName !== oldName && rows.some((r) => r.model_folder_name === newName)) {
+      setErrorMessage("この機種名は既に登録されています");
+      return;
+    }
+    const row = rows.find((r) => r.model_folder_name === oldName);
+    if (!row) return;
+    setSavingModelName(oldName);
+    setErrorMessage(null);
+    try {
+      await renameModelFolder(oldName, newName, row.threshold, row.purchasing_count, row.drive_folder_url);
+      await reload();
+      setSavedModelName(newName);
+      setTimeout(() => setSavedModelName((cur) => (cur === newName ? null : cur)), 2000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "機種名の変更に失敗しました");
+    } finally {
+      setSavingModelName(null);
+    }
+  }
+
+  function updateDriveUrlValue(modelFolderName: string, value: string) {
+    setDriveUrlValues((prev) => ({ ...prev, [modelFolderName]: value }));
+    setSavedDriveUrl(null);
+  }
+
+  async function handleSaveDriveUrl(modelFolderName: string) {
+    const value = (driveUrlValues[modelFolderName] ?? "").trim();
+    setSavingDriveUrl(modelFolderName);
+    setErrorMessage(null);
+    try {
+      await upsertDriveFolderUrl(modelFolderName, value);
+      await reload();
+      setSavedDriveUrl(modelFolderName);
+      setTimeout(() => setSavedDriveUrl((cur) => (cur === modelFolderName ? null : cur)), 2000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Google DriveフォルダURLの保存に失敗しました");
+    } finally {
+      setSavingDriveUrl(null);
+    }
+  }
+
+  function handleOpenDriveFolder(modelFolderName: string) {
+    const url = (driveUrlValues[modelFolderName] ?? "").trim();
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   function updatePurchasingValue(modelFolderName: string, value: string) {
@@ -335,6 +421,7 @@ export default function StockAlertsPage() {
               >
                 機種名フォルダ {sortOrder === "asc" ? "▲" : "▼"}
               </th>
+              <th style={{ padding: "6px 4px", fontWeight: 500 }}>Driveフォルダ</th>
               <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>在庫数</th>
               <th style={{ padding: "6px 4px", fontWeight: 500, textAlign: "right" }}>しきい値</th>
               <th style={{ padding: "6px 4px", fontWeight: 500 }}></th>
@@ -353,12 +440,73 @@ export default function StockAlertsPage() {
               const purchasingValue = purchasingValues[r.model_folder_name] ?? String(r.purchasing_count);
               const isSavingPurchasing = savingPurchasing === r.model_folder_name;
               const isDirtyPurchasing = purchasingValue !== String(r.purchasing_count);
+              const modelNameValue = modelNameEditValues[r.model_folder_name] ?? r.model_folder_name;
+              const isDirtyModelName = modelNameValue !== r.model_folder_name;
+              const isSavingModelName = savingModelName === r.model_folder_name;
+              const isSavedModelName = savedModelName === r.model_folder_name;
+              const driveUrlValue = driveUrlValues[r.model_folder_name] ?? r.drive_folder_url ?? "";
+              const isDirtyDriveUrl = driveUrlValue !== (r.drive_folder_url ?? "");
+              const isSavingDriveUrl = savingDriveUrl === r.model_folder_name;
+              const isSavedDriveUrl = savedDriveUrl === r.model_folder_name;
               return (
                 <tr
                   key={r.model_folder_name}
                   style={{ borderTop: "0.5px solid var(--border)", background: zebraBackground }}
                 >
-                  <td style={{ padding: "8px 4px" }}>{r.model_folder_name}</td>
+                  <td style={{ padding: "8px 4px" }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="text"
+                        value={modelNameValue}
+                        onChange={(e) => updateModelNameValue(r.model_folder_name, e.target.value)}
+                        disabled={isSavingModelName}
+                        style={{ flex: 1, minWidth: 120 }}
+                      />
+                      {isDirtyModelName && (
+                        <button
+                          onClick={() => handleSaveModelName(r.model_folder_name)}
+                          disabled={isSavingModelName}
+                          style={{ fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}
+                        >
+                          {isSavingModelName ? "保存中..." : "保存"}
+                        </button>
+                      )}
+                      {!isDirtyModelName && isSavedModelName && (
+                        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>保存しました</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ padding: "8px 4px" }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="text"
+                        placeholder="https://drive.google.com/..."
+                        value={driveUrlValue}
+                        onChange={(e) => updateDriveUrlValue(r.model_folder_name, e.target.value)}
+                        disabled={isSavingDriveUrl}
+                        style={{ flex: 1, minWidth: 160 }}
+                      />
+                      <button
+                        onClick={() => handleOpenDriveFolder(r.model_folder_name)}
+                        disabled={!driveUrlValue.trim()}
+                        style={{ fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}
+                      >
+                        フォルダを開く
+                      </button>
+                      {isDirtyDriveUrl && (
+                        <button
+                          onClick={() => handleSaveDriveUrl(r.model_folder_name)}
+                          disabled={isSavingDriveUrl}
+                          style={{ fontSize: 12, padding: "3px 10px", whiteSpace: "nowrap" }}
+                        >
+                          {isSavingDriveUrl ? "保存中..." : "保存"}
+                        </button>
+                      )}
+                      {!isDirtyDriveUrl && isSavedDriveUrl && (
+                        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>保存しました</span>
+                      )}
+                    </div>
+                  </td>
                   <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: 500 }}>{r.in_stock_count}</td>
                   <td style={{ padding: "8px 4px", textAlign: "right" }}>
                     <input
