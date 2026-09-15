@@ -530,6 +530,8 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
             <col style={{ width: "7%" }} />
             <col style={{ width: "8%" }} />
             <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
             <col style={{ width: "6%" }} />
             <col style={{ width: "7%" }} />
             <col style={{ width: "8%" }} />
@@ -554,6 +556,8 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                   （合計：{totalPurchasePrice.toLocaleString()}円）
                 </div>
               </th>
+              <th style={{ padding: "6px 8px", textAlign: "right" }}>邦プラットフォーム販売価格</th>
+              <th style={{ padding: "6px 8px", textAlign: "right" }}>粗利</th>
               {COLUMNS_AFTER_PRICE.map((col) => (
                 <th
                   key={col.key}
@@ -573,7 +577,7 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                   width: 150,
                   minWidth: 150,
                   background: "var(--surface-2)",
-                  borderLeft: "1px solid var(--border)",
+                  borderLeft: "1px solid transparent",
                   zIndex: 2,
                 }}
               >
@@ -653,6 +657,12 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                 <td style={{ padding: "8px", textAlign: "right" }}>
                   {item.purchase_price != null ? `¥${item.purchase_price.toLocaleString()}` : "-"}
                 </td>
+                <td style={{ padding: "8px", textAlign: "right" }}>
+                  {item.jp_platform_price != null ? `¥${Math.round(item.jp_platform_price).toLocaleString()}` : "-"}
+                </td>
+                <td style={{ padding: "8px", textAlign: "right" }}>
+                  {item.gross_profit_jpy != null ? `¥${Math.round(item.gross_profit_jpy).toLocaleString()}` : "-"}
+                </td>
                 <td style={{ padding: "8px" }}>{item.sale_date ?? "-"}</td>
                 <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
                   {item.sale_item_title ?? "-"}
@@ -684,7 +694,7 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                     width: 150,
                     minWidth: 150,
                     background: rowIndex % 2 === 1 ? "var(--surface-1)" : "var(--surface-2)",
-                    borderLeft: "1px solid var(--border)",
+                    borderLeft: "1px solid transparent",
                     zIndex: 1,
                   }}
                   onClick={(e) => e.stopPropagation()}

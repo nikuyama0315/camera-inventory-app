@@ -110,6 +110,10 @@ export interface ItemWithPurchase extends Item {
   tracking_info: string | null;
   /** 直近の売上(sales)レコードの送料支払額(sales.shipping_cost_paid)。未販売ならnull。2026-09-10追加。 */
   shipping_cost_paid: number | null;
+  /** 直近の売上(sales)レコードの邦プラットフォーム販売価格(sales.jp_platform_price)。未販売ならnull。2026-09-15追加。 */
+  jp_platform_price: number | null;
+  /** 直近の売上(sales)レコードの粗利(sales.gross_profit_jpy、DB側の生成列)。未販売ならnull。2026-09-15追加。 */
+  gross_profit_jpy: number | null;
   drive_folder_id: string | null;
   drive_folder_path: string | null;
   drive_model_folder_name: string | null;
@@ -134,8 +138,8 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
       filters.status === "sold_missing_shipping_tracking",
   );
   const salesEmbed = needsSalesInnerJoin
-    ? "sales!inner(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)"
-    : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid)";
+    ? "sales!inner(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid, jp_platform_price, gross_profit_jpy)"
+    : "sales(sale_date, sale_item_title, sales_record_reference, tracking_info, shipping_cost_paid, jp_platform_price, gross_profit_jpy)";
   // 出品者名・仕入日での絞り込み指定時のみ purchases を !inner 結合にする(2026-09-15追加、salesと同じ理由)。
   const needsPurchasesInnerJoin = Boolean(
     filters.sourceType || filters.sellerName || filters.purchaseDateFrom || filters.purchaseDateTo,
@@ -289,8 +293,24 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
         | { purchase_date: string; purchase_price: number; source_type: string | null; source_name: string | null }[]
         | null;
       sales:
-        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null; shipping_cost_paid: number | null }[]
-        | { sale_date: string; sale_item_title: string | null; sales_record_reference: string | null; tracking_info: string | null; shipping_cost_paid: number | null }
+        | {
+            sale_date: string;
+            sale_item_title: string | null;
+            sales_record_reference: string | null;
+            tracking_info: string | null;
+            shipping_cost_paid: number | null;
+            jp_platform_price: number | null;
+            gross_profit_jpy: number | null;
+          }[]
+        | {
+            sale_date: string;
+            sale_item_title: string | null;
+            sales_record_reference: string | null;
+            tracking_info: string | null;
+            shipping_cost_paid: number | null;
+            jp_platform_price: number | null;
+            gross_profit_jpy: number | null;
+          }
         | null;
       item_drive_folders:
         | { drive_folder_id: string | null; drive_folder_path: string; model_folder_name: string | null; item_folder_name: string | null; current_stage: string | null }
@@ -314,6 +334,8 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
       sales_record_reference: latestSale?.sales_record_reference ?? null,
       tracking_info: latestSale?.tracking_info ?? null,
       shipping_cost_paid: latestSale?.shipping_cost_paid ?? null,
+      jp_platform_price: latestSale?.jp_platform_price ?? null,
+      gross_profit_jpy: latestSale?.gross_profit_jpy ?? null,
       drive_folder_id: driveFolder?.drive_folder_id ?? null,
       drive_folder_path: driveFolder?.drive_folder_path ?? null,
       drive_model_folder_name: driveFolder?.model_folder_name ?? null,
