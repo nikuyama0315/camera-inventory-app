@@ -21,6 +21,9 @@ const SOURCE_LABELS: Record<string, string> = {
   // 2026-09-10追加: ebay-automation側のevent_notifier.py(受注・メッセージ・返品・キャンセル・
   // INR問い合わせ・ケース・フィードバックをまとめて通知)由来のログ。
   "event_notifier": "eBay通知",
+  // 2026-09-15追加: notify-his50s-sold Edge Function(売上登録時にhis50s.comへ「売れた」を通知し
+  // 在庫を削除した結果)由来のログ。
+  "notify-his50s-sold": "his50s通知",
 };
 
 export function eventSourceLabel(source: string): string {
