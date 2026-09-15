@@ -534,7 +534,7 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
             <col style={{ width: "7%" }} />
             <col style={{ width: "8%" }} />
             <col style={{ width: "7%" }} />
-            <col style={{ width: "5%" }} />
+            <col style={{ width: "15%" }} />
           </colgroup>
           <thead>
             <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
@@ -565,8 +565,20 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                 </th>
               ))}
               <th style={{ padding: "6px 8px" }}>フォルダ</th>
-              <th style={{ padding: "6px 8px" }}>削除</th>
-              <th style={{ padding: "6px 8px" }}>複写</th>
+              <th
+                style={{
+                  padding: "6px 8px",
+                  position: "sticky",
+                  right: 0,
+                  width: 150,
+                  minWidth: 150,
+                  background: "var(--surface-2)",
+                  borderLeft: "1px solid var(--border)",
+                  zIndex: 2,
+                }}
+              >
+                操作
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -664,22 +676,34 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                     );
                   })()}
                 </td>
-                <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => void handleDeleteItem(item)}
-                    disabled={deletingItemId === item.id}
-                    style={{ fontSize: 11, padding: "2px 8px", color: "var(--danger-text)" }}
-                  >
-                    {deletingItemId === item.id ? "削除中..." : "削除"}
-                  </button>
-                </td>
-                <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => onCopyAsNew?.(item.id)}
-                    style={{ fontSize: 11, padding: "2px 8px" }}
-                  >
-                    複写して登録
-                  </button>
+                <td
+                  style={{
+                    padding: "8px",
+                    position: "sticky",
+                    right: 0,
+                    width: 150,
+                    minWidth: 150,
+                    background: rowIndex % 2 === 1 ? "var(--surface-1)" : "var(--surface-2)",
+                    borderLeft: "1px solid var(--border)",
+                    zIndex: 1,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      onClick={() => void handleDeleteItem(item)}
+                      disabled={deletingItemId === item.id}
+                      style={{ fontSize: 11, padding: "2px 8px", color: "var(--danger-text)" }}
+                    >
+                      {deletingItemId === item.id ? "削除中..." : "削除"}
+                    </button>
+                    <button
+                      onClick={() => onCopyAsNew?.(item.id)}
+                      style={{ fontSize: 11, padding: "2px 8px" }}
+                    >
+                      複写して登録
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
