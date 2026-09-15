@@ -32,6 +32,9 @@ export default function InventoryPage() {
   const [valuationSummary, setValuationSummary] = useState<InventoryValuationSummary | null>(null);
   /** 一覧表示モードで行をクリックした際に、画面遷移せずその場で編集するためのモーダル対象商品ID(2026-09-03追加)。 */
   const [modalItemId, setModalItemId] = useState<string | null>(null);
+  /** 一覧表示モードの行にある「複写して登録」ボタン押下時、画面遷移せずその場で新規登録モーダルを
+   *  開くためのコピー元商品ID(2026-09-15追加)。modalItemIdとは排他(どちらか一方のみ立つ)。 */
+  const [modalCopySourceItemId, setModalCopySourceItemId] = useState<string | null>(null);
   /** 「複写して新規作成」で選択した、コピー元とする既存商品ID(2026-09-04追加)。詳細編集(split)モードの
    *  ItemDetailPaneにのみ渡し、一覧表示モードのモーダル編集には渡さない(仕様上、複写元は詳細編集画面から
    *  しか選べないため)。 */
@@ -111,6 +114,24 @@ export default function InventoryPage() {
   async function handleModalItemDeleted() {
     setModalItemId(null);
     await reloadList();
+  }
+
+  /** 「一覧表示」モードの行の「複写して登録」ボタン押下時のハンドラ(2026-09-15追加)。
+   *  画面遷移(詳細編集モードへの切り替え)はせず、その場でモーダルを新規登録+コピー元指定モードで開く。 */
+  function handleOpenCopyModal(sourceItemId: string) {
+    setModalItemId(null);
+    setModalCopySourceItemId(sourceItemId);
+  }
+
+  /** モーダルでの新規登録(複写して登録)が完了した後のハンドラ(2026-09-15追加)。モーダルを閉じて一覧を再取得する。 */
+  async function handleModalItemCreated() {
+    setModalCopySourceItemId(null);
+    await reloadList();
+  }
+
+  function handleCloseModal() {
+    setModalItemId(null);
+    setModalCopySourceItemId(null);
   }
 
   return (
@@ -270,14 +291,15 @@ export default function InventoryPage() {
             errorMessage={errorMessage}
             onSelectItem={setModalItemId}
             onItemChanged={reloadList}
+            onCopyAsNew={handleOpenCopyModal}
           />
         </div>
       )}
 
-      {modalItemId && (
+      {(modalItemId || modalCopySourceItemId) && (
         <>
           <div
-            onClick={() => setModalItemId(null)}
+            onClick={handleCloseModal}
             style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000 }}
           />
           <div
@@ -299,20 +321,27 @@ export default function InventoryPage() {
             }}
           >
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button
-                onClick={() => setModalItemId(null)}
-                style={{ fontSize: 12, padding: "4px 10px" }}
-              >
+              <button onClick={handleCloseModal} style={{ fontSize: 12, padding: "4px 10px" }}>
                 閉じる
               </button>
             </div>
-            <ItemDetailPane
-              itemId={modalItemId}
-              isCreatingNew={false}
-              onItemCreated={() => {}}
-              onItemChanged={reloadList}
-              onItemDeleted={handleModalItemDeleted}
-            />
+            {modalCopySourceItemId ? (
+              <ItemDetailPane
+                itemId={null}
+                isCreatingNew={true}
+                copySourceItemId={modalCopySourceItemId}
+                onItemCreated={handleModalItemCreated}
+                onItemChanged={reloadList}
+              />
+            ) : (
+              <ItemDetailPane
+                itemId={modalItemId}
+                isCreatingNew={false}
+                onItemCreated={() => {}}
+                onItemChanged={reloadList}
+                onItemDeleted={handleModalItemDeleted}
+              />
+            )}
           </div>
         </>
       )}

@@ -10,6 +10,9 @@ interface Props {
   onSelectItem: (itemId: string) => void;
   /** ステータス・カテゴリをこの一覧上のプルダウンから直接修正した後、呼び出し元に一覧の再取得を促す。 */
   onItemChanged?: () => void | Promise<void>;
+  /** 行の「複写して登録」ボタン押下時に、その商品をコピー元として新規登録モーダルを開くよう
+   *  呼び出し元(InventoryPage)に伝える(2026-09-15追加)。 */
+  onCopyAsNew?: (itemId: string) => void;
 }
 
 type SortColumn =
@@ -161,7 +164,7 @@ const EMPTY_FILTERS: TableFilters = {
 
 const STATUS_OPTIONS = Object.entries(ITEM_STATUS_LABELS) as [ItemStatus, string][];
 
-export default function ItemTableView({ items, loading, errorMessage, onSelectItem, onItemChanged }: Props) {
+export default function ItemTableView({ items, loading, errorMessage, onSelectItem, onItemChanged, onCopyAsNew }: Props) {
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filters, setFilters] = useState<TableFilters>(EMPTY_FILTERS);
@@ -563,6 +566,7 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
               ))}
               <th style={{ padding: "6px 8px" }}>フォルダ</th>
               <th style={{ padding: "6px 8px" }}>削除</th>
+              <th style={{ padding: "6px 8px" }}>複写</th>
             </tr>
           </thead>
           <tbody>
@@ -667,6 +671,14 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                     style={{ fontSize: 11, padding: "2px 8px", color: "var(--danger-text)" }}
                   >
                     {deletingItemId === item.id ? "削除中..." : "削除"}
+                  </button>
+                </td>
+                <td style={{ padding: "8px" }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => onCopyAsNew?.(item.id)}
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    複写して登録
                   </button>
                 </td>
               </tr>
