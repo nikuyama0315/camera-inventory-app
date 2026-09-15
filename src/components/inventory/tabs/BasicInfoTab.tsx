@@ -310,6 +310,11 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
           sales_record_reference: editForm.sales_record_reference.trim() || null,
           sale_item_title: editForm.sale_item_title.trim() || null,
           sales_platform: editForm.sales_platform.trim() || null,
+          // 2026-09-15追加(ユーザー報告「仕入高を修正したが粗利に反映されない」): 販売済み商品の
+          // 仕入高(purchases.purchase_price)を基本情報タブから修正した場合、既存売上の
+          // purchase_price_snapshot(粗利=gross_profit_jpyの元になる生成列の入力値)も
+          // 合わせて更新し、粗利が再計算されるようにする。
+          ...(purchase ? { purchase_price_snapshot: Number(editForm.purchase_price) || 0 } : {}),
         });
       }
 

@@ -556,7 +556,10 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
                   （合計：{totalPurchasePrice.toLocaleString()}円）
                 </div>
               </th>
-              <th style={{ padding: "6px 8px", textAlign: "right" }}>邦プラットフォーム販売価格</th>
+              <th style={{ padding: "6px 8px", textAlign: "right" }}>
+                <div>邦プラットフォーム</div>
+                <div>販売価格</div>
+              </th>
               <th style={{ padding: "6px 8px", textAlign: "right" }}>粗利</th>
               {COLUMNS_AFTER_PRICE.map((col) => (
                 <th
