@@ -284,7 +284,7 @@ export default function InventoryPage() {
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <ItemTableView
             items={items}
             loading={loading}
