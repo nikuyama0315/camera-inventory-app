@@ -45,17 +45,26 @@ export async function translateInspectionField(
   return (data as { translated_text: string }).translated_text;
 }
 
-/** 検品タブの自由記述項目(日本語側のみ、英訳欄は対象外)。 */
+/** 検品タブの自由記述項目(日本語・英訳の両方、2026-09-16に英訳欄も対象に追加)。 */
 const CANDIDATE_FIELDS = [
   "overall_notes",
+  "overall_notes_en",
   "appearance_notes",
+  "appearance_notes_en",
   "electrical_notes",
+  "electrical_notes_en",
   "shutter_notes",
+  "shutter_notes_en",
   "aperture_exposure_notes",
+  "aperture_exposure_notes_en",
   "film_transport_notes",
+  "film_transport_notes_en",
   "viewfinder_notes",
+  "viewfinder_notes_en",
   "lens_notes",
+  "lens_notes_en",
   "other_notes",
+  "other_notes_en",
 ] as const;
 
 export type InspectionFieldCandidates = Record<string, string[]>;

@@ -266,6 +266,25 @@ export default function InspectionTab({ detail, onChanged }: Props) {
             onChange={(e) => update(field.key, e.target.value)}
             style={{ width: "100%", marginBottom: 6 }}
           />
+          {(candidates[field.enKey]?.length ?? 0) > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) update(field.enKey, e.target.value);
+                }}
+                style={{ fontSize: 11, maxWidth: 180 }}
+                title="過去に入力した内容から選択"
+              >
+                <option value="">候補から選択...</option>
+                {candidates[field.enKey].map((c) => (
+                  <option key={c} value={c}>
+                    {c.length > 30 ? `${c.slice(0, 30)}…` : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <textarea
             rows={2}
             placeholder="英訳(編集可能)"
