@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ItemDetail } from "../../../lib/types";
 import {
+  fetchInspectionFieldCandidates,
   saveInspection,
   translateInspectionField,
+  type InspectionFieldCandidates,
   type InspectionInput,
 } from "../../../lib/api/inspections";
 import {
@@ -82,10 +84,25 @@ export default function InspectionTab({ detail, onChanged }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [returnReason, setReturnReason] = useState("");
   const [showReturnForm, setShowReturnForm] = useState(false);
+  // 検品項目の入力候補(2026-09-16追加)。過去の検品データから頻度順に集計したものを、
+  // マウント時と保存成功時(新しい値が候補に反映されるよう)に再取得する。
+  const [candidates, setCandidates] = useState<InspectionFieldCandidates>({});
 
   function update(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
+
+  async function loadCandidates() {
+    try {
+      setCandidates(await fetchInspectionFieldCandidates());
+    } catch {
+      // 候補取得の失敗は入力自体をブロックしない(自由記述欄は従来通り使える)。
+    }
+  }
+
+  useEffect(() => {
+    void loadCandidates();
+  }, []);
 
   async function handleTranslate(field: FieldDef) {
     const text = values[field.key];
@@ -131,6 +148,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
       };
       await saveInspection(input);
       onChanged();
+      void loadCandidates();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
@@ -212,15 +230,34 @@ export default function InspectionTab({ detail, onChanged }: Props) {
     <div>
       {FIELDS.map((field) => (
         <div key={field.key} style={{ marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
             <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>{field.label}</label>
-            <button
-              onClick={() => handleTranslate(field)}
-              disabled={translating === field.key}
-              style={{ fontSize: 12, padding: "2px 10px" }}
-            >
-              {translating === field.key ? "翻訳中..." : "翻訳"}
-            </button>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {(candidates[field.key]?.length ?? 0) > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) update(field.key, e.target.value);
+                  }}
+                  style={{ fontSize: 11, maxWidth: 180 }}
+                  title="過去に入力した内容から選択"
+                >
+                  <option value="">候補から選択...</option>
+                  {candidates[field.key].map((c) => (
+                    <option key={c} value={c}>
+                      {c.length > 30 ? `${c.slice(0, 30)}…` : c}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => handleTranslate(field)}
+                disabled={translating === field.key}
+                style={{ fontSize: 12, padding: "2px 10px" }}
+              >
+                {translating === field.key ? "翻訳中..." : "翻訳"}
+              </button>
+            </div>
           </div>
           <textarea
             rows={2}
