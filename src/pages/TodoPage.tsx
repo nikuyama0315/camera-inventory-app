@@ -630,7 +630,7 @@ export default function TodoPage() {
             padding: "5px 4px",
             marginLeft: depth * 22,
             borderRadius: 6,
-            background: isDragOver ? "var(--surface-1)" : isZebraRow ? "var(--surface-1)" : undefined,
+            background: isDragOver ? "var(--surface-1)" : isZebraRow ? "#eef0f2" : undefined,
             outline: isDragOver ? "2px dashed var(--accent, #185fa5)" : "none",
           }}
         >
