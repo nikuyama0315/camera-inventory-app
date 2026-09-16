@@ -244,7 +244,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
                   onChange={(e) => {
                     if (e.target.value) update(field.key, e.target.value);
                   }}
-                  style={{ fontSize: 11, maxWidth: 540 }}
+                  style={{ fontSize: 11, width: 540 }}
                   title="過去に入力した内容から選択"
                 >
                   <option value="">候補から選択...</option>
@@ -278,7 +278,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
                 onChange={(e) => {
                   if (e.target.value) update(field.enKey, e.target.value);
                 }}
-                style={{ fontSize: 11, maxWidth: 540 }}
+                style={{ fontSize: 11, width: 540 }}
                 title="過去に入力した内容から選択"
               >
                 <option value="">候補から選択...</option>
