@@ -359,6 +359,9 @@ export async function fetchItemDetail(itemId: string): Promise<ItemDetail> {
         "item_title, item_id, buyer_username, buyer_country, item_subtotal, shipping_and_handling, " +
         "final_value_fee, international_fee, transaction_currency, exchange_rate))",
     )
+    // 検品タブはdetail.inspections?.[0]を「現在の検品データ」として扱うため、念のため
+    // 新しい順で返す(2026-09-16追加、保存が毎回insertしていた過去分の不具合対策と合わせて)。
+    .order("inspected_at", { foreignTable: "inspections", ascending: false })
     .eq("id", itemId)
     .single();
 

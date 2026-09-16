@@ -4,6 +4,7 @@ import {
   fetchInspectionFieldCandidates,
   saveInspection,
   translateInspectionField,
+  updateInspection,
   type InspectionFieldCandidates,
   type InspectionInput,
 } from "../../../lib/api/inspections";
@@ -123,9 +124,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
     setSaving(true);
     setErrorMessage(null);
     try {
-      const input: InspectionInput = {
-        item_id: detail.id,
-        inspected_by: null,
+      const notesAndGrade = {
         overall_notes: values.overall_notes || null,
         overall_notes_en: values.overall_notes_en || null,
         appearance_notes: values.appearance_notes || null,
@@ -146,7 +145,13 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,
       };
-      await saveInspection(input);
+      const existingId = detail.inspections?.[0]?.id;
+      if (existingId) {
+        await updateInspection(existingId, notesAndGrade);
+      } else {
+        const input: InspectionInput = { item_id: detail.id, inspected_by: null, ...notesAndGrade };
+        await saveInspection(input);
+      }
       onChanged();
       void loadCandidates();
     } catch (err) {
