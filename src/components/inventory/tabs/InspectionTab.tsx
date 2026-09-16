@@ -250,7 +250,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
                   <option value="">候補から選択...</option>
                   {candidates[field.key].map((c) => (
                     <option key={c} value={c}>
-                      {c.length > 30 ? `${c.slice(0, 30)}…` : c}
+                      {c.length > 60 ? `${c.slice(0, 60)}…` : c}
                     </option>
                   ))}
                 </select>
@@ -284,7 +284,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
                 <option value="">候補から選択...</option>
                 {candidates[field.enKey].map((c) => (
                   <option key={c} value={c}>
-                    {c.length > 30 ? `${c.slice(0, 30)}…` : c}
+                    {c.length > 60 ? `${c.slice(0, 60)}…` : c}
                   </option>
                 ))}
               </select>
