@@ -33,6 +33,11 @@ interface FieldDef {
     | "viewfinder_notes"
     | "lens_notes"
     | "other_notes"
+    | "flash_notes"
+    | "autofocus_notes"
+    | "zoom_notes"
+    | "film_counter_notes"
+    | "self_timer_notes"
   >;
   enKey: string;
   label: string;
@@ -49,6 +54,11 @@ const FIELDS: FieldDef[] = [
   { key: "film_transport_notes", enKey: "film_transport_notes_en", label: "フィルム装填・巻き上げ・巻取り確認" },
   { key: "viewfinder_notes", enKey: "viewfinder_notes_en", label: "ファインダー" },
   { key: "lens_notes", enKey: "lens_notes_en", label: "レンズ" },
+  { key: "flash_notes", enKey: "flash_notes_en", label: "フラッシュ" },
+  { key: "autofocus_notes", enKey: "autofocus_notes_en", label: "オートフォーカス" },
+  { key: "zoom_notes", enKey: "zoom_notes_en", label: "ズーム" },
+  { key: "film_counter_notes", enKey: "film_counter_notes_en", label: "フィルムカウンター" },
+  { key: "self_timer_notes", enKey: "self_timer_notes_en", label: "セルフタイマー" },
   { key: "other_notes", enKey: "other_notes_en", label: "その他" },
 ];
 
@@ -141,6 +151,16 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         viewfinder_notes_en: values.viewfinder_notes_en || null,
         lens_notes: values.lens_notes || null,
         lens_notes_en: values.lens_notes_en || null,
+        flash_notes: values.flash_notes || null,
+        flash_notes_en: values.flash_notes_en || null,
+        autofocus_notes: values.autofocus_notes || null,
+        autofocus_notes_en: values.autofocus_notes_en || null,
+        zoom_notes: values.zoom_notes || null,
+        zoom_notes_en: values.zoom_notes_en || null,
+        film_counter_notes: values.film_counter_notes || null,
+        film_counter_notes_en: values.film_counter_notes_en || null,
+        self_timer_notes: values.self_timer_notes || null,
+        self_timer_notes_en: values.self_timer_notes_en || null,
         other_notes: values.other_notes || null,
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,

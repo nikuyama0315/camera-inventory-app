@@ -103,6 +103,17 @@ export interface Inspection {
   /** 検品項目「外観」の自由記述。直販プラットフォーム登録用CSVのcondition_description [Body]に使用。 */
   appearance_notes: string | null;
   appearance_notes_en: string | null;
+  /** 検品項目「フラッシュ」「オートフォーカス」「ズーム」「フィルムカウンター」「セルフタイマー」の自由記述(2026-09-17追加)。 */
+  flash_notes: string | null;
+  flash_notes_en: string | null;
+  autofocus_notes: string | null;
+  autofocus_notes_en: string | null;
+  zoom_notes: string | null;
+  zoom_notes_en: string | null;
+  film_counter_notes: string | null;
+  film_counter_notes_en: string | null;
+  self_timer_notes: string | null;
+  self_timer_notes_en: string | null;
   condition_grade: string | null;
 }
 

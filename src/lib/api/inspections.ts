@@ -65,6 +65,16 @@ const CANDIDATE_FIELDS = [
   "lens_notes_en",
   "other_notes",
   "other_notes_en",
+  "flash_notes",
+  "flash_notes_en",
+  "autofocus_notes",
+  "autofocus_notes_en",
+  "zoom_notes",
+  "zoom_notes_en",
+  "film_counter_notes",
+  "film_counter_notes_en",
+  "self_timer_notes",
+  "self_timer_notes_en",
 ] as const;
 
 export type InspectionFieldCandidates = Record<string, string[]>;
