@@ -664,6 +664,38 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
 
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
+              Google DriveフォルダのURL(任意・ステータス連動の自動移動に必要)
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                type="text"
+                placeholder="https://drive.google.com/drive/folders/..."
+                value={editForm.drive_folder_url}
+                onChange={(e) => updateEdit("drive_folder_url", e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button type="button" onClick={handleFetchDriveInfo} disabled={fetchingDriveInfo}>
+                {fetchingDriveInfo ? "取得中..." : "Driveから取得"}
+              </button>
+            </div>
+            {/* 2026-09-05追加: 上のボタンで実際のGoogle Driveフォルダ名(商品フォルダ)と親フォルダ名
+                (機種名フォルダ)を取得し、下記2項目に反映する(常に上書き、保存は別途「保存」ボタンで確定)。 */}
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, marginBottom: 0 }}>
+              URLを入力して「Driveから取得」を押すと、実際のフォルダ名を下の「機種名フォルダ」「商品フォルダ」欄に自動入力します(入力済みの内容も上書きされます)。
+            </p>
+            {/* 2026-09-05バグ修正: 出品中(フラット配置)等、機種名フォルダが存在しないケースでは
+                機種名フォルダ欄を意図的に空欄のままにする。エラーではないため、注意書きとして案内する
+                (ユーザー指摘「@カメラ出品データ(ステージ管理用フォルダ)が機種名フォルダとして
+                入ってしまう」への対応)。 */}
+            {driveInfoNote && (
+              <p style={{ fontSize: 11, color: "var(--danger-text)", marginTop: 4, marginBottom: 0 }}>
+                ⚠ {driveInfoNote}
+              </p>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
               機種名フォルダ(@撮影済み・出品待ち 配下)
             </label>
             <div style={{ display: "flex", gap: 6 }}>
@@ -736,38 +768,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
               />
             </div>
           )}
-
-          <div style={{ marginTop: 10 }}>
-            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
-              Google DriveフォルダのURL(任意・ステータス連動の自動移動に必要)
-            </label>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                type="text"
-                placeholder="https://drive.google.com/drive/folders/..."
-                value={editForm.drive_folder_url}
-                onChange={(e) => updateEdit("drive_folder_url", e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button type="button" onClick={handleFetchDriveInfo} disabled={fetchingDriveInfo}>
-                {fetchingDriveInfo ? "取得中..." : "Driveから取得"}
-              </button>
-            </div>
-            {/* 2026-09-05追加: 上のボタンで実際のGoogle Driveフォルダ名(商品フォルダ)と親フォルダ名
-                (機種名フォルダ)を取得し、上記2項目に反映する(常に上書き、保存は別途「保存」ボタンで確定)。 */}
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, marginBottom: 0 }}>
-              URLを入力して「Driveから取得」を押すと、実際のフォルダ名を上の「機種名フォルダ」「商品フォルダ」欄に自動入力します(入力済みの内容も上書きされます)。
-            </p>
-            {/* 2026-09-05バグ修正: 出品中(フラット配置)等、機種名フォルダが存在しないケースでは
-                機種名フォルダ欄を意図的に空欄のままにする。エラーではないため、注意書きとして案内する
-                (ユーザー指摘「@カメラ出品データ(ステージ管理用フォルダ)が機種名フォルダとして
-                入ってしまう」への対応)。 */}
-            {driveInfoNote && (
-              <p style={{ fontSize: 11, color: "var(--danger-text)", marginTop: 4, marginBottom: 0 }}>
-                ⚠ {driveInfoNote}
-              </p>
-            )}
-          </div>
         </div>
 
         <div

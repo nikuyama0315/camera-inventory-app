@@ -461,6 +461,32 @@ export default function PurchaseTab({ isCreatingNew, detail, onCreated, initialC
 
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
+              Google DriveフォルダのURL(任意・ステータス連動の自動移動に必要)
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                type="text"
+                placeholder="https://drive.google.com/drive/folders/..."
+                value={form.drive_folder_url}
+                onChange={(e) => update("drive_folder_url", e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button type="button" onClick={handleFetchDriveInfo} disabled={fetchingDriveInfo}>
+                {fetchingDriveInfo ? "取得中..." : "Driveから取得"}
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>
+              Google DriveのWeb画面で当該商品フォルダを開き、アドレスバーのURLをそのまま貼り付けてください。これを登録すると、出品・販売等のステータス変化時にシステムが自動でフォルダを移動できるようになります(未入力の場合は自動移動されません)。「Driveから取得」を押すと、実際のフォルダ名を下の「機種名フォルダ」「商品フォルダ」欄に自動入力します(入力済みの内容も上書きされます)。
+            </p>
+            {driveInfoNote && (
+              <p style={{ fontSize: 11, color: "var(--danger-text)", marginTop: 4, marginBottom: 0 }}>
+                ⚠ {driveInfoNote}
+              </p>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
               機種名フォルダ(@撮影済み・出品待ち 配下)
             </label>
             <div style={{ display: "flex", gap: 6 }}>
@@ -532,32 +558,6 @@ export default function PurchaseTab({ isCreatingNew, detail, onCreated, initialC
           <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "6px 0 0 0" }}>
             ブラウザの仕様上、フォルダの絶対パス(ドライブレター等)は自動取得できません。「フォルダを選択」でフォルダ名だけを自動入力し、フルパスは組み立てたものを確認のうえ、必要であれば直接修正してください。
           </p>
-
-          <div style={{ marginTop: 10 }}>
-            <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 2 }}>
-              Google DriveフォルダのURL(任意・ステータス連動の自動移動に必要)
-            </label>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                type="text"
-                placeholder="https://drive.google.com/drive/folders/..."
-                value={form.drive_folder_url}
-                onChange={(e) => update("drive_folder_url", e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button type="button" onClick={handleFetchDriveInfo} disabled={fetchingDriveInfo}>
-                {fetchingDriveInfo ? "取得中..." : "Driveから取得"}
-              </button>
-            </div>
-            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>
-              Google DriveのWeb画面で当該商品フォルダを開き、アドレスバーのURLをそのまま貼り付けてください。これを登録すると、出品・販売等のステータス変化時にシステムが自動でフォルダを移動できるようになります(未入力の場合は自動移動されません)。「Driveから取得」を押すと、実際のフォルダ名を上の「機種名フォルダ」「商品フォルダ」欄に自動入力します(入力済みの内容も上書きされます)。
-            </p>
-            {driveInfoNote && (
-              <p style={{ fontSize: 11, color: "var(--danger-text)", marginTop: 4, marginBottom: 0 }}>
-                ⚠ {driveInfoNote}
-              </p>
-            )}
-          </div>
         </div>
 
         <Field label="カテゴリ">
