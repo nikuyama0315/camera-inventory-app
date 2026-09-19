@@ -25,7 +25,19 @@ const SORT_OPTIONS: { value: ItemSortOption; label: string }[] = [
   { value: "sale_date_asc", label: "販売日(古い順)" },
 ];
 
-const STATUS_OPTIONS = Object.entries(ITEM_STATUS_LABELS) as [ItemStatus, string][];
+const STATUS_FILTER_OPTIONS: [string, string][] = [
+  ["awaiting_arrival", ITEM_STATUS_LABELS.awaiting_arrival],
+  ["awaiting_inspection", ITEM_STATUS_LABELS.awaiting_inspection],
+  ["inspected_awaiting_listing", ITEM_STATUS_LABELS.inspected_awaiting_listing],
+  ["listed", ITEM_STATUS_LABELS.listed],
+  ["sold", ITEM_STATUS_LABELS.sold],
+  ["inspected_return_requested", ITEM_STATUS_LABELS.inspected_return_requested],
+  ["inspected_returned", ITEM_STATUS_LABELS.inspected_returned],
+  ["sold_missing_shipping_tracking", "販売済・送料/追跡情報未入力"],
+  ["not_sold", "販売済み以外"],
+  ["returned_item_received", ITEM_STATUS_LABELS.returned_item_received],
+  ["on_hold", ITEM_STATUS_LABELS.on_hold],
+];
 
 // items.categoryは自由入力の文字列列(DBにCHECK制約は無い)だが、実運用では以下3種類のみに
 // 統一されている(2026-09-02にラベルを「カメラ関連品」「雑貨」「衣類」に統一済み)。一覧表示モード
@@ -81,9 +93,7 @@ export default function ItemListPane({
             style={{ flex: 1 }}
           >
             <option value="">ステータス(すべて)</option>
-            <option value="not_sold">販売済み以外</option>
-            <option value="sold_missing_shipping_tracking">販売済・送料/追跡情報未入力</option>
-            {STATUS_OPTIONS.map(([value, label]) => (
+            {STATUS_FILTER_OPTIONS.map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
