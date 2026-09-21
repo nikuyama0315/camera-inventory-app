@@ -237,7 +237,7 @@ interface RawItemQueryRow {
   purchases: RawPurchaseJoin[] | RawPurchaseJoin | null;
   sales: RawSaleJoin[] | RawSaleJoin | null;
   inspections: RawInspectionJoin[] | null;
-  item_drive_folders: RawDriveFolderJoin[] | null;
+  item_drive_folders: RawDriveFolderJoin[] | RawDriveFolderJoin | null;
 }
 
 /** items・purchases・sales・inspections・item_drive_folders を結合し、バックアップCSV出力用のデータを取得する。 */
@@ -318,7 +318,14 @@ export async function fetchAllInventoryBackupData(): Promise<InventoryBackupData
         conditionGrade: insp.condition_grade,
       });
     }
-    for (const f of row.item_drive_folders ?? []) {
+    // item_drive_foldersはitem_idにUNIQUE制約があるため、PostgRESTが1件のみ紐づく商品では
+    // 配列ではなく単一オブジェクトを返す(purchases/salesと同じ挙動)。配列に正規化してから処理する。
+    const driveFolderRows = Array.isArray(row.item_drive_folders)
+      ? row.item_drive_folders
+      : row.item_drive_folders
+        ? [row.item_drive_folders]
+        : [];
+    for (const f of driveFolderRows) {
       driveFolders.push({
         managementNo: row.management_no,
         driveFolderPath: f.drive_folder_path,
