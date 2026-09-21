@@ -456,34 +456,6 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             </>
           )}
         </EditField>
-        <EditField label="ITEM TITLE">
-          {item.sales && item.sales.length === 1 ? (
-            <input
-              type="text"
-              value={editForm.sale_item_title}
-              onChange={(e) => updateEdit("sale_item_title", e.target.value)}
-              style={{ width: "100%" }}
-            />
-          ) : (
-            <>
-              <input
-                type="text"
-                value={
-                  item.sales && item.sales.length > 1
-                    ? item.sales.map((s) => s.sale_item_title).filter(Boolean).join("、")
-                    : ""
-                }
-                disabled
-                style={{ width: "100%" }}
-              />
-              <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
-                {item.sales && item.sales.length > 1
-                  ? "この商品には売上が複数件あるため、ここでは編集できません(売上・粗利タブの売上一覧から個別に編集してください)"
-                  : "売上データが未登録のため編集できません(売上登録後に編集できます)"}
-              </p>
-            </>
-          )}
-        </EditField>
         <EditField label="販売プラットフォーム">
           {item.sales && item.sales.length === 1 ? (
             <input
