@@ -31,6 +31,32 @@ interface Props {
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 8, fontSize: 13 };
 const LABEL_STYLE: React.CSSProperties = { color: "var(--text-secondary)", width: 140, flexShrink: 0 };
 
+/** ITEM TITLE(items.item_title)の文字数上限(半角換算)。eBay出品タイトルの実仕様(80文字)に合わせる。 */
+const HALF_WIDTH_TITLE_MAX_LENGTH = 80;
+
+/** 半角換算の文字数を数える(コードポイントが256以上の全角文字は2、それ以外の半角文字は1としてカウントする一般的な方式)。 */
+function halfWidthLength(value: string): number {
+  let length = 0;
+  for (const ch of value) {
+    length += (ch.codePointAt(0) ?? 0) > 255 ? 2 : 1;
+  }
+  return length;
+}
+
+/** 半角換算でHALF_WIDTH_TITLE_MAX_LENGTHを超える入力は、超えない範囲まで切り詰める。 */
+function truncateToHalfWidthLimit(value: string, maxLength: number): string {
+  if (halfWidthLength(value) <= maxLength) return value;
+  let result = "";
+  let length = 0;
+  for (const ch of value) {
+    const chLength = (ch.codePointAt(0) ?? 0) > 255 ? 2 : 1;
+    if (length + chLength > maxLength) break;
+    result += ch;
+    length += chLength;
+  }
+  return result;
+}
+
 /** 2026-09-08変更: ステータス進行ボタンを「検品」タブに一本化し、このタブの汎用ボタンは
  *  「入荷待ち→着荷・検品待ち」の1段階のみに絞った(検品完了・出品待ち以降の各遷移は検品タブの
  *  専用ボタン群を参照)。定義の無いステータスではボタン自体を表示しない(handleAdvanceStatus参照)。 */
@@ -51,6 +77,10 @@ interface EditForm {
    *  ヤフーフリマ等)。sales_record_referenceと同様、該当する売上が1件のときのみ編集可能。 */
   sales_platform: string;
   title: string;
+  /** 2026-09-21追加(ユーザー指示): eBay等の出品タイトル(ITEM TITLE)。items.item_titleに保存する
+   *  商品単位のフィールドで、sale_item_title(売上単位・売上1件時のみ編集可)とは異なり、
+   *  未販売の商品でも常に編集・登録できる。半角換算80文字まで(HALF_WIDTH_TITLE_MAX_LENGTH参照)。 */
+  item_title: string;
   category: string;
   brand: string;
   model: string;
@@ -179,6 +209,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       sale_item_title: item.sales?.length === 1 ? item.sales[0].sale_item_title ?? "" : "",
       sales_platform: item.sales?.length === 1 ? item.sales[0].sales_platform ?? "" : "",
       title: item.title ?? "",
+      item_title: item.item_title ?? "",
       category: item.category,
       brand: item.brand ?? "",
       model: item.model ?? "",
@@ -294,6 +325,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       await updateItemBasicInfo(item.id, {
         management_no: editForm.management_no.trim(),
         title: editForm.title || null,
+        item_title: editForm.item_title.trim() || null,
         category: editForm.category,
         brand: editForm.brand || null,
         model: editForm.model || null,
@@ -493,6 +525,17 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             onChange={(e) => updateEdit("title", e.target.value)}
             style={{ width: "100%" }}
           />
+        </EditField>
+        <EditField label="ITEM TITLE">
+          <input
+            type="text"
+            value={editForm.item_title}
+            onChange={(e) => updateEdit("item_title", truncateToHalfWidthLimit(e.target.value, HALF_WIDTH_TITLE_MAX_LENGTH))}
+            style={{ width: "100%" }}
+          />
+          <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+            {halfWidthLength(editForm.item_title)} / {HALF_WIDTH_TITLE_MAX_LENGTH}(半角換算。全角文字は2文字分としてカウントします)
+          </p>
         </EditField>
         <EditField label="仕入日">
           <input
@@ -868,6 +911,10 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>仕入品名</span>
         <span>{item.title ?? "-"}</span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>ITEM TITLE</span>
+        <span>{item.item_title ?? "-"}</span>
       </div>
       {purchase && (
         <>

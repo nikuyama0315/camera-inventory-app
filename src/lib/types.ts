@@ -51,6 +51,8 @@ export interface Item {
   model: string | null;
   serial_number: string | null;
   title: string | null;
+  /** eBay等の出品タイトル(ITEM TITLE)。販売前の商品でも登録可能(半角換算80文字まで、UI側で検証)。2026-09-21追加。 */
+  item_title: string | null;
   status: ItemStatus;
   created_at: string;
   updated_at: string;

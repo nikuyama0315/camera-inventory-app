@@ -384,6 +384,7 @@ export async function fetchItemDetail(itemId: string): Promise<ItemDetail> {
 export interface ItemBasicInfoPatch {
   management_no?: string;
   title?: string | null;
+  item_title?: string | null;
   category?: string;
   brand?: string | null;
   model?: string | null;
