@@ -192,7 +192,7 @@ function buildReplacements(
     INCLUDES: detail.accessories_included ?? "",
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",
-    OPTICALTEXT: `${values.lens_notes_en || ""}${opticalSeparator}${values.viewfinder_notes_en || ""}`,
+    OPTICALTEXT: [values.lens_notes_en || "", values.viewfinder_notes_en || ""].filter(Boolean).join(opticalSeparator),
     BODYSN: detail.serial_number || "-",
     LENSSN: detail.lens_serial_number || "-",
   };
