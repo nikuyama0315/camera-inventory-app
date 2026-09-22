@@ -187,9 +187,17 @@ export function generateDescriptionHtml(detail: ItemDetail, values: Record<strin
 
   FUNCTIONAL_ORDER.forEach((f, i) => {
     const n = i + 1;
-    const ok = values[f.key] === "ok";
-    replacements[`OKNG${n}`] = ok ? "✓" : "✗";
-    replacements[`WORK${n}`] = ok ? "Works Properly" : "Not Work";
+    const state = values[f.key];
+    if (state === "ok") {
+      replacements[`OKNG${n}`] = "✓";
+      replacements[`WORK${n}`] = "Works Properly";
+    } else if (state === "na") {
+      replacements[`OKNG${n}`] = "-";
+      replacements[`WORK${n}`] = "N/A";
+    } else {
+      replacements[`OKNG${n}`] = "✗";
+      replacements[`WORK${n}`] = "Not Work";
+    }
   });
 
   OPTICAL_SUFFIXES.forEach((suffix) => {

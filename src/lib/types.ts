@@ -122,14 +122,14 @@ export interface Inspection {
   self_timer_notes_en: string | null;
   condition_grade: string | null;
   /** 状態チェック表(2026-09-22追加)。各機能のOK/NG。未選択はnull。 */
-  check_shutter: "ok" | "ng" | null;
-  check_flash: "ok" | "ng" | null;
-  check_autofocus: "ok" | "ng" | null;
-  check_auto_exposure: "ok" | "ng" | null;
-  check_film_winding: "ok" | "ng" | null;
-  check_film_rewinding: "ok" | "ng" | null;
-  check_film_counter: "ok" | "ng" | null;
-  check_self_timer: "ok" | "ng" | null;
+  check_shutter: "ok" | "ng" | "na" | null;
+  check_flash: "ok" | "ng" | "na" | null;
+  check_autofocus: "ok" | "ng" | "na" | null;
+  check_auto_exposure: "ok" | "ng" | "na" | null;
+  check_film_winding: "ok" | "ng" | "na" | null;
+  check_film_rewinding: "ok" | "ng" | "na" | null;
+  check_film_counter: "ok" | "ng" | "na" | null;
+  check_self_timer: "ok" | "ng" | "na" | null;
   /** 光学チェック表(レンズ/ファインダー、2026-09-22追加)。No/Few/Middle/Large。未選択はnull。 */
   optical_lens_dust: "none" | "few" | "middle" | "large" | null;
   optical_lens_fungus: "none" | "few" | "middle" | "large" | null;

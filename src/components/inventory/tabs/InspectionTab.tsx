@@ -208,14 +208,14 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         other_notes: values.other_notes || null,
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,
-        check_shutter: (values.check_shutter || null) as "ok" | "ng" | null,
-        check_flash: (values.check_flash || null) as "ok" | "ng" | null,
-        check_autofocus: (values.check_autofocus || null) as "ok" | "ng" | null,
-        check_auto_exposure: (values.check_auto_exposure || null) as "ok" | "ng" | null,
-        check_film_winding: (values.check_film_winding || null) as "ok" | "ng" | null,
-        check_film_rewinding: (values.check_film_rewinding || null) as "ok" | "ng" | null,
-        check_film_counter: (values.check_film_counter || null) as "ok" | "ng" | null,
-        check_self_timer: (values.check_self_timer || null) as "ok" | "ng" | null,
+        check_shutter: (values.check_shutter || null) as "ok" | "ng" | "na" | null,
+        check_flash: (values.check_flash || null) as "ok" | "ng" | "na" | null,
+        check_autofocus: (values.check_autofocus || null) as "ok" | "ng" | "na" | null,
+        check_auto_exposure: (values.check_auto_exposure || null) as "ok" | "ng" | "na" | null,
+        check_film_winding: (values.check_film_winding || null) as "ok" | "ng" | "na" | null,
+        check_film_rewinding: (values.check_film_rewinding || null) as "ok" | "ng" | "na" | null,
+        check_film_counter: (values.check_film_counter || null) as "ok" | "ng" | "na" | null,
+        check_self_timer: (values.check_self_timer || null) as "ok" | "ng" | "na" | null,
         optical_lens_dust: (values.optical_lens_dust || null) as "none" | "few" | "middle" | "large" | null,
         optical_lens_fungus: (values.optical_lens_fungus || null) as "none" | "few" | "middle" | "large" | null,
         optical_lens_haze: (values.optical_lens_haze || null) as "none" | "few" | "middle" | "large" | null,
@@ -390,6 +390,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
             <tr>
               <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>OK</th>
               <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>NG</th>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>N/A</th>
               <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "left" }}>機能</th>
             </tr>
           </thead>
@@ -410,6 +411,14 @@ export default function InspectionTab({ detail, onChanged }: Props) {
                     name={item.key}
                     checked={values[item.key] === "ng"}
                     onChange={() => update(item.key, "ng")}
+                  />
+                </td>
+                <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "center" }}>
+                  <input
+                    type="radio"
+                    name={item.key}
+                    checked={values[item.key] === "na"}
+                    onChange={() => update(item.key, "na")}
                   />
                 </td>
                 <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>{item.label}</td>
