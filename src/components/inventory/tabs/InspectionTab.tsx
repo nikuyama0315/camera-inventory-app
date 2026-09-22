@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ItemDetail } from "../../../lib/types";
 import {
   fetchInspectionFieldCandidates,
@@ -20,6 +20,9 @@ import { generateDescriptionHtml, generateSellerNoteText } from "../../../lib/de
 interface Props {
   detail: ItemDetail;
   onChanged: () => void;
+  /** 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたときの、
+   *  Description生成セクションへのスクロールトリガー。親(ItemDetailPane)が押すたびインクリメントする。 */
+  scrollToDescriptionTrigger?: number;
 }
 
 interface FieldDef {
@@ -128,7 +131,7 @@ function buildInitialValues(detail: ItemDetail): FormValues {
   return values;
 }
 
-export default function InspectionTab({ detail, onChanged }: Props) {
+export default function InspectionTab({ detail, onChanged, scrollToDescriptionTrigger }: Props) {
   const [values, setValues] = useState<FormValues>(() => buildInitialValues(detail));
   const [translating, setTranslating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -141,6 +144,14 @@ export default function InspectionTab({ detail, onChanged }: Props) {
   // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [sellerNoteText, setSellerNoteText] = useState("");
+  const descriptionSectionRef = useRef<HTMLDivElement>(null);
+
+  // 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたとき、
+  // このセクションまで自動スクロールする(0=初期値のときは何もしない)。
+  useEffect(() => {
+    if (!scrollToDescriptionTrigger) return;
+    descriptionSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [scrollToDescriptionTrigger]);
 
   function handleGenerateDescription() {
     setDescriptionHtml(generateDescriptionHtml(detail, values));
@@ -586,7 +597,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </div>
       )}
 
-      <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
+      <div ref={descriptionSectionRef} style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
         <button onClick={handleGenerateDescription}>Description生成</button>
         {(descriptionHtml || sellerNoteText) && (
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>

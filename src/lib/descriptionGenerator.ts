@@ -49,7 +49,7 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
   <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px 24px;">
-    <table style="border-collapse:collapse;min-width:460px;width:100%;font-size:13px;">
+    <table style="border-collapse:collapse;min-width:460px;width:65%;font-size:13px;">
       <caption style="caption-side:top;text-align:left;font-size:14px;line-height:1.75;color:#6e7378;padding-bottom:6px;">$$OPTICALTEXT$$</caption>
       <thead>
       <tr>

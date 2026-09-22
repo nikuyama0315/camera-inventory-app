@@ -39,6 +39,14 @@ export default function ItemDetailPane({
   onItemDeleted,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("purchase");
+  /** 2026-09-23追加(ユーザー指示): タブ行右端の「Description生成へ」ボタン用。押すたびインクリメントし、
+   *  検品タブ側でDescription生成セクションへスクロールするトリガーとして渡す。 */
+  const [descriptionScrollTrigger, setDescriptionScrollTrigger] = useState(0);
+
+  function handleGoToDescriptionGenerator() {
+    setActiveTab("inspection");
+    setDescriptionScrollTrigger((v) => v + 1);
+  }
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -195,7 +203,15 @@ export default function ItemDetailPane({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 4, borderBottom: "0.5px solid var(--border)", marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          borderBottom: "0.5px solid var(--border)",
+          marginBottom: 16,
+        }}
+      >
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -213,6 +229,14 @@ export default function ItemDetailPane({
             {tab.label}
           </button>
         ))}
+        {detail && !isCreatingNew && (
+          <button
+            onClick={handleGoToDescriptionGenerator}
+            style={{ marginLeft: "auto", fontSize: 12, padding: "4px 10px" }}
+          >
+            Description生成へ
+          </button>
+        )}
       </div>
 
       {activeTab === "basic" && detail && (
@@ -236,7 +260,11 @@ export default function ItemDetailPane({
       )}
 
       {activeTab === "inspection" && detail && (
-        <InspectionTab detail={detail} onChanged={handleAfterChange} />
+        <InspectionTab
+          detail={detail}
+          onChanged={handleAfterChange}
+          scrollToDescriptionTrigger={descriptionScrollTrigger}
+        />
       )}
 
       {activeTab === "sales" && detail && <SalesTab item={detail} onChanged={handleAfterChange} />}
