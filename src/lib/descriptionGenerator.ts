@@ -37,16 +37,16 @@ $$GRADETABLE$$
   </ul>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Functional Check</font></h3>
-  <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 0px; list-style: none; font-size: 14px; line-height: 1.9;">
-    <li>$$OKNG1$$&nbsp;Shutter&nbsp;—&nbsp;<strong>$$WORK1$$</strong></li>
-    <li>$$OKNG2$$&nbsp;Flash&nbsp;—&nbsp;<strong>$$WORK2$$</strong></li>
-    <li>$$OKNG3$$&nbsp;Auto focus&nbsp;—&nbsp;<strong>$$WORK3$$</strong></li>
-    <li>$$OKNG4$$&nbsp;Auto exposure&nbsp;—&nbsp;<strong>$$WORK4$$</strong></li>
-    <li>$$OKNG5$$&nbsp;Film winding&nbsp;—&nbsp;<strong>$$WORK5$$</strong></li>
-    <li>$$OKNG6$$&nbsp;Film rewinding&nbsp;—&nbsp;<strong>$$WORK6$$</strong></li>
-    <li>$$OKNG7$$&nbsp;Film counter&nbsp;—&nbsp;<strong>$$WORK7$$</strong></li>
-    <li>$$OKNG8$$&nbsp;Self timer&nbsp;— <strong>$$WORK8$$</strong></li>
-  </ul>
+  <table style="border-collapse:collapse;color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; font-size: 14px; line-height: 1.9;">
+    <tr><td style="width:20px;padding:0;">$$OKNG1$$</td><td style="width:140px;padding:0;">Shutter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK1$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG2$$</td><td style="width:140px;padding:0;">Flash</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK2$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG3$$</td><td style="width:140px;padding:0;">Auto focus</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK3$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG4$$</td><td style="width:140px;padding:0;">Auto exposure</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK4$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG5$$</td><td style="width:140px;padding:0;">Film winding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK5$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:140px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:140px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:140px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
+  </table>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
   <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px 24px;">
