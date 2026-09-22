@@ -38,14 +38,14 @@ $$GRADETABLE$$
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Functional Check</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 0px; list-style: none; font-size: 14px; line-height: 1.9;">
-    <li>$$OKNG1$$&nbsp;<strong>$$WORK1$$</strong>&nbsp;—&nbsp;Shutter</li>
-    <li>$$OKNG2$$&nbsp;<strong>$$WORK2$$</strong>&nbsp;—&nbsp;Flash</li>
-    <li>$$OKNG3$$&nbsp;<strong>$$WORK3$$</strong>&nbsp;—&nbsp;Auto focus</li>
-    <li>$$OKNG4$$&nbsp;<strong>$$WORK4$$</strong>&nbsp;—&nbsp;Auto exposure</li>
-    <li>$$OKNG5$$&nbsp;<strong>$$WORK5$$</strong>&nbsp;—&nbsp;Film winding</li>
-    <li>$$OKNG6$$&nbsp;<strong>$$WORK6$$</strong>&nbsp;—&nbsp;Film rewinding</li>
-    <li>$$OKNG7$$&nbsp;<strong>$$WORK7$$</strong>&nbsp;—&nbsp;Film counter</li>
-    <li>$$OKNG8$$&nbsp;<strong>$$WORK8$$</strong>&nbsp;— Self timer</li>
+    <li>$$OKNG1$$&nbsp;Shutter&nbsp;—&nbsp;<strong>$$WORK1$$</strong></li>
+    <li>$$OKNG2$$&nbsp;Flash&nbsp;—&nbsp;<strong>$$WORK2$$</strong></li>
+    <li>$$OKNG3$$&nbsp;Auto focus&nbsp;—&nbsp;<strong>$$WORK3$$</strong></li>
+    <li>$$OKNG4$$&nbsp;Auto exposure&nbsp;—&nbsp;<strong>$$WORK4$$</strong></li>
+    <li>$$OKNG5$$&nbsp;Film winding&nbsp;—&nbsp;<strong>$$WORK5$$</strong></li>
+    <li>$$OKNG6$$&nbsp;Film rewinding&nbsp;—&nbsp;<strong>$$WORK6$$</strong></li>
+    <li>$$OKNG7$$&nbsp;Film counter&nbsp;—&nbsp;<strong>$$WORK7$$</strong></li>
+    <li>$$OKNG8$$&nbsp;Self timer&nbsp;— <strong>$$WORK8$$</strong></li>
   </ul>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
