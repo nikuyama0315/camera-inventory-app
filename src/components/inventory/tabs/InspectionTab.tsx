@@ -380,7 +380,8 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </div>
       ))}
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ flex: "0 0 auto" }}>
         <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
           状態チェック表
         </label>
@@ -418,7 +419,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </table>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ flex: "0 0 auto" }}>
         <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
           光学チェック表(レンズ)
         </label>
@@ -459,7 +460,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </table>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ flex: "0 0 auto" }}>
         <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
           光学チェック表(ファインダー)
         </label>
@@ -498,6 +499,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
             })}
           </tbody>
         </table>
+      </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
