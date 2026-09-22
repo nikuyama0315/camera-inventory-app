@@ -97,6 +97,12 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
 
 </div>`;
 
+/**
+ * セラーノート(プレーンテキスト)用テンプレート(2026-09-22追加)。$$VARNAME$$形式のプレースホルダーを
+ * generateSellerNoteText()で実際の値に置換する。
+ */
+const SELLER_NOTE_TEMPLATE = `$$EXTERIOR$$, consistent with our $$CONDITION1$$ ($$GRADEPERCENT$$) grade: $$GRADETEXT$$.   $$TESTEDFUNC$$ : Confirmed working.   $$OPTICALTEXT$$.   $$ELECTRICITY$$.   Please refer to all listing photos for a full visual assessment of the actual item.`;
+
 const GRADE_PERCENT: Record<string, string> = {
   "Brand New": "100%",
   "Like New": "99%",
@@ -149,10 +155,16 @@ const FUNCTIONAL_ORDER: { key: string; label: string }[] = [
 const OPTICAL_SUFFIXES = ["dust", "fungus", "haze", "mark"] as const;
 
 /**
- * 検品タブの入力値(InspectionTabのFormValues、未保存の編集中の値も含む)と基本情報から
- * eBay Description用HTMLを生成する。$$VARNAME$$形式のプレースホルダーを実値に置換する。
+ * 検品タブの入力値(InspectionTabのFormValues、未保存の編集中の値も含む)と基本情報から、
+ * $$VARNAME$$置換用のマップを組み立てる(HTML生成・セラーノート生成の両方で共有)。
+ * opticalSeparatorはOPTICALTEXT(レンズの翻訳文/ファインダーの翻訳文の間の区切り)で、
+ * HTML用は"<br>"、プレーンテキスト用は改行"\n"を渡す。
  */
-export function generateDescriptionHtml(detail: ItemDetail, values: Record<string, string>): string {
+function buildReplacements(
+  detail: ItemDetail,
+  values: Record<string, string>,
+  opticalSeparator: string,
+): Record<string, string> {
   const purchase = detail.purchases?.[0];
   const isUsed = purchase?.is_used_goods !== false;
   const statusText = isUsed ? "USED" : "BRANDNEW";
@@ -180,7 +192,7 @@ export function generateDescriptionHtml(detail: ItemDetail, values: Record<strin
     INCLUDES: detail.accessories_included ?? "",
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",
-    OPTICALTEXT: `${values.lens_notes_en || ""}<br>${values.viewfinder_notes_en || ""}`,
+    OPTICALTEXT: `${values.lens_notes_en || ""}${opticalSeparator}${values.viewfinder_notes_en || ""}`,
     BODYSN: detail.serial_number || "-",
     LENSSN: detail.lens_serial_number || "-",
   };
@@ -207,9 +219,32 @@ export function generateDescriptionHtml(detail: ItemDetail, values: Record<strin
     replacements[`F${suffix.toUpperCase()}`] = OPTICAL_LABEL[finderVal] ?? "No";
   });
 
-  let html = DESCRIPTION_TEMPLATE;
+  return replacements;
+}
+
+function applyReplacements(template: string, replacements: Record<string, string>): string {
+  let result = template;
   for (const [key, value] of Object.entries(replacements)) {
-    html = html.split(`$$${key}$$`).join(value);
+    result = result.split(`$$${key}$$`).join(value);
   }
-  return html;
+  return result;
+}
+
+/**
+ * 検品タブの入力値(InspectionTabのFormValues、未保存の編集中の値も含む)と基本情報から
+ * eBay Description用HTMLを生成する。$$VARNAME$$形式のプレースホルダーを実値に置換する。
+ */
+export function generateDescriptionHtml(detail: ItemDetail, values: Record<string, string>): string {
+  const replacements = buildReplacements(detail, values, "<br>");
+  return applyReplacements(DESCRIPTION_TEMPLATE, replacements);
+}
+
+/**
+ * 検品タブの入力値と基本情報から、セラーノート用のプレーンテキストを生成する(2026-09-22追加)。
+ * 変数の置換ルールはgenerateDescriptionHtmlと共通(buildReplacements)だが、OPTICALTEXTの区切りは
+ * HTMLの<br>ではなく改行を使う。
+ */
+export function generateSellerNoteText(detail: ItemDetail, values: Record<string, string>): string {
+  const replacements = buildReplacements(detail, values, "\n");
+  return applyReplacements(SELLER_NOTE_TEMPLATE, replacements);
 }

@@ -15,7 +15,7 @@ import {
   markItemListed,
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
-import { generateDescriptionHtml } from "../../../lib/descriptionGenerator";
+import { generateDescriptionHtml, generateSellerNoteText } from "../../../lib/descriptionGenerator";
 
 interface Props {
   detail: ItemDetail;
@@ -138,9 +138,11 @@ export default function InspectionTab({ detail, onChanged }: Props) {
   const [candidates, setCandidates] = useState<InspectionFieldCandidates>({});
   // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
   const [descriptionHtml, setDescriptionHtml] = useState("");
+  const [sellerNoteText, setSellerNoteText] = useState("");
 
   function handleGenerateDescription() {
     setDescriptionHtml(generateDescriptionHtml(detail, values));
+    setSellerNoteText(generateSellerNoteText(detail, values));
   }
 
   function update(key: string, value: string) {
@@ -576,13 +578,21 @@ export default function InspectionTab({ detail, onChanged }: Props) {
 
       <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
         <button onClick={handleGenerateDescription}>Description生成</button>
-        {descriptionHtml && (
-          <textarea
-            rows={16}
-            value={descriptionHtml}
-            onChange={(e) => setDescriptionHtml(e.target.value)}
-            style={{ width: "100%", marginTop: 8, fontFamily: "monospace", fontSize: 11 }}
-          />
+        {(descriptionHtml || sellerNoteText) && (
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
+            <textarea
+              rows={16}
+              value={descriptionHtml}
+              onChange={(e) => setDescriptionHtml(e.target.value)}
+              style={{ flex: 1, minWidth: 320, fontFamily: "monospace", fontSize: 11 }}
+            />
+            <textarea
+              rows={16}
+              value={sellerNoteText}
+              onChange={(e) => setSellerNoteText(e.target.value)}
+              style={{ flex: 1, minWidth: 320, fontFamily: "monospace", fontSize: 11 }}
+            />
+          </div>
         )}
       </div>
 
