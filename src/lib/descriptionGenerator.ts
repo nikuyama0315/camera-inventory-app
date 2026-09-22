@@ -101,7 +101,7 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
  * セラーノート(プレーンテキスト)用テンプレート(2026-09-22追加)。$$VARNAME$$形式のプレースホルダーを
  * generateSellerNoteText()で実際の値に置換する。
  */
-const SELLER_NOTE_TEMPLATE = `$$EXTERIOR$$, consistent with our $$CONDITION1$$ ($$GRADEPERCENT$$) grade: $$GRADETEXT$$.   $$TESTEDFUNC$$ : Confirmed working.   $$OPTICALTEXT$$.   $$ELECTRICITY$$.   Please refer to all listing photos for a full visual assessment of the actual item.`;
+const SELLER_NOTE_TEMPLATE = `$$EXTERIOR$$ Consistent with our $$CONDITION1$$ ($$GRADEPERCENT$$) grade. $$GRADETEXT$$   $$TESTEDFUNC$$ : Confirmed working.   $$OPTICALTEXT$$   $$ELECTRICITY$$   Please refer to all listing photos for a full visual assessment of the actual item.`;
 
 const GRADE_PERCENT: Record<string, string> = {
   "Brand New": "100%",
