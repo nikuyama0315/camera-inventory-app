@@ -192,7 +192,7 @@ export function generateDescriptionHtml(detail: ItemDetail, values: Record<strin
       replacements[`OKNG${n}`] = "✓";
       replacements[`WORK${n}`] = "Works Properly";
     } else if (state === "na") {
-      replacements[`OKNG${n}`] = "-";
+      replacements[`OKNG${n}`] = "-- ";
       replacements[`WORK${n}`] = "N/A";
     } else {
       replacements[`OKNG${n}`] = "✗";
