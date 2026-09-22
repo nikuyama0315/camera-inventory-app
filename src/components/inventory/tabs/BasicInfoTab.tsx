@@ -114,11 +114,13 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
   // 既存候補から選択しつつ自由入力(新規登録)も可能にする(input list=属性によるネイティブcombobox)。
   const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [typeOptions, setTypeOptions] = useState<string[]>([]);
   useEffect(() => {
     fetchDistinctBrandsAndModels()
       .then((opts) => {
         setBrandOptions(opts.brands);
         setModelOptions(opts.models);
+        setTypeOptions(opts.types);
       })
       .catch(() => {
         /* 候補取得の失敗は致命的でないため無視(自由入力は引き続き可能) */
@@ -627,10 +629,16 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <EditField label="タイプ">
           <input
             type="text"
+            list="type-options"
             value={editForm.type}
             onChange={(e) => updateEdit("type", e.target.value)}
             style={{ width: "100%" }}
           />
+          <datalist id="type-options">
+            {typeOptions.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
         </EditField>
         <EditField label="シリアル番号(ボディー)">
           <input

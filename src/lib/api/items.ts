@@ -538,18 +538,24 @@ export async function deleteItem(itemId: string): Promise<void> {
 export interface BrandModelOptions {
   brands: string[];
   models: string[];
+  /** タイプの入力候補(datalist用、2026-09-22追加)。 */
+  types: string[];
 }
 
-/** ブランド・機種名の入力候補(datalist用)を、登録済み商品から重複無しで取得する(2026-09-15追加)。
- *  itemsは1000件を超えるため、PostgRESTのデフォルト上限を回避するrangeページネーションで全件走査する
- *  (ebay-listing-check Edge Functionのfetch AllItems()と同じ対策)。 */
+/** ブランド・機種名・タイプの入力候補(datalist用)を、登録済み商品から重複無しで取得する(2026-09-15追加、
+ *  2026-09-22にタイプを追加)。itemsは1000件を超えるため、PostgRESTのデフォルト上限を回避するrangeページ
+ *  ネーションで全件走査する(ebay-listing-check Edge Functionのfetch AllItems()と同じ対策)。 */
 export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions> {
   const pageSize = 1000;
   const brands = new Set<string>();
   const models = new Set<string>();
+  const types = new Set<string>();
   let from = 0;
   while (true) {
-    const { data, error } = await supabase.from("items").select("brand, model").range(from, from + pageSize - 1);
+    const { data, error } = await supabase
+      .from("items")
+      .select("brand, model, type")
+      .range(from, from + pageSize - 1);
     if (error) throw error;
     const rows = data ?? [];
     for (const row of rows) {
@@ -557,6 +563,8 @@ export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions>
       if (b) brands.add(b);
       const m = (row.model ?? "").trim();
       if (m) models.add(m);
+      const t = (row.type ?? "").trim();
+      if (t) types.add(t);
     }
     if (rows.length < pageSize) break;
     from += pageSize;
@@ -564,5 +572,6 @@ export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions>
   return {
     brands: Array.from(brands).sort((a, b) => a.localeCompare(b, "ja")),
     models: Array.from(models).sort((a, b) => a.localeCompare(b, "ja")),
+    types: Array.from(types).sort((a, b) => a.localeCompare(b, "ja")),
   };
 }
