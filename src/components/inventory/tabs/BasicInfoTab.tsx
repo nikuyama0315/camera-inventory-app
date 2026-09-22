@@ -30,6 +30,8 @@ interface Props {
 
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 8, fontSize: 13 };
 const LABEL_STYLE: React.CSSProperties = { color: "var(--text-secondary)", width: 140, flexShrink: 0 };
+/** 2026-09-22追加(ユーザー指示): 特定項目のラベルを赤太字で強調表示する。 */
+const HIGHLIGHT_LABEL_STYLE: React.CSSProperties = { ...LABEL_STYLE, color: "var(--danger-text)", fontWeight: 700 };
 
 /** ITEM TITLE(items.item_title)の文字数上限(半角換算)。eBay出品タイトルの実仕様(80文字)に合わせる。 */
 const HALF_WIDTH_TITLE_MAX_LENGTH = 80;
@@ -428,7 +430,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             style={{ width: "100%" }}
           />
         </EditField>
-        <EditField label="管理番号">
+        <EditField label="管理番号" highlight>
           <input
             type="text"
             value={editForm.management_no}
@@ -506,7 +508,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             style={{ width: "100%" }}
           />
         </EditField>
-        <EditField label="ITEM TITLE">
+        <EditField label="ITEM TITLE" highlight>
           <input
             type="text"
             value={editForm.item_title}
@@ -571,7 +573,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
           />
         </EditField>
 
-        <EditField label="新古判定">
+        <EditField label="新古判定" highlight>
           <select
             value={editForm.is_used_goods}
             onChange={(e) => updateEdit("is_used_goods", e.target.value)}
@@ -598,7 +600,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
           </select>
         </EditField>
         <DeductionBadge counterpartyType={editForm.counterparty_type} />
-        <EditField label="ブランド">
+        <EditField label="ブランド" highlight>
           <input
             type="text"
             list="brand-options"
@@ -612,7 +614,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             ))}
           </datalist>
         </EditField>
-        <EditField label="機種名">
+        <EditField label="機種名" highlight>
           <input
             type="text"
             list="model-options"
@@ -626,7 +628,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             ))}
           </datalist>
         </EditField>
-        <EditField label="タイプ">
+        <EditField label="タイプ" highlight>
           <input
             type="text"
             list="type-options"
@@ -640,7 +642,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             ))}
           </datalist>
         </EditField>
-        <EditField label="シリアル番号(ボディー)">
+        <EditField label="シリアル番号(ボディー)" highlight>
           <input
             type="text"
             value={editForm.serial_number}
@@ -648,7 +650,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             style={{ width: "100%" }}
           />
         </EditField>
-        <EditField label="シリアル番号(レンズ)">
+        <EditField label="シリアル番号(レンズ)" highlight>
           <input
             type="text"
             value={editForm.lens_serial_number}
@@ -684,7 +686,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             ))}
           </select>
         </EditField>
-        <EditField label="付属品">
+        <EditField label="付属品" highlight>
           <input
             type="text"
             value={editForm.accessories_included}
@@ -870,7 +872,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span>{item.category}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>管理番号</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>管理番号</span>
         <span>{item.management_no}</span>
       </div>
       <div style={ROW_STYLE}>
@@ -915,7 +917,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span>{item.title ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>ITEM TITLE</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>ITEM TITLE</span>
         <span>{item.item_title ?? "-"}</span>
       </div>
       {purchase && (
@@ -950,7 +952,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       )}
 
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>新古判定</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>新古判定</span>
         <span>{purchase ? (purchase.is_used_goods ? "古物" : "新品") : "-"}</span>
       </div>
       <div style={ROW_STYLE}>
@@ -963,19 +965,19 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         </span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>ブランド / 機種</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>ブランド / 機種</span>
         <span>{[item.brand, item.model].filter(Boolean).join(" ") || "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>タイプ</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>タイプ</span>
         <span>{item.type ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>シリアル番号(ボディー)</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>シリアル番号(ボディー)</span>
         <span>{item.serial_number ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>シリアル番号(レンズ)</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>シリアル番号(レンズ)</span>
         <span>{item.lens_serial_number ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
@@ -1000,7 +1002,7 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span>{item.grade ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>付属品</span>
+        <span style={HIGHLIGHT_LABEL_STYLE}>付属品</span>
         <span>{item.accessories_included ?? "-"}</span>
       </div>
 
@@ -1051,10 +1053,27 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
   );
 }
 
-function EditField({ label, children }: { label: string; children: React.ReactNode }) {
+function EditField({
+  label,
+  children,
+  highlight,
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** 2026-09-22追加(ユーザー指示): trueのときラベルを赤太字で強調表示する。 */
+  highlight?: boolean;
+}) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+      <label
+        style={{
+          fontSize: 12,
+          color: highlight ? "var(--danger-text)" : "var(--text-secondary)",
+          fontWeight: highlight ? 700 : undefined,
+          display: "block",
+          marginBottom: 4,
+        }}
+      >
         {label}
       </label>
       <div style={{ fontSize: 13 }}>{children}</div>

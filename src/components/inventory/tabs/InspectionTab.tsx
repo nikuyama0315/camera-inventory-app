@@ -42,19 +42,21 @@ interface FieldDef {
   >;
   enKey: string;
   label: string;
+  /** 2026-09-22追加(ユーザー指示): trueのときラベルを赤太字で強調表示する。 */
+  highlight?: boolean;
 }
 
 // 2026-09-01: 「外観」を追加(直販プラットフォーム登録用CSVのcondition_description [Body]に対応)。
 // [Total]=全体の直後に配置し、CSV出力側の並び([Total][Body][Finder][Lens][Functional])と揃えている。
 const FIELDS: FieldDef[] = [
-  { key: "overall_notes", enKey: "overall_notes_en", label: "全体" },
-  { key: "appearance_notes", enKey: "appearance_notes_en", label: "外観" },
-  { key: "electrical_notes", enKey: "electrical_notes_en", label: "電気系統(接触・通電確認)" },
+  { key: "overall_notes", enKey: "overall_notes_en", label: "全体", highlight: true },
+  { key: "appearance_notes", enKey: "appearance_notes_en", label: "外観", highlight: true },
+  { key: "electrical_notes", enKey: "electrical_notes_en", label: "電気系統(接触・通電確認)", highlight: true },
   { key: "shutter_notes", enKey: "shutter_notes_en", label: "シャッター確認" },
   { key: "aperture_exposure_notes", enKey: "aperture_exposure_notes_en", label: "絞り・露出確認" },
   { key: "film_transport_notes", enKey: "film_transport_notes_en", label: "フィルム装填・巻き上げ・巻取り確認" },
-  { key: "viewfinder_notes", enKey: "viewfinder_notes_en", label: "ファインダー" },
-  { key: "lens_notes", enKey: "lens_notes_en", label: "レンズ" },
+  { key: "viewfinder_notes", enKey: "viewfinder_notes_en", label: "ファインダー", highlight: true },
+  { key: "lens_notes", enKey: "lens_notes_en", label: "レンズ", highlight: true },
   { key: "flash_notes", enKey: "flash_notes_en", label: "フラッシュ" },
   { key: "autofocus_notes", enKey: "autofocus_notes_en", label: "オートフォーカス" },
   { key: "zoom_notes", enKey: "zoom_notes_en", label: "ズーム" },
@@ -318,7 +320,15 @@ export default function InspectionTab({ detail, onChanged }: Props) {
       {FIELDS.map((field) => (
         <div key={field.key} style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
-            <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>{field.label}</label>
+            <label
+              style={{
+                fontSize: 13,
+                color: field.highlight ? "var(--danger-text)" : "var(--text-secondary)",
+                fontWeight: field.highlight ? 700 : undefined,
+              }}
+            >
+              {field.label}
+            </label>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {(candidates[field.key]?.length ?? 0) > 0 && (
                 <select
@@ -384,7 +394,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
       <div style={{ flex: "0 0 auto" }}>
-        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+        <label style={{ fontSize: 13, color: "var(--danger-text)", fontWeight: 700, display: "block", marginBottom: 4 }}>
           状態チェック表
         </label>
         <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
@@ -431,7 +441,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
       </div>
 
       <div style={{ flex: "0 0 auto" }}>
-        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+        <label style={{ fontSize: 13, color: "var(--danger-text)", fontWeight: 700, display: "block", marginBottom: 4 }}>
           光学チェック表(レンズ)
         </label>
         <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
@@ -472,7 +482,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
       </div>
 
       <div style={{ flex: "0 0 auto" }}>
-        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+        <label style={{ fontSize: 13, color: "var(--danger-text)", fontWeight: 700, display: "block", marginBottom: 4 }}>
           光学チェック表(ファインダー)
         </label>
         <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
@@ -514,7 +524,7 @@ export default function InspectionTab({ detail, onChanged }: Props) {
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-        <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>状態ランク</label>
+        <label style={{ fontSize: 13, color: "var(--danger-text)", fontWeight: 700 }}>状態ランク</label>
         <select value={values.condition_grade} onChange={(e) => update("condition_grade", e.target.value)}>
           <option value="">選択してください</option>
           {CONDITION_GRADES.map((g) => (
