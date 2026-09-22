@@ -10,7 +10,7 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
   <p style="color: rgb(110, 115, 120); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 18px; letter-spacing: 0.08em; text-transform: uppercase; font-size: 12pt;">Inspected &amp; Graded in Japan · Admin No. $$ADMINNO$$</p>
 
   <div itemprop="itemCondition" content="https://schema.org/UsedCondition" style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; display: inline-block; border: 2px solid rgb(168, 103, 43); font-weight: bold; text-align: center; padding: 6px 14px; margin: 0px 0px 18px;">
-    GRADE $$CONDITION1$$ $$GRADEPERCENT$$ ($$STATUS$$)
+    GRADE: $$CONDITION1$$ $$GRADEPERCENT$$ ($$STATUS$$)
   </div>
 
   <p itemprop="description" style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 20px; font-size: 14px; line-height: 1.75;">$$OVERALL$$ Graded $$CONDITION1$$ ($$GRADEPERCENT$$) on our internal scale: $$GRADETEXT$$. Photos are of the actual item and are considered part of the description. Please review them closely.</p>
