@@ -84,7 +84,9 @@ interface EditForm {
   category: string;
   brand: string;
   model: string;
+  type: string;
   serial_number: string;
+  lens_serial_number: string;
   status: ItemStatus;
   /** eBayアカウント区分(soulcamera/soulmenjapan/other)。空文字列は未設定を表す。2026-09-03追加。 */
   account: string;
@@ -213,7 +215,9 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
       category: item.category,
       brand: item.brand ?? "",
       model: item.model ?? "",
+      type: item.type ?? "",
       serial_number: item.serial_number ?? "",
+      lens_serial_number: item.lens_serial_number ?? "",
       status: item.status,
       account: item.account ?? "",
       platform_category: item.platform_category ?? "",
@@ -329,7 +333,9 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         category: editForm.category,
         brand: editForm.brand || null,
         model: editForm.model || null,
+        type: editForm.type || null,
         serial_number: editForm.serial_number || null,
+        lens_serial_number: editForm.lens_serial_number || null,
         status: editForm.status,
         account: editForm.account || null,
         platform_category: editForm.platform_category || null,
@@ -618,11 +624,27 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
             ))}
           </datalist>
         </EditField>
-        <EditField label="シリアル番号">
+        <EditField label="タイプ">
+          <input
+            type="text"
+            value={editForm.type}
+            onChange={(e) => updateEdit("type", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="シリアル番号(ボディー)">
           <input
             type="text"
             value={editForm.serial_number}
             onChange={(e) => updateEdit("serial_number", e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </EditField>
+        <EditField label="シリアル番号(レンズ)">
+          <input
+            type="text"
+            value={editForm.lens_serial_number}
+            onChange={(e) => updateEdit("lens_serial_number", e.target.value)}
             style={{ width: "100%" }}
           />
         </EditField>
@@ -937,8 +959,16 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <span>{[item.brand, item.model].filter(Boolean).join(" ") || "-"}</span>
       </div>
       <div style={ROW_STYLE}>
-        <span style={LABEL_STYLE}>シリアル番号</span>
+        <span style={LABEL_STYLE}>タイプ</span>
+        <span>{item.type ?? "-"}</span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>シリアル番号(ボディー)</span>
         <span>{item.serial_number ?? "-"}</span>
+      </div>
+      <div style={ROW_STYLE}>
+        <span style={LABEL_STYLE}>シリアル番号(レンズ)</span>
+        <span>{item.lens_serial_number ?? "-"}</span>
       </div>
       <div style={ROW_STYLE}>
         <span style={LABEL_STYLE}>ステータス</span>

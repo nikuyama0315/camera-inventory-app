@@ -300,6 +300,22 @@ export async function executeCameraStockImportRow(
           other_notes: row.conditionNotes,
           other_notes_en: null,
           condition_grade: null,
+          check_shutter: null,
+          check_flash: null,
+          check_autofocus: null,
+          check_auto_exposure: null,
+          check_film_winding: null,
+          check_film_rewinding: null,
+          check_film_counter: null,
+          check_self_timer: null,
+          optical_lens_dust: null,
+          optical_lens_fungus: null,
+          optical_lens_haze: null,
+          optical_lens_mark: null,
+          optical_finder_dust: null,
+          optical_finder_fungus: null,
+          optical_finder_haze: null,
+          optical_finder_mark: null,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "不明なエラー";

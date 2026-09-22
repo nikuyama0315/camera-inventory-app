@@ -15,6 +15,7 @@ import {
   markItemListed,
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
+import { generateDescriptionHtml } from "../../../lib/descriptionGenerator";
 
 interface Props {
   detail: ItemDetail;
@@ -63,6 +64,8 @@ const FIELDS: FieldDef[] = [
 ];
 
 const CONDITION_GRADES = [
+  "Brand New",
+  "Like New",
   "TOP MINT",
   "MINT",
   "Near MINT++",
@@ -75,6 +78,32 @@ const CONDITION_GRADES = [
   "Junk",
 ];
 
+/** 状態チェック表(2026-09-22追加)。OK/NGのラジオボタン、$$OKNG1$$〜$$OKNG8$$・$$WORK1$$〜$$WORK8$$の並び順と一致させる。 */
+const FUNCTIONAL_CHECK_ITEMS: { key: string; label: string }[] = [
+  { key: "check_shutter", label: "Shutter" },
+  { key: "check_flash", label: "Flash" },
+  { key: "check_autofocus", label: "Auto focus" },
+  { key: "check_auto_exposure", label: "Auto exposure" },
+  { key: "check_film_winding", label: "Film winding" },
+  { key: "check_film_rewinding", label: "Film rewinding" },
+  { key: "check_film_counter", label: "Film counter" },
+  { key: "check_self_timer", label: "Self timer" },
+];
+
+/** 光学チェック表(レンズ/ファインダー共通、2026-09-22追加)。No/Few/Middle/Largeのラジオボタン。 */
+const OPTICAL_CHECK_ITEMS: { suffix: "dust" | "fungus" | "haze" | "mark"; label: string }[] = [
+  { suffix: "dust", label: "Dust" },
+  { suffix: "fungus", label: "Fungus" },
+  { suffix: "haze", label: "Haze" },
+  { suffix: "mark", label: "Mark" },
+];
+const OPTICAL_LEVELS: { value: "none" | "few" | "middle" | "large"; label: string }[] = [
+  { value: "none", label: "No" },
+  { value: "few", label: "Few" },
+  { value: "middle", label: "Middle" },
+  { value: "large", label: "Large" },
+];
+
 type FormValues = Record<string, string>;
 
 function buildInitialValues(detail: ItemDetail): FormValues {
@@ -85,6 +114,15 @@ function buildInitialValues(detail: ItemDetail): FormValues {
     values[f.enKey] = (existing?.[f.enKey as keyof typeof existing] as string | null) ?? "";
   }
   values.condition_grade = existing?.condition_grade ?? "";
+  for (const item of FUNCTIONAL_CHECK_ITEMS) {
+    values[item.key] = (existing?.[item.key as keyof typeof existing] as string | null) ?? "";
+  }
+  for (const item of OPTICAL_CHECK_ITEMS) {
+    values[`optical_lens_${item.suffix}`] =
+      (existing?.[`optical_lens_${item.suffix}` as keyof typeof existing] as string | null) ?? "";
+    values[`optical_finder_${item.suffix}`] =
+      (existing?.[`optical_finder_${item.suffix}` as keyof typeof existing] as string | null) ?? "";
+  }
   return values;
 }
 
@@ -98,6 +136,12 @@ export default function InspectionTab({ detail, onChanged }: Props) {
   // 検品項目の入力候補(2026-09-16追加)。過去の検品データから頻度順に集計したものを、
   // マウント時と保存成功時(新しい値が候補に反映されるよう)に再取得する。
   const [candidates, setCandidates] = useState<InspectionFieldCandidates>({});
+  // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
+  const [descriptionHtml, setDescriptionHtml] = useState("");
+
+  function handleGenerateDescription() {
+    setDescriptionHtml(generateDescriptionHtml(detail, values));
+  }
 
   function update(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -164,6 +208,22 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         other_notes: values.other_notes || null,
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,
+        check_shutter: (values.check_shutter || null) as "ok" | "ng" | null,
+        check_flash: (values.check_flash || null) as "ok" | "ng" | null,
+        check_autofocus: (values.check_autofocus || null) as "ok" | "ng" | null,
+        check_auto_exposure: (values.check_auto_exposure || null) as "ok" | "ng" | null,
+        check_film_winding: (values.check_film_winding || null) as "ok" | "ng" | null,
+        check_film_rewinding: (values.check_film_rewinding || null) as "ok" | "ng" | null,
+        check_film_counter: (values.check_film_counter || null) as "ok" | "ng" | null,
+        check_self_timer: (values.check_self_timer || null) as "ok" | "ng" | null,
+        optical_lens_dust: (values.optical_lens_dust || null) as "none" | "few" | "middle" | "large" | null,
+        optical_lens_fungus: (values.optical_lens_fungus || null) as "none" | "few" | "middle" | "large" | null,
+        optical_lens_haze: (values.optical_lens_haze || null) as "none" | "few" | "middle" | "large" | null,
+        optical_lens_mark: (values.optical_lens_mark || null) as "none" | "few" | "middle" | "large" | null,
+        optical_finder_dust: (values.optical_finder_dust || null) as "none" | "few" | "middle" | "large" | null,
+        optical_finder_fungus: (values.optical_finder_fungus || null) as "none" | "few" | "middle" | "large" | null,
+        optical_finder_haze: (values.optical_finder_haze || null) as "none" | "few" | "middle" | "large" | null,
+        optical_finder_mark: (values.optical_finder_mark || null) as "none" | "few" | "middle" | "large" | null,
       };
       const existingId = detail.inspections?.[0]?.id;
       if (existingId) {
@@ -320,6 +380,126 @@ export default function InspectionTab({ detail, onChanged }: Props) {
         </div>
       ))}
 
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+          状態チェック表
+        </label>
+        <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>OK</th>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>NG</th>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "left" }}>機能</th>
+            </tr>
+          </thead>
+          <tbody>
+            {FUNCTIONAL_CHECK_ITEMS.map((item) => (
+              <tr key={item.key}>
+                <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "center" }}>
+                  <input
+                    type="radio"
+                    name={item.key}
+                    checked={values[item.key] === "ok"}
+                    onChange={() => update(item.key, "ok")}
+                  />
+                </td>
+                <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "center" }}>
+                  <input
+                    type="radio"
+                    name={item.key}
+                    checked={values[item.key] === "ng"}
+                    onChange={() => update(item.key, "ng")}
+                  />
+                </td>
+                <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>{item.label}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+          光学チェック表(レンズ)
+        </label>
+        <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}></th>
+              {OPTICAL_LEVELS.map((lv) => (
+                <th key={lv.value} style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>
+                  {lv.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {OPTICAL_CHECK_ITEMS.map((item) => {
+              const key = `optical_lens_${item.suffix}`;
+              return (
+                <tr key={key}>
+                  <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>{item.label}</td>
+                  {OPTICAL_LEVELS.map((lv) => (
+                    <td
+                      key={lv.value}
+                      style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "center" }}
+                    >
+                      <input
+                        type="radio"
+                        name={key}
+                        checked={values[key] === lv.value}
+                        onChange={() => update(key, lv.value)}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+          光学チェック表(ファインダー)
+        </label>
+        <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}></th>
+              {OPTICAL_LEVELS.map((lv) => (
+                <th key={lv.value} style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>
+                  {lv.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {OPTICAL_CHECK_ITEMS.map((item) => {
+              const key = `optical_finder_${item.suffix}`;
+              return (
+                <tr key={key}>
+                  <td style={{ border: "0.5px solid var(--border)", padding: "4px 10px" }}>{item.label}</td>
+                  {OPTICAL_LEVELS.map((lv) => (
+                    <td
+                      key={lv.value}
+                      style={{ border: "0.5px solid var(--border)", padding: "4px 10px", textAlign: "center" }}
+                    >
+                      <input
+                        type="radio"
+                        name={key}
+                        checked={values[key] === lv.value}
+                        onChange={() => update(key, lv.value)}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
         <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>状態ランク</label>
         <select value={values.condition_grade} onChange={(e) => update("condition_grade", e.target.value)}>
@@ -382,6 +562,18 @@ export default function InspectionTab({ detail, onChanged }: Props) {
           </div>
         </div>
       )}
+
+      <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
+        <button onClick={handleGenerateDescription}>Description生成</button>
+        {descriptionHtml && (
+          <textarea
+            rows={16}
+            value={descriptionHtml}
+            onChange={(e) => setDescriptionHtml(e.target.value)}
+            style={{ width: "100%", marginTop: 8, fontFamily: "monospace", fontSize: 11 }}
+          />
+        )}
+      </div>
 
       {detail.status === "inspected_awaiting_listing" && (
         <div style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12 }}>

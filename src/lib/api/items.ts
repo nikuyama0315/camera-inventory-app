@@ -389,6 +389,8 @@ export interface ItemBasicInfoPatch {
   brand?: string | null;
   model?: string | null;
   serial_number?: string | null;
+  lens_serial_number?: string | null; // シリアル番号(レンズ)。2026-09-22追加
+  type?: string | null; // タイプ(自由記述)。2026-09-22追加
   status?: ItemStatus; // 修正用の手動変更のみ想定。通常のステータス遷移は各専用アクション経由で行う
   listing_status_code?: string | null; // 「カメラ」在庫シートのステータス列(S/L等)の生値。将来の拡張用の単純な文字列
   platform_category?: string | null; // 直販プラットフォーム出品用のカテゴリ(film_camera/digital_camera/lens/accessory)

@@ -50,6 +50,10 @@ export interface Item {
   brand: string | null;
   model: string | null;
   serial_number: string | null;
+  /** シリアル番号(レンズ)。2026-09-22追加。 */
+  lens_serial_number: string | null;
+  /** タイプ(自由記述)。2026-09-22追加、機種名の下に表示。 */
+  type: string | null;
   title: string | null;
   /** eBay等の出品タイトル(ITEM TITLE)。販売前の商品でも登録可能(半角換算80文字まで、UI側で検証)。2026-09-21追加。 */
   item_title: string | null;
@@ -117,6 +121,24 @@ export interface Inspection {
   self_timer_notes: string | null;
   self_timer_notes_en: string | null;
   condition_grade: string | null;
+  /** 状態チェック表(2026-09-22追加)。各機能のOK/NG。未選択はnull。 */
+  check_shutter: "ok" | "ng" | null;
+  check_flash: "ok" | "ng" | null;
+  check_autofocus: "ok" | "ng" | null;
+  check_auto_exposure: "ok" | "ng" | null;
+  check_film_winding: "ok" | "ng" | null;
+  check_film_rewinding: "ok" | "ng" | null;
+  check_film_counter: "ok" | "ng" | null;
+  check_self_timer: "ok" | "ng" | null;
+  /** 光学チェック表(レンズ/ファインダー、2026-09-22追加)。No/Few/Middle/Large。未選択はnull。 */
+  optical_lens_dust: "none" | "few" | "middle" | "large" | null;
+  optical_lens_fungus: "none" | "few" | "middle" | "large" | null;
+  optical_lens_haze: "none" | "few" | "middle" | "large" | null;
+  optical_lens_mark: "none" | "few" | "middle" | "large" | null;
+  optical_finder_dust: "none" | "few" | "middle" | "large" | null;
+  optical_finder_fungus: "none" | "few" | "middle" | "large" | null;
+  optical_finder_haze: "none" | "few" | "middle" | "large" | null;
+  optical_finder_mark: "none" | "few" | "middle" | "large" | null;
 }
 
 export interface ItemDriveFolder {
