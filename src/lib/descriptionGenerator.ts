@@ -26,6 +26,7 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
 <tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Tested functions</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">$$TESTEDFUNC$$ : Confirmed working</td></tr>
 <tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Includes</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">As shown in the listing photos. ($$INCLUDES$$)</td></tr>
 </tbody></table>
+$$GRADETABLE$$
   </div>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Appearance</font></h3>
@@ -140,6 +141,51 @@ const OPTICAL_LABEL: Record<string, string> = {
   large: "Large",
 };
 
+/** $$GRADETABLE$$(Quick Facts欄下部のグレード早見表、2026-09-23追加)の表示順。 */
+const GRADE_ORDER = [
+  "Brand New",
+  "Like New",
+  "TOP MINT",
+  "MINT",
+  "Near MINT++",
+  "Near MINT+",
+  "Near MINT",
+  "Exc +5",
+  "Exc +4",
+  "Exc +3",
+  "For Parts",
+  "Junk",
+];
+
+/**
+ * Quick Facts欄下部に表示するグレード早見表のHTMLを組み立てる。現在の商品のグレード(currentGrade)の
+ * 行だけ背景色を付けて強調し、買い手がスケール全体の中でのこの商品の位置をひと目で分かるようにする。
+ */
+function buildGradeCellHtml(g: string, currentGrade: string): string {
+  const isCurrent = g === currentGrade;
+  const style = isCurrent
+    ? "padding:3px 8px;border-bottom:1px solid #e4e2db;background:#f7e9da;font-weight:bold;color:#8a4a2b;"
+    : "padding:3px 8px;border-bottom:1px solid #e4e2db;color:#6e7378;";
+  return `<td style="${style}">${g}${isCurrent ? " &larr;" : ""} <span style="opacity:0.7;">${GRADE_PERCENT[g]}</span></td>`;
+}
+
+function buildGradeTableHtml(currentGrade: string): string {
+  // 2026-09-23変更(ユーザー指示): 縦幅を抑えるため4列組みにし、上から下へ縦方向に埋める
+  // (12段階÷4列=3行、列1に1〜3番目、列2に4〜6番目…という並び)。
+  const COLUMNS = 4;
+  const ROWS = Math.ceil(GRADE_ORDER.length / COLUMNS);
+  const columns: string[][] = [];
+  for (let c = 0; c < COLUMNS; c++) {
+    columns.push(GRADE_ORDER.slice(c * ROWS, c * ROWS + ROWS));
+  }
+  let rows = "";
+  for (let r = 0; r < ROWS; r++) {
+    const rowCells = columns.map((col) => (col[r] ? buildGradeCellHtml(col[r], currentGrade) : "<td></td>")).join("");
+    rows += `<tr>${rowCells}</tr>`;
+  }
+  return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgb(228,226,219);"><p style="margin:0 0 6px;font-family:&quot;Courier New&quot;,Courier,monospace;letter-spacing:0.1em;color:rgb(110,115,120);text-transform:uppercase;font-size:11px;">Grading Scale</p><table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;"><tbody>${rows}</tbody></table></div>`;
+}
+
 /** $$OKNG1$$〜$$OKNG8$$・$$WORK1$$〜$$WORK8$$の並び順(状態チェック表と同じ順)。 */
 const FUNCTIONAL_ORDER: { key: string; label: string }[] = [
   { key: "check_shutter", label: "Shutter" },
@@ -195,6 +241,7 @@ function buildReplacements(
     OPTICALTEXT: [values.lens_notes_en || "", values.viewfinder_notes_en || ""].filter(Boolean).join(opticalSeparator),
     BODYSN: detail.serial_number || "-",
     LENSSN: detail.lens_serial_number || "-",
+    GRADETABLE: buildGradeTableHtml(grade),
   };
 
   FUNCTIONAL_ORDER.forEach((f, i) => {
