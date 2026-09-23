@@ -345,7 +345,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             <label
               style={{
                 fontSize: 13,
-                color: field.highlight ? "var(--danger-text)" : "var(--text-secondary)",
+                color: field.highlight ? "var(--highlight-text)" : "var(--text-secondary)",
                 fontWeight: field.highlight ? 700 : undefined,
               }}
             >

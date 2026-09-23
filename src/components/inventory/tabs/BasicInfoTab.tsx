@@ -31,7 +31,7 @@ interface Props {
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 12, marginBottom: 8, fontSize: 13 };
 const LABEL_STYLE: React.CSSProperties = { color: "var(--text-secondary)", width: 140, flexShrink: 0 };
 /** 2026-09-22追加(ユーザー指示): 特定項目のラベルを赤太字で強調表示する。 */
-const HIGHLIGHT_LABEL_STYLE: React.CSSProperties = { ...LABEL_STYLE, color: "var(--danger-text)", fontWeight: 700 };
+const HIGHLIGHT_LABEL_STYLE: React.CSSProperties = { ...LABEL_STYLE, color: "var(--highlight-text)", fontWeight: 700 };
 
 /** ITEM TITLE(items.item_title)の文字数上限(半角換算)。eBay出品タイトルの実仕様(80文字)に合わせる。 */
 const HALF_WIDTH_TITLE_MAX_LENGTH = 80;

@@ -9,6 +9,8 @@
   --accent: #185fa5;
   --danger-bg: #fcebeb;
   --danger-text: #791f1f;
+  /* 2026-09-23追加: 「赤太字で強調表示」用の、エラー表示(--danger-text)より明るい赤。 */
+  --highlight-text: #e0392e;
   font-family: -apple-system, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
 }
 
