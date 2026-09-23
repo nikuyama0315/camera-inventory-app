@@ -582,6 +582,26 @@ export async function lookupEbayOrdersLive(
   return (data as { results: EbayOrderLookupResult[] }).results;
 }
 
+/**
+ * 指定した日時(年月日時分)以降に成立したeBay注文の注文番号一覧を取得する(2026-09-23追加、
+ * 「利益管理票更新用データの作成」機能でOrder Noを手入力する代わりに使う)。
+ * 専用のEdge Function(ebay-orders-since、DB書き込み無しの読み取り専用)を呼び出す。
+ * eBay Sell Fulfillment APIの仕様上、直近90日より前の注文は返らない点に注意。
+ */
+export async function fetchOrderNumbersSince(
+  shopId: "soulcamera" | "soulmenjapan",
+  sinceDatetimeIso: string,
+): Promise<string[]> {
+  const { data, error } = await supabase.functions.invoke("ebay-orders-since", {
+    body: { shopId, sinceDatetime: sinceDatetimeIso },
+  });
+  if (error) throw error;
+  if (data && typeof data === "object" && "error" in data && (data as { error?: unknown }).error) {
+    throw new Error(String((data as { error: unknown }).error));
+  }
+  return (data as { orderNumbers: string[] }).orderNumbers;
+}
+
 /** 「出品チェック」機能(2026-09-08追加)。システム上「出品中」の商品と、eBay(米国サイト・
  *  ストック1以上)の実際のアクティブ出品を突合し、過不足を検出する。Trading APIの
  *  GetMyeBaySellingを使うため、DB同期(ebay_transaction_lines等)には依存しない。 */

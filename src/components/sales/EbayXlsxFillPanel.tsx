@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ExcelJS from "exceljs";
-import { lookupEbayOrdersLive } from "../../lib/api/ebaySync";
+import { lookupEbayOrdersLive, fetchOrderNumbersSince } from "../../lib/api/ebaySync";
 import { fetchShippingCostByOrderNos } from "../../lib/api/sales";
 
 // テンプレート「利益管理表」の実データ範囲(既存の数式がF13:F302等を参照しているのに合わせる)
@@ -126,6 +126,10 @@ export default function EbayXlsxFillPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [results, setResults] = useState<RowFillResult[] | null>(null);
   const [valueResults, setValueResults] = useState<RowValuesResult[] | null>(null);
+  // 2026-09-23追加: Order Noを手入力する代わりに、指定日時(年月日時分)以降に売れたアイテムを
+  // 自動取得して実行するモード用の状態。
+  const [cutoffDatetime, setCutoffDatetime] = useState("");
+  const [fetchingSince, setFetchingSince] = useState(false);
 
   function updateOrderNo(index: number, value: string) {
     setOrderNos((prev) => prev.map((v, i) => (i === index ? value : v)));
@@ -137,16 +141,12 @@ export default function EbayXlsxFillPanel() {
     setOrderNos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
   }
 
-  async function handleRun() {
+  /** targetOrderNosで指定したOrder Noについて、テンプレートへの入力・ダウンロードまで実行する共通処理。
+   *  手入力モード(handleRun)・日時指定モード(handleRunFromDatetime)の両方から呼ばれる(2026-09-23追加)。 */
+  async function runFill(targetOrderNos: string[]) {
     setErrorMessage(null);
     setResults(null);
     setValueResults(null);
-
-    const targetOrderNos = orderNos.map((v) => v.trim()).filter((v) => v.length > 0);
-    if (targetOrderNos.length === 0) {
-      setErrorMessage("Order Noを1件以上入力してください");
-      return;
-    }
 
     setBusy(true);
     try {
@@ -306,6 +306,42 @@ export default function EbayXlsxFillPanel() {
     }
   }
 
+  async function handleRun() {
+    const targetOrderNos = orderNos.map((v) => v.trim()).filter((v) => v.length > 0);
+    if (targetOrderNos.length === 0) {
+      setErrorMessage("Order Noを1件以上入力してください");
+      return;
+    }
+    await runFill(targetOrderNos);
+  }
+
+  /** 2026-09-23追加: 指定日時(年月日時分)以降に売れたアイテムのOrder NoをeBay APIからその場で
+   *  自動取得し、そのままrunFill()へ渡す。 */
+  async function handleRunFromDatetime() {
+    setErrorMessage(null);
+    if (!cutoffDatetime) {
+      setErrorMessage("基準日時を指定してください");
+      return;
+    }
+    const sinceIso = new Date(cutoffDatetime).toISOString();
+    setFetchingSince(true);
+    try {
+      const fetched = await fetchOrderNumbersSince("soulcamera", sinceIso);
+      if (fetched.length === 0) {
+        setErrorMessage(
+          "指定日時以降に売れたアイテムが見つかりませんでした(eBay APIの仕様上、直近90日より前の注文は取得できません)",
+        );
+        return;
+      }
+      setOrderNos(fetched);
+      await runFill(fetched);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "取得に失敗しました");
+    } finally {
+      setFetchingSince(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -318,7 +354,7 @@ export default function EbayXlsxFillPanel() {
     >
       <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 8px" }}>利益管理票更新用データの作成</p>
       <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 12px" }}>
-        Order No(eBay注文番号)を指定すると、eBay(soulcameraアカウント)からその場でAPI取得した売上データを、テンプレートのまだ入力されていない行(C列が空欄の行)に上から順に自動入力し、ダウンロードを促します。
+        Order No(eBay注文番号)を指定するか、基準日時を指定すると、eBay(soulcameraアカウント)からその場でAPI取得した売上データを、テンプレートのまだ入力されていない行(C列が空欄の行)に上から順に自動入力し、ダウンロードを促します。基準日時指定の場合、eBay APIの仕様上、直近90日より前の注文は取得できません。
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -350,8 +386,26 @@ export default function EbayXlsxFillPanel() {
             </div>
           </div>
 
-          <button onClick={handleRun} disabled={busy} style={{ width: "fit-content" }}>
+          <button onClick={handleRun} disabled={busy || fetchingSince} style={{ width: "fit-content" }}>
             {busy ? "処理中..." : "実行してダウンロード"}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              この日時以降に売れたアイテムを自動取得
+            </label>
+            <input
+              type="datetime-local"
+              value={cutoffDatetime}
+              onChange={(e) => setCutoffDatetime(e.target.value)}
+              style={{ width: 220 }}
+            />
+          </div>
+
+          <button onClick={handleRunFromDatetime} disabled={busy || fetchingSince} style={{ width: "fit-content" }}>
+            {fetchingSince ? "取得中..." : busy ? "処理中..." : "この日時以降を実行してダウンロード"}
           </button>
         </div>
       </div>
