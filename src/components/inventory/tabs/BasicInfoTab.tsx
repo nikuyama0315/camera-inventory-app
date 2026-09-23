@@ -1077,7 +1077,7 @@ function EditField({
       <label
         style={{
           fontSize: 12,
-          color: highlight ? "var(--danger-text)" : "var(--text-secondary)",
+          color: highlight ? "var(--highlight-text)" : "var(--text-secondary)",
           fontWeight: highlight ? 700 : undefined,
           display: "block",
           marginBottom: 4,
