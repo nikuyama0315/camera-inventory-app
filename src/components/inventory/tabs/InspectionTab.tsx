@@ -515,7 +515,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
           </tbody>
         </table>
         {/* 2026-09-23追加: 光学チェック表(レンズ)の下の自由記述欄。Description HTMLでは
-            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALLENSNOTES参照)。 */}
+            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALCHECKNOTES参照)。 */}
         <textarea
           rows={2}
           placeholder="光学チェック表(レンズ)の補足(自由記述)"
@@ -565,7 +565,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
           </tbody>
         </table>
         {/* 2026-09-23追加: 光学チェック表(ファインダー)の下の自由記述欄。Description HTMLでは
-            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALFINDERNOTES参照)。 */}
+            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALCHECKNOTES参照)。 */}
         <textarea
           rows={2}
           placeholder="光学チェック表(ファインダー)の補足(自由記述)"

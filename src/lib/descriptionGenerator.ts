@@ -54,7 +54,7 @@ $$GRADETABLE$$
 $$FUNCTIONALNOTES$$  </table>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
-  <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px 24px;">
+  <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px $$OPTICSBOTTOMMARGIN$$px;">
     <table style="border-collapse:collapse;min-width:460px;width:65%;font-size:13px;">
       <caption style="caption-side:top;text-align:left;font-size:14px;line-height:1.75;color:#6e7378;padding-bottom:6px;">$$OPTICALTEXT$$</caption>
       <thead>
@@ -84,7 +84,7 @@ $$FUNCTIONALNOTES$$  </table>
       </tbody>
     </table>
   </div>
-$$OPTICALLENSNOTES$$$$OPTICALFINDERNOTES$$
+$$OPTICALCHECKNOTES$$
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Included Accessories</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 20px; font-size: 14px; line-height: 1.8;">
     $$INCLUDESLI$$<li>As shown in the listing photos (see photo gallery for exact contents).</li>
@@ -258,14 +258,26 @@ function buildReplacements(
       ? `<tr><td colspan="3" style="padding:8px 0 0;">${values.functional_check_notes}</td></tr>`
       : "",
     // 2026-09-23追加(ユーザー指示): 光学チェック表(レンズ/ファインダー)の下の自由記述欄を、
-    // Optics Inspectionの下に、入力があるものだけ縦積みで表示する(それぞれ独立、両方空なら
-    // 表示エリア自体が出ない)。
-    OPTICALLENSNOTES: (values.optical_check_lens_notes || "").trim()
-      ? `<p style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 10px 0 0; font-size: 14px; line-height: 1.75;">${values.optical_check_lens_notes}</p>`
-      : "",
-    OPTICALFINDERNOTES: (values.optical_check_finder_notes || "").trim()
-      ? `<p style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 10px 0 0; font-size: 14px; line-height: 1.75;">${values.optical_check_finder_notes}</p>`
-      : "",
+    // Optics Inspectionの下に、入力があるものだけ縦積みで表示する。表示位置は表のすぐ下に
+    // 近づけつつ(OPTICSBOTTOMMARGINでOptics Inspection側の下マージンを詰める)、次の見出し
+    // 「Included Accessories」との間は広めに取る(OPTICALCHECKNOTES側のdivで24px確保)。
+    // 入力が無い場合はOPTICSBOTTOMMARGINを元の24pxに戻し、表示エリア自体も出さない。
+    OPTICSBOTTOMMARGIN: [values.optical_check_lens_notes, values.optical_check_finder_notes].some((v) => (v || "").trim())
+      ? "6"
+      : "24",
+    OPTICALCHECKNOTES: (() => {
+      const parts = [values.optical_check_lens_notes, values.optical_check_finder_notes]
+        .map((v) => (v || "").trim())
+        .filter(Boolean);
+      if (parts.length === 0) return "";
+      const paragraphs = parts
+        .map(
+          (t) =>
+            `<p style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0 0 6px; font-size: 14px; line-height: 1.75;">${t}</p>`,
+        )
+        .join("");
+      return `<div style="margin: 0px 0px 24px;">${paragraphs}</div>`;
+    })(),
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",
     OPTICALTEXT: [values.lens_notes_en || "", values.viewfinder_notes_en || ""].filter(Boolean).join(opticalSeparator),
