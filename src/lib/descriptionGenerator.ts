@@ -38,14 +38,14 @@ $$GRADETABLE$$
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Functional Check</font></h3>
   <table style="border-collapse:collapse;color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; font-size: 14px; line-height: 1.9;">
-    <tr><td style="width:20px;padding:0;">$$OKNG1$$</td><td style="width:140px;padding:0;">Shutter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK1$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG2$$</td><td style="width:140px;padding:0;">Flash</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK2$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG3$$</td><td style="width:140px;padding:0;">Auto focus</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK3$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG4$$</td><td style="width:140px;padding:0;">Auto exposure</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK4$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG5$$</td><td style="width:140px;padding:0;">Film winding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK5$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:140px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:140px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:140px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG1$$</td><td style="width:110px;padding:0;">Shutter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK1$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG2$$</td><td style="width:110px;padding:0;">Flash</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK2$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG3$$</td><td style="width:110px;padding:0;">Auto focus</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK3$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG4$$</td><td style="width:110px;padding:0;">Auto exposure</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK4$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG5$$</td><td style="width:110px;padding:0;">Film winding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK5$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:110px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:110px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:110px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
   </table>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
@@ -249,13 +249,13 @@ function buildReplacements(
     const state = values[f.key];
     if (state === "ok") {
       replacements[`OKNG${n}`] = "✓";
-      replacements[`WORK${n}`] = "Works Properly";
+      replacements[`WORK${n}`] = "Working";
     } else if (state === "na") {
       replacements[`OKNG${n}`] = "--";
       replacements[`WORK${n}`] = "N/A";
     } else {
       replacements[`OKNG${n}`] = "✗";
-      replacements[`WORK${n}`] = "Not Work";
+      replacements[`WORK${n}`] = "Not working";
     }
   });
 
