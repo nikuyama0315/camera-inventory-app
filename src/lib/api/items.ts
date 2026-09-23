@@ -221,6 +221,15 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   if (filters.purchaseDateTo) {
     query = query.lte("purchases.purchase_date", filters.purchaseDateTo);
   }
+  if (filters.updatedAtFrom) {
+    query = query.gte("updated_at", filters.updatedAtFrom);
+  }
+  if (filters.updatedAtTo) {
+    // updated_atはtimestamptzのため、日付のみ指定時は当日末尾まで含めるよう翌日0時未満で絞り込む。
+    const nextDay = new Date(`${filters.updatedAtTo}T00:00:00`);
+    nextDay.setDate(nextDay.getDate() + 1);
+    query = query.lt("updated_at", nextDay.toISOString().slice(0, 10));
+  }
   return query;
 }
 

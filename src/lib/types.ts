@@ -220,4 +220,8 @@ export interface ItemListFilters {
    *  (purchases)が登録済みの商品のみが対象になる(未仕入の商品は結果から除外される)。 */
   purchaseDateFrom?: string;
   purchaseDateTo?: string;
+  /** 更新日(items.updated_at)での範囲絞り込み(2026-09-23追加)。itemsの列を直接見るため
+   *  仕入日・販売日と異なりjoinの切り替えは不要。 */
+  updatedAtFrom?: string;
+  updatedAtTo?: string;
 }

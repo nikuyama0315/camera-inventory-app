@@ -46,8 +46,10 @@ const STATUS_FILTER_OPTIONS: [string, string][] = [
 // 他の選択肢が一覧から消えて選び直せなくなるため、固定リストにしている(2026-09-06追加)。
 const CATEGORY_OPTIONS = ["カメラ関連品", "雑貨", "衣類"];
 
-const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 8, marginBottom: 8 };
-const ROW_STYLE_END: React.CSSProperties = { display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" };
+/** 2026-09-23変更(ユーザー指示): 絞り込み条件を横3段組み(3列)のflex-wrapグリッドに変更。
+ *  各項目をこのスタイルで並べ、幅が足りない場合は自動的に折り返す。 */
+const FILTER_GRID_STYLE: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 };
+const FILTER_ITEM_STYLE: React.CSSProperties = { flex: "1 1 30%", minWidth: 150 };
 
 export default function ItemListPane({
   items,
@@ -64,12 +66,12 @@ export default function ItemListPane({
   return (
     <div>
       <div style={{ padding: "12px", borderBottom: "0.5px solid var(--border)" }}>
-        {/* 1段目: アカウント / ステータス */}
-        <div style={ROW_STYLE}>
+        {/* 絞り込み条件(2026-09-23変更: 横3段組み(3列)のflex-wrapグリッドに変更)。 */}
+        <div style={FILTER_GRID_STYLE}>
           <select
             value={filters.account ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, account: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           >
             <option value="">アカウント(すべて)</option>
             {EBAY_ACCOUNT_OPTIONS.map((a) => (
@@ -90,7 +92,7 @@ export default function ItemListPane({
                   | undefined,
               })
             }
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           >
             <option value="">ステータス(すべて)</option>
             {STATUS_FILTER_OPTIONS.map(([value, label]) => (
@@ -99,14 +101,10 @@ export default function ItemListPane({
               </option>
             ))}
           </select>
-        </div>
-
-        {/* 2段目: カテゴリ / 表示順 */}
-        <div style={ROW_STYLE}>
           <select
             value={filters.category ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, category: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           >
             <option value="">カテゴリ(すべて)</option>
             {CATEGORY_OPTIONS.map((c) => (
@@ -118,7 +116,7 @@ export default function ItemListPane({
           <select
             value={sort}
             onChange={(e) => onSortChange(e.target.value as ItemSortOption)}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -126,50 +124,38 @@ export default function ItemListPane({
               </option>
             ))}
           </select>
-        </div>
-
-        {/* 3段目: 管理番号・シリアル番号 / 追跡番号 */}
-        <div style={ROW_STYLE}>
           <input
             type="text"
             placeholder="管理番号・シリアル番号"
             value={filters.keyword ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, keyword: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           />
           <input
             type="text"
             placeholder="追跡番号"
             value={filters.trackingNumber ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, trackingNumber: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           />
-        </div>
-
-        {/* 4段目: ブランド/機種 / 仕入品名 */}
-        <div style={ROW_STYLE}>
           <input
             type="text"
             placeholder="ブランド/機種"
             value={filters.brand ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, brand: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           />
           <input
             type="text"
             placeholder="仕入品名"
             value={filters.purchaseTitle ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, purchaseTitle: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           />
-        </div>
-
-        {/* 5段目: 仕入先 / 出品者名 */}
-        <div style={ROW_STYLE}>
           <select
             value={filters.sourceType ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, sourceType: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           >
             <option value="">仕入先(すべて)</option>
             {SOURCE_TYPE_OPTIONS.map((o) => (
@@ -183,13 +169,9 @@ export default function ItemListPane({
             placeholder="出品者名"
             value={filters.sellerName ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, sellerName: e.target.value || undefined })}
-            style={{ flex: 1 }}
+            style={FILTER_ITEM_STYLE}
           />
-        </div>
-
-        {/* 6段目: 仕入日(範囲) / 販売日(範囲) */}
-        <div style={ROW_STYLE_END}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ ...FILTER_ITEM_STYLE, display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>仕入日</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -207,7 +189,7 @@ export default function ItemListPane({
               />
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ ...FILTER_ITEM_STYLE, display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>販売日</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -221,6 +203,24 @@ export default function ItemListPane({
                 type="date"
                 value={filters.saleDateTo ?? ""}
                 onChange={(e) => onFiltersChange({ ...filters, saleDateTo: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+            </div>
+          </div>
+          <div style={{ ...FILTER_ITEM_STYLE, display: "flex", flexDirection: "column", gap: 2 }}>
+            <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>更新日</label>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="date"
+                value={filters.updatedAtFrom ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, updatedAtFrom: e.target.value || undefined })}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>〜</span>
+              <input
+                type="date"
+                value={filters.updatedAtTo ?? ""}
+                onChange={(e) => onFiltersChange({ ...filters, updatedAtTo: e.target.value || undefined })}
                 style={{ flex: 1 }}
               />
             </div>

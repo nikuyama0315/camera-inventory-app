@@ -144,6 +144,9 @@ interface TableFilters {
   purchaseItemName: string;
   /** 追跡番号(items.tracking_info、sales.tracking_info由来)のテキスト部分一致。2026-09-06追加。 */
   trackingNumber: string;
+  /** 更新日(items.updated_at)のfrom/to範囲指定。2026-09-23追加。 */
+  updatedAtFrom: string;
+  updatedAtTo: string;
 }
 
 const EMPTY_FILTERS: TableFilters = {
@@ -160,6 +163,8 @@ const EMPTY_FILTERS: TableFilters = {
   sourceName: "",
   purchaseItemName: "",
   trackingNumber: "",
+  updatedAtFrom: "",
+  updatedAtTo: "",
 };
 
 const STATUS_OPTIONS = Object.entries(ITEM_STATUS_LABELS) as [ItemStatus, string][];
@@ -316,6 +321,12 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
         return false;
       }
       if (filters.saleDateTo && (!item.sale_date || item.sale_date > filters.saleDateTo)) {
+        return false;
+      }
+      if (filters.updatedAtFrom && (!item.updated_at || item.updated_at.slice(0, 10) < filters.updatedAtFrom)) {
+        return false;
+      }
+      if (filters.updatedAtTo && (!item.updated_at || item.updated_at.slice(0, 10) > filters.updatedAtTo)) {
         return false;
       }
       return true;
@@ -500,6 +511,22 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
               type="date"
               value={filters.saleDateTo}
               onChange={(e) => updateFilter("saleDateTo", e.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>更新日</label>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <input
+              type="date"
+              value={filters.updatedAtFrom}
+              onChange={(e) => updateFilter("updatedAtFrom", e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>〜</span>
+            <input
+              type="date"
+              value={filters.updatedAtTo}
+              onChange={(e) => updateFilter("updatedAtTo", e.target.value)}
             />
           </div>
         </div>
