@@ -257,7 +257,7 @@ export default function InventoryPage() {
         </div>
       ) : viewMode === "split" ? (
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <div style={{ width: "38%", borderRight: "0.5px solid var(--border)", overflowY: "auto" }}>
+          <div style={{ width: "46%", borderRight: "0.5px solid var(--border)", overflowY: "auto" }}>
             <ItemListPane
               items={items}
               loading={loading}
