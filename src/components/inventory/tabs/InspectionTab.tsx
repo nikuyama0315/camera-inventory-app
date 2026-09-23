@@ -120,6 +120,8 @@ function buildInitialValues(detail: ItemDetail): FormValues {
   }
   values.condition_grade = existing?.condition_grade ?? "";
   values.functional_check_notes = existing?.functional_check_notes ?? "";
+  values.optical_check_lens_notes = existing?.optical_check_lens_notes ?? "";
+  values.optical_check_finder_notes = existing?.optical_check_finder_notes ?? "";
   for (const item of FUNCTIONAL_CHECK_ITEMS) {
     values[item.key] = (existing?.[item.key as keyof typeof existing] as string | null) ?? "";
   }
@@ -234,6 +236,8 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,
         functional_check_notes: values.functional_check_notes || null,
+        optical_check_lens_notes: values.optical_check_lens_notes || null,
+        optical_check_finder_notes: values.optical_check_finder_notes || null,
         check_shutter: (values.check_shutter || null) as "ok" | "ng" | "na" | null,
         check_flash: (values.check_flash || null) as "ok" | "ng" | "na" | null,
         check_autofocus: (values.check_autofocus || null) as "ok" | "ng" | "na" | null,
@@ -510,6 +514,15 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             })}
           </tbody>
         </table>
+        {/* 2026-09-23追加: 光学チェック表(レンズ)の下の自由記述欄。Description HTMLでは
+            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALLENSNOTES参照)。 */}
+        <textarea
+          rows={2}
+          placeholder="光学チェック表(レンズ)の補足(自由記述)"
+          value={values.optical_check_lens_notes}
+          onChange={(e) => update("optical_check_lens_notes", e.target.value)}
+          style={{ width: "100%", marginTop: 6, fontSize: 12 }}
+        />
       </div>
 
       <div style={{ flex: "0 0 auto" }}>
@@ -551,6 +564,15 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             })}
           </tbody>
         </table>
+        {/* 2026-09-23追加: 光学チェック表(ファインダー)の下の自由記述欄。Description HTMLでは
+            Optics Inspectionの下に、入力があるときのみ表示する(descriptionGenerator.tsのOPTICALFINDERNOTES参照)。 */}
+        <textarea
+          rows={2}
+          placeholder="光学チェック表(ファインダー)の補足(自由記述)"
+          value={values.optical_check_finder_notes}
+          onChange={(e) => update("optical_check_finder_notes", e.target.value)}
+          style={{ width: "100%", marginTop: 6, fontSize: 12 }}
+        />
       </div>
       </div>
 

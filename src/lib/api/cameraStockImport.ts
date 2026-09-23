@@ -317,6 +317,8 @@ export async function executeCameraStockImportRow(
           optical_finder_haze: null,
           optical_finder_mark: null,
           functional_check_notes: null,
+          optical_check_lens_notes: null,
+          optical_check_finder_notes: null,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "不明なエラー";

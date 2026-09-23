@@ -84,7 +84,7 @@ $$FUNCTIONALNOTES$$  </table>
       </tbody>
     </table>
   </div>
-
+$$OPTICALLENSNOTES$$$$OPTICALFINDERNOTES$$
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Included Accessories</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 20px; font-size: 14px; line-height: 1.8;">
     $$INCLUDESLI$$<li>As shown in the listing photos (see photo gallery for exact contents).</li>
@@ -256,6 +256,15 @@ function buildReplacements(
     // Functional CheckテーブルのSelf timer行の下に、入力があるときのみ行として追加する。
     FUNCTIONALNOTES: (values.functional_check_notes || "").trim()
       ? `<tr><td colspan="3" style="padding:8px 0 0;">${values.functional_check_notes}</td></tr>`
+      : "",
+    // 2026-09-23追加(ユーザー指示): 光学チェック表(レンズ/ファインダー)の下の自由記述欄を、
+    // Optics Inspectionの下に、入力があるものだけ縦積みで表示する(それぞれ独立、両方空なら
+    // 表示エリア自体が出ない)。
+    OPTICALLENSNOTES: (values.optical_check_lens_notes || "").trim()
+      ? `<p style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 10px 0 0; font-size: 14px; line-height: 1.75;">${values.optical_check_lens_notes}</p>`
+      : "",
+    OPTICALFINDERNOTES: (values.optical_check_finder_notes || "").trim()
+      ? `<p style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 10px 0 0; font-size: 14px; line-height: 1.75;">${values.optical_check_finder_notes}</p>`
       : "",
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",

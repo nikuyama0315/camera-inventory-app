@@ -142,6 +142,10 @@ export interface Inspection {
   /** 状態チェック表の下の自由記述欄(2026-09-23追加)。Description HTMLの
    *  Functional CheckテーブルのSelf timer行の下に、入力があるときのみ表示する。 */
   functional_check_notes: string | null;
+  /** 光学チェック表(レンズ/ファインダー)の下の自由記述欄(2026-09-23追加)。Description HTMLの
+   *  Optics Inspectionの下に、入力があるものだけ縦積みで表示する。 */
+  optical_check_lens_notes: string | null;
+  optical_check_finder_notes: string | null;
 }
 
 export interface ItemDriveFolder {
