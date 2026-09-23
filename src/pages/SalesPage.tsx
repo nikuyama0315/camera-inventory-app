@@ -49,6 +49,7 @@ interface FormState {
   selectedItem: ItemForSale | null;
   sale_date: string;
   sale_item_title: string;
+  order_number: string;
   tracking_info: string;
   jp_platform_price: string;
   jp_platform_fee: string;
@@ -67,6 +68,7 @@ const EMPTY_FORM: FormState = {
   selectedItem: null,
   sale_date: new Date().toISOString().slice(0, 10),
   sale_item_title: "",
+  order_number: "",
   tracking_info: "",
   jp_platform_price: "0",
   jp_platform_fee: "0",
@@ -541,6 +543,7 @@ export default function SalesPage() {
           item_id: form.selectedItem.id,
           sale_date: form.sale_date,
           sale_item_title: form.sale_item_title || null,
+          order_number: form.order_number || null,
           tracking_info: form.tracking_info || null,
           jp_platform_price: num(form.jp_platform_price),
           jp_platform_fee: num(form.jp_platform_fee),
@@ -571,6 +574,7 @@ export default function SalesPage() {
             item_id: form.selectedItem.id,
             sale_date: form.sale_date,
             sale_item_title: form.sale_item_title || undefined,
+            order_number: form.order_number || undefined,
             tracking_info: form.tracking_info || undefined,
             jp_platform_price: num(form.jp_platform_price),
             jp_platform_fee: num(form.jp_platform_fee),
@@ -628,6 +632,7 @@ export default function SalesPage() {
       },
       sale_date: s.sale_date,
       sale_item_title: s.sale_item_title ?? "",
+      order_number: s.order_number ?? "",
       tracking_info: s.tracking_info ?? "",
       jp_platform_price: String(s.jp_platform_price),
       jp_platform_fee: String(s.jp_platform_fee),
@@ -918,9 +923,10 @@ export default function SalesPage() {
             <colgroup>
               <col style={{ width: "7%" }} />
               <col style={{ width: "7%" }} />
+              <col style={{ width: "7%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "22%" }} />
-              <col style={{ width: "9%" }} />
+              <col style={{ width: "8%" }} />
               <col style={{ width: "10%" }} />
               <col style={{ width: "9%" }} />
               <col style={{ width: "8%" }} />
@@ -943,6 +949,7 @@ export default function SalesPage() {
                 </th>
                 <th style={{ padding: "6px 8px" }}>アカウント</th>
                 <th style={{ padding: "6px 8px" }}>販売アイテム名</th>
+                <th style={{ padding: "6px 8px" }}>Order No.</th>
                 <th style={{ padding: "6px 8px" }}>追跡情報</th>
                 <th style={{ padding: "6px 8px", textAlign: "right" }}>円貨+ドル貨合計</th>
                 <th style={{ padding: "6px 8px", textAlign: "right" }}>送料支払</th>
@@ -970,6 +977,9 @@ export default function SalesPage() {
                   </td>
                   <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
                     {s.sale_item_title ?? "-"}
+                  </td>
+                  <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
+                    {s.order_number ?? "-"}
                   </td>
                   <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
                     {s.tracking_info ?? "-"}
@@ -1417,6 +1427,9 @@ export default function SalesPage() {
               }}
               style={{ width: "100%" }}
             />
+          </Field>
+          <Field label="Order No.">
+            <input type="text" value={form.order_number} onChange={(e) => updateForm("order_number", e.target.value)} style={{ width: "100%" }} />
           </Field>
           <Field label="追跡情報">
             <input type="text" value={form.tracking_info} onChange={(e) => updateForm("tracking_info", e.target.value)} style={{ width: "100%" }} />
