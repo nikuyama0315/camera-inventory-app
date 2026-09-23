@@ -29,7 +29,7 @@ const DESCRIPTION_TEMPLATE = `<div itemscope="" itemtype="https://schema.org/Pro
 <tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Body Serial No.</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">$$BODYSN$$</td></tr>
 <tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Lens Serial No.</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">$$LENSSN$$</td></tr>
 <tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Tested functions</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">$$TESTEDFUNC$$ : Confirmed working</td></tr>
-<tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Includes</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">As shown in the listing photos. ($$INCLUDES$$)</td></tr>
+<tr><th scope="row" style="width:130px;padding:3px 14px 3px 0;text-align:left;vertical-align:top;font-weight:bold;">Includes</th><td style="padding:3px 0;text-align:left;vertical-align:top;overflow-wrap:anywhere;">As shown in the listing photos.$$INCLUDES_PAREN$$</td></tr>
 </tbody></table>
 $$GRADETABLE$$
   </div>
@@ -241,6 +241,12 @@ function buildReplacements(
     TYPE: detail.type ?? "",
     TESTEDFUNC: testedFunc,
     INCLUDES: detail.accessories_included ?? "",
+    // 2026-09-23追加(ユーザー指示): 付属物(accessories_included)が未登録の場合、Quick Facts表の
+    // 「Includes」欄に空の丸括弧「()」だけが残ってしまうのを避けるため、値がある場合のみ
+    // 前後の半角スペース+丸括弧ごと差し込む(無い場合はこのトークン自体が空文字列になる)。
+    INCLUDES_PAREN: (detail.accessories_included ?? "").trim()
+      ? ` (${detail.accessories_included})`
+      : "",
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",
     OPTICALTEXT: [values.lens_notes_en || "", values.viewfinder_notes_en || ""].filter(Boolean).join(opticalSeparator),
