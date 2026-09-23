@@ -120,16 +120,16 @@ export default function ItemListPane({
             placeholder="管理番号・シリアル番号"
             value={filters.keyword ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, keyword: e.target.value || undefined })}
-            style={{ flex: "0.7" }}
+            style={{ flex: "0.5" }}
           />
           <input
             type="text"
             placeholder="追跡番号"
             value={filters.trackingNumber ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, trackingNumber: e.target.value || undefined })}
-            style={{ flex: "0.7" }}
+            style={{ flex: "0.5" }}
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: "1.6" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: "1" }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>登録日時</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
