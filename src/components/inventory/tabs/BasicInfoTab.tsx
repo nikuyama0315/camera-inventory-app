@@ -117,12 +117,15 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
   const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
+  /** ITEM TITLEの入力候補(datalist、2026-09-23追加)。 */
+  const [itemTitleOptions, setItemTitleOptions] = useState<string[]>([]);
   useEffect(() => {
     fetchDistinctBrandsAndModels()
       .then((opts) => {
         setBrandOptions(opts.brands);
         setModelOptions(opts.models);
         setTypeOptions(opts.types);
+        setItemTitleOptions(opts.itemTitles);
       })
       .catch(() => {
         /* 候補取得の失敗は致命的でないため無視(自由入力は引き続き可能) */
@@ -511,10 +514,16 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
         <EditField label="ITEM TITLE" highlight>
           <input
             type="text"
+            list="item-title-options"
             value={editForm.item_title}
             onChange={(e) => updateEdit("item_title", truncateToHalfWidthLimit(e.target.value, HALF_WIDTH_TITLE_MAX_LENGTH))}
             style={{ width: "100%" }}
           />
+          <datalist id="item-title-options">
+            {itemTitleOptions.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
           <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
             {halfWidthLength(editForm.item_title)} / {HALF_WIDTH_TITLE_MAX_LENGTH}(半角換算。全角文字は2文字分としてカウントします)
           </p>

@@ -558,6 +558,8 @@ export interface BrandModelOptions {
   models: string[];
   /** タイプの入力候補(datalist用、2026-09-22追加)。 */
   types: string[];
+  /** ITEM TITLE(items.item_title)の入力候補(datalist用、2026-09-23追加)。 */
+  itemTitles: string[];
 }
 
 /** ブランド・機種名・タイプの入力候補(datalist用)を、登録済み商品から重複無しで取得する(2026-09-15追加、
@@ -568,11 +570,12 @@ export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions>
   const brands = new Set<string>();
   const models = new Set<string>();
   const types = new Set<string>();
+  const itemTitles = new Set<string>();
   let from = 0;
   while (true) {
     const { data, error } = await supabase
       .from("items")
-      .select("brand, model, type")
+      .select("brand, model, type, item_title")
       .range(from, from + pageSize - 1);
     if (error) throw error;
     const rows = data ?? [];
@@ -583,6 +586,8 @@ export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions>
       if (m) models.add(m);
       const t = (row.type ?? "").trim();
       if (t) types.add(t);
+      const it = (row.item_title ?? "").trim();
+      if (it) itemTitles.add(it);
     }
     if (rows.length < pageSize) break;
     from += pageSize;
@@ -591,5 +596,6 @@ export async function fetchDistinctBrandsAndModels(): Promise<BrandModelOptions>
     brands: Array.from(brands).sort((a, b) => a.localeCompare(b, "ja")),
     models: Array.from(models).sort((a, b) => a.localeCompare(b, "ja")),
     types: Array.from(types).sort((a, b) => a.localeCompare(b, "ja")),
+    itemTitles: Array.from(itemTitles).sort((a, b) => a.localeCompare(b, "ja")),
   };
 }
