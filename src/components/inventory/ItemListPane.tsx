@@ -47,7 +47,6 @@ const STATUS_FILTER_OPTIONS: [string, string][] = [
 const CATEGORY_OPTIONS = ["カメラ関連品", "雑貨", "衣類"];
 
 const ROW_STYLE: React.CSSProperties = { display: "flex", gap: 8, marginBottom: 8 };
-const ROW_STYLE_END: React.CSSProperties = { display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" };
 
 export default function ItemListPane({
   items,
@@ -114,24 +113,29 @@ export default function ItemListPane({
           </select>
         </div>
 
-        <div style={ROW_STYLE_END}>
-          <div style={{ display: "flex", gap: 8, flex: 1 }}>
+        {/* 2026-09-23変更: rows2〜6をCSS Gridの2列に変更。flexboxで行ごとに独立してサイズ計算する
+            方式だと、行によって左側の要素の中身(inputとbuttonの既定box-sizing差、複数inputを内包する
+            ラッパーの有無等)が異なるため、右側の項目(登録日時・仕入日・販売日・更新日・新規登録)の
+            左端が行ごとに微妙にズレてしまっていた。CSS Gridは列幅を全行共通で1回だけ計算するため、
+            この種のズレが原理的に起きない。 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 8, rowGap: 8 }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <input
               type="text"
               placeholder="管理番号・シリアル番号"
               value={filters.keyword ?? ""}
               onChange={(e) => onFiltersChange({ ...filters, keyword: e.target.value || undefined })}
-              style={{ flex: 1 }}
+              style={{ flex: 1, minWidth: 0 }}
             />
             <input
               type="text"
               placeholder="追跡番号"
               value={filters.trackingNumber ?? ""}
               onChange={(e) => onFiltersChange({ ...filters, trackingNumber: e.target.value || undefined })}
-              style={{ flex: 1 }}
+              style={{ flex: 1, minWidth: 0 }}
             />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>登録日時</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -149,17 +153,14 @@ export default function ItemListPane({
               />
             </div>
           </div>
-        </div>
 
-        <div style={ROW_STYLE}>
           <input
             type="text"
             placeholder="ブランド/機種"
             value={filters.brand ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, brand: e.target.value || undefined })}
-            style={{ flex: 1 }}
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>仕入日</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -177,17 +178,14 @@ export default function ItemListPane({
               />
             </div>
           </div>
-        </div>
 
-        <div style={ROW_STYLE}>
           <input
             type="text"
             placeholder="仕入品名"
             value={filters.purchaseTitle ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, purchaseTitle: e.target.value || undefined })}
-            style={{ flex: 1 }}
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>販売日</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -205,13 +203,10 @@ export default function ItemListPane({
               />
             </div>
           </div>
-        </div>
 
-        <div style={ROW_STYLE}>
           <select
             value={filters.sourceType ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, sourceType: e.target.value || undefined })}
-            style={{ flex: 1 }}
           >
             <option value="">仕入先(すべて)</option>
             {SOURCE_TYPE_OPTIONS.map((o) => (
@@ -220,7 +215,7 @@ export default function ItemListPane({
               </option>
             ))}
           </select>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>更新日</label>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <input
@@ -238,19 +233,14 @@ export default function ItemListPane({
               />
             </div>
           </div>
-        </div>
 
-        <div style={ROW_STYLE}>
           <input
             type="text"
             placeholder="出品者名"
             value={filters.sellerName ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, sellerName: e.target.value || undefined })}
-            style={{ flex: 1 }}
           />
-          <button onClick={onStartNewItem} style={{ flex: 1 }}>
-            + 新規登録
-          </button>
+          <button onClick={onStartNewItem}>+ 新規登録</button>
         </div>
       </div>
 
