@@ -224,4 +224,7 @@ export interface ItemListFilters {
    *  仕入日・販売日と異なりjoinの切り替えは不要。 */
   updatedAtFrom?: string;
   updatedAtTo?: string;
+  /** 登録日時(items.created_at)での範囲絞り込み(2026-09-23追加)。updated_at同様joinの切り替えは不要。 */
+  createdAtFrom?: string;
+  createdAtTo?: string;
 }

@@ -226,9 +226,18 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   }
   if (filters.updatedAtTo) {
     // updated_atはtimestamptzのため、日付のみ指定時は当日末尾まで含めるよう翌日0時未満で絞り込む。
-    const nextDay = new Date(`${filters.updatedAtTo}T00:00:00`);
-    nextDay.setDate(nextDay.getDate() + 1);
-    query = query.lt("updated_at", nextDay.toISOString().slice(0, 10));
+    const nextUpdatedDay = new Date(`${filters.updatedAtTo}T00:00:00`);
+    nextUpdatedDay.setDate(nextUpdatedDay.getDate() + 1);
+    query = query.lt("updated_at", nextUpdatedDay.toISOString().slice(0, 10));
+  }
+  if (filters.createdAtFrom) {
+    query = query.gte("created_at", filters.createdAtFrom);
+  }
+  if (filters.createdAtTo) {
+    // created_atもtimestamptzのため、updated_atと同様に翌日0時未満で絞り込む。
+    const nextCreatedDay = new Date(`${filters.createdAtTo}T00:00:00`);
+    nextCreatedDay.setDate(nextCreatedDay.getDate() + 1);
+    query = query.lt("created_at", nextCreatedDay.toISOString().slice(0, 10));
   }
   return query;
 }
