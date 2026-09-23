@@ -632,7 +632,7 @@ export default function SalesPage() {
       },
       sale_date: s.sale_date,
       sale_item_title: s.sale_item_title ?? "",
-      order_number: s.order_number ?? "",
+      order_number: s.order_number ?? s.ebay_transaction_lines?.order_number ?? "",
       tracking_info: s.tracking_info ?? "",
       jp_platform_price: String(s.jp_platform_price),
       jp_platform_fee: String(s.jp_platform_fee),
@@ -979,7 +979,7 @@ export default function SalesPage() {
                     {s.sale_item_title ?? "-"}
                   </td>
                   <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
-                    {s.order_number ?? "-"}
+                    {s.order_number ?? s.ebay_transaction_lines?.order_number ?? "-"}
                   </td>
                   <td style={{ padding: "8px", whiteSpace: "normal", overflowWrap: "break-word" }}>
                     {s.tracking_info ?? "-"}

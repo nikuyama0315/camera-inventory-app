@@ -40,6 +40,9 @@ export interface Sale {
 
 export interface SaleWithItem extends Sale {
   items: { management_no: string; title: string | null } | null;
+  /** eBay自動同期(ebay_transaction_lines)の読み取り専用Order番号(2026-09-24追加、
+   *  order_number未入力時の表示フォールバック用)。紐付けが無い場合はnull。 */
+  ebay_transaction_lines: { order_number: string | null } | null;
 }
 
 export interface CreateSaleInput {
@@ -372,7 +375,7 @@ export async function fetchSalesList(
 ): Promise<SaleWithItem[]> {
   let query = supabase
     .from("sales")
-    .select("*, items(management_no, title)")
+    .select("*, items(management_no, title), ebay_transaction_lines(order_number)")
     .order("sale_date", { ascending: false })
     .limit(limit);
 
