@@ -158,6 +158,15 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
     setSellerNoteText(generateSellerNoteText(detail, values));
   }
 
+  /** 2026-09-23追加: 生成したDescription HTMLを、そのままブラウザの新しいタブで開いて見た目を確認できるようにする。
+   *  Blob URLを使う(テキストエリア編集後の最新の内容を都度反映するため、生成のたびに新しいURLを作る)。 */
+  function handleViewDescriptionInBrowser() {
+    const blob = new Blob([descriptionHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
   function update(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
@@ -601,12 +610,21 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
         <button onClick={handleGenerateDescription}>Description生成</button>
         {(descriptionHtml || sellerNoteText) && (
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
-            <textarea
-              rows={16}
-              value={descriptionHtml}
-              onChange={(e) => setDescriptionHtml(e.target.value)}
-              style={{ flex: 1, minWidth: 320, fontFamily: "monospace", fontSize: 11 }}
-            />
+            <div style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column" }}>
+              <textarea
+                rows={16}
+                value={descriptionHtml}
+                onChange={(e) => setDescriptionHtml(e.target.value)}
+                style={{ fontFamily: "monospace", fontSize: 11 }}
+              />
+              <button
+                onClick={handleViewDescriptionInBrowser}
+                disabled={!descriptionHtml.trim()}
+                style={{ marginTop: 6, width: "fit-content" }}
+              >
+                ブラウザで見る
+              </button>
+            </div>
             <textarea
               rows={16}
               value={sellerNoteText}
