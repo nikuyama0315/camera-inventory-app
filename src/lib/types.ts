@@ -139,6 +139,9 @@ export interface Inspection {
   optical_finder_fungus: "none" | "few" | "middle" | "large" | null;
   optical_finder_haze: "none" | "few" | "middle" | "large" | null;
   optical_finder_mark: "none" | "few" | "middle" | "large" | null;
+  /** 状態チェック表の下の自由記述欄(2026-09-23追加)。Description HTMLの
+   *  Functional CheckテーブルのSelf timer行の下に、入力があるときのみ表示する。 */
+  functional_check_notes: string | null;
 }
 
 export interface ItemDriveFolder {

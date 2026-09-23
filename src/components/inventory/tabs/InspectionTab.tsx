@@ -119,6 +119,7 @@ function buildInitialValues(detail: ItemDetail): FormValues {
     values[f.enKey] = (existing?.[f.enKey as keyof typeof existing] as string | null) ?? "";
   }
   values.condition_grade = existing?.condition_grade ?? "";
+  values.functional_check_notes = existing?.functional_check_notes ?? "";
   for (const item of FUNCTIONAL_CHECK_ITEMS) {
     values[item.key] = (existing?.[item.key as keyof typeof existing] as string | null) ?? "";
   }
@@ -232,6 +233,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
         other_notes: values.other_notes || null,
         other_notes_en: values.other_notes_en || null,
         condition_grade: values.condition_grade || null,
+        functional_check_notes: values.functional_check_notes || null,
         check_shutter: (values.check_shutter || null) as "ok" | "ng" | "na" | null,
         check_flash: (values.check_flash || null) as "ok" | "ng" | "na" | null,
         check_autofocus: (values.check_autofocus || null) as "ok" | "ng" | "na" | null,
@@ -458,6 +460,15 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             ))}
           </tbody>
         </table>
+        {/* 2026-09-23追加: 状態チェック表の下の自由記述欄。Description HTMLではSelf timer行の
+            下に、入力があるときのみ表示する(descriptionGenerator.tsのFUNCTIONALNOTES参照)。 */}
+        <textarea
+          rows={2}
+          placeholder="状態チェック表の補足(自由記述)"
+          value={values.functional_check_notes}
+          onChange={(e) => update("functional_check_notes", e.target.value)}
+          style={{ width: "100%", marginTop: 6, fontSize: 12 }}
+        />
       </div>
 
       <div style={{ flex: "0 0 auto" }}>

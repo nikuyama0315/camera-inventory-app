@@ -51,7 +51,7 @@ $$GRADETABLE$$
     <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:110px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
     <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:110px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
     <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:110px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
-  </table>
+$$FUNCTIONALNOTES$$  </table>
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
   <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px 24px;">
@@ -87,7 +87,7 @@ $$GRADETABLE$$
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Included Accessories</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 20px; font-size: 14px; line-height: 1.8;">
-    <li>$$INCLUDES$$</li><li>As shown in the listing photos (see photo gallery for exact contents).</li>
+    $$INCLUDESLI$$<li>As shown in the listing photos (see photo gallery for exact contents).</li>
   </ul>
 
   <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px;">
@@ -246,6 +246,16 @@ function buildReplacements(
     // 前後の半角スペース+丸括弧ごと差し込む(無い場合はこのトークン自体が空文字列になる)。
     INCLUDES_PAREN: (detail.accessories_included ?? "").trim()
       ? ` (${detail.accessories_included})`
+      : "",
+    // 2026-09-23追加(ユーザー指示): Included Accessoriesの1行目(付属物そのものの記載)は、
+    // 未登録の場合は空の<li></li>を残さず行ごと出力しない。
+    INCLUDESLI: (detail.accessories_included ?? "").trim()
+      ? `<li>${detail.accessories_included}</li>`
+      : "",
+    // 2026-09-23追加(ユーザー指示): 状態チェック表の下の自由記述欄(functional_check_notes)を、
+    // Functional CheckテーブルのSelf timer行の下に、入力があるときのみ行として追加する。
+    FUNCTIONALNOTES: (values.functional_check_notes || "").trim()
+      ? `<tr><td colspan="3" style="padding:8px 0 0;">${values.functional_check_notes}</td></tr>`
       : "",
     EXTERIOR: values.appearance_notes_en || "",
     ELECTRICITY: values.electrical_notes_en || "",
