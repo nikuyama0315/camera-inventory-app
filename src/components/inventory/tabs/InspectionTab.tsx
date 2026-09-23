@@ -144,6 +144,10 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   // 検品項目の入力候補(2026-09-16追加)。過去の検品データから頻度順に集計したものを、
   // マウント時と保存成功時(新しい値が候補に反映されるよう)に再取得する。
   const [candidates, setCandidates] = useState<InspectionFieldCandidates>({});
+  // 候補選択欄(2026-09-23変更: <select>からinput+datalist方式に変更し、文字列入力で候補を
+  // 絞り込めるようにした)。選択欄自体の入力途中の文字列を、フィールドキーごとに保持する
+  // (実際の値(values[key])とは別管理。候補と完全一致した時点でvaluesへ反映し、この欄は空に戻す)。
+  const [candidateSearch, setCandidateSearch] = useState<Record<string, string>>({});
   // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [sellerNoteText, setSellerNoteText] = useState("");
@@ -172,6 +176,18 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
 
   function update(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  /** 候補選択欄(input+datalist)の入力ハンドラ。入力値が候補一覧と完全一致した時点(=datalistから
+   *  選択、またはユーザーが候補と同じ文字列まで手入力した時点)で実際の値へ反映し、選択欄は空に戻す。
+   *  一致しない間は絞り込み中の文字列として保持するだけで、実際の値には反映しない。 */
+  function handleCandidateInput(key: string, list: string[] | undefined, raw: string) {
+    if (list?.includes(raw)) {
+      update(key, raw);
+      setCandidateSearch((prev) => ({ ...prev, [key]: "" }));
+    } else {
+      setCandidateSearch((prev) => ({ ...prev, [key]: raw }));
+    }
   }
 
   async function loadCandidates() {
@@ -357,21 +373,22 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             </label>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {(candidates[field.key]?.length ?? 0) > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) update(field.key, e.target.value);
-                  }}
-                  style={{ fontSize: 11, width: 620 }}
-                  title="過去に入力した内容から選択"
-                >
-                  <option value="">候補から選択...</option>
-                  {candidates[field.key].map((c) => (
-                    <option key={c} value={c}>
-                      {c.length > 80 ? `${c.slice(0, 80)}…` : c}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <input
+                    type="text"
+                    list={`candidates-${field.key}`}
+                    value={candidateSearch[field.key] ?? ""}
+                    onChange={(e) => handleCandidateInput(field.key, candidates[field.key], e.target.value)}
+                    placeholder="候補から選択(入力して絞り込み)..."
+                    style={{ fontSize: 11, width: 620 }}
+                    title="過去に入力した内容から選択(文字列を入力すると候補を絞り込めます)"
+                  />
+                  <datalist id={`candidates-${field.key}`}>
+                    {candidates[field.key].map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </>
               )}
               <button
                 onClick={() => handleTranslate(field)}
@@ -391,21 +408,20 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
           />
           {(candidates[field.enKey]?.length ?? 0) > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) update(field.enKey, e.target.value);
-                }}
+              <input
+                type="text"
+                list={`candidates-${field.enKey}`}
+                value={candidateSearch[field.enKey] ?? ""}
+                onChange={(e) => handleCandidateInput(field.enKey, candidates[field.enKey], e.target.value)}
+                placeholder="候補から選択(入力して絞り込み)..."
                 style={{ fontSize: 11, width: 620 }}
-                title="過去に入力した内容から選択"
-              >
-                <option value="">候補から選択...</option>
+                title="過去に入力した内容から選択(文字列を入力すると候補を絞り込めます)"
+              />
+              <datalist id={`candidates-${field.enKey}`}>
                 {candidates[field.enKey].map((c) => (
-                  <option key={c} value={c}>
-                    {c.length > 140 ? `${c.slice(0, 140)}…` : c}
-                  </option>
+                  <option key={c} value={c} />
                 ))}
-              </select>
+              </datalist>
             </div>
           )}
           <textarea
