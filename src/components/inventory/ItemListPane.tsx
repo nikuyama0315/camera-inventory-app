@@ -271,9 +271,10 @@ export default function ItemListPane({
                 background: isSelected ? "var(--surface-1)" : "transparent",
               }}
             >
-              {/* 2026-09-24変更(ユーザー指示): 管理番号・ブランド/機種・ステータス・状態ランクを1行に統合。 */}
-              <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>
-                {item.management_no}
+              {/* 2026-09-24変更(ユーザー指示): 管理番号・ブランド/機種・ステータス・状態ランクを1行に統合。
+                  管理番号のみ太字で強調表示。 */}
+              <p style={{ fontSize: 13, fontWeight: 400, margin: 0 }}>
+                <strong style={{ fontWeight: 700 }}>{item.management_no}</strong>
                 {[item.brand, item.model].filter(Boolean).length > 0
                   ? ` ・ ${[item.brand, item.model].filter(Boolean).join(" ")}`
                   : ""}
