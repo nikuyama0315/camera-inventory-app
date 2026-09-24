@@ -271,9 +271,13 @@ export default function ItemListPane({
                 background: isSelected ? "var(--surface-1)" : "transparent",
               }}
             >
-              <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{item.management_no}</p>
-              <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "2px 0 0" }}>
-                {[item.brand, item.model].filter(Boolean).join(" ")} ・ {ITEM_STATUS_LABELS[item.status]}
+              {/* 2026-09-24変更(ユーザー指示): 管理番号・ブランド/機種・ステータス・状態ランクを1行に統合。 */}
+              <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>
+                {item.management_no}
+                {[item.brand, item.model].filter(Boolean).length > 0
+                  ? ` ・ ${[item.brand, item.model].filter(Boolean).join(" ")}`
+                  : ""}
+                {` ・ ${ITEM_STATUS_LABELS[item.status]}`}
                 {item.condition_grade ? ` ・ ${item.condition_grade}` : ""}
               </p>
               {/* 2026-09-24追加(ユーザー指示): 状態チェック表下の自由記述(functional_check_notes)を表示。 */}
