@@ -121,6 +121,10 @@ export interface ItemWithPurchase extends Item {
   /** item_drive_folders.current_stage。2026-09-05追加: 「フォルダを開く」ボタンが、機種名フォルダの
    *  有無に関わらずステージに応じた正しいローカルパスを組み立てられるようにするため。 */
   drive_current_stage: string | null;
+  /** 直近の検品データ(inspections)の状態ランク(condition_grade)。未検品ならnull。2026-09-24追加。 */
+  condition_grade: string | null;
+  /** 直近の検品データの状態チェック表の下の自由記述(functional_check_notes)。未検品ならnull。2026-09-24追加。 */
+  functional_check_notes: string | null;
 }
 
 /** 在庫一覧(表形式)向けに、仕入日・仕入高も併せて取得する */
@@ -150,8 +154,12 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   let query = supabase
     .from("items")
     .select(
-      `id, management_no, category, brand, model, serial_number, title, status, created_at, updated_at, account, ${purchasesEmbed}, ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage)`,
-    );
+      `id, management_no, category, brand, model, serial_number, title, status, created_at, updated_at, account, ${purchasesEmbed}, ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage), inspections(condition_grade, functional_check_notes, inspected_at)`,
+    )
+    // 2026-09-24追加(ユーザー指示): 詳細編集モード左ペインの一覧に状態ランク・状態チェック表下の
+    // 自由記述を表示するため。inspectionsは1対多だが「現在の検品データ」は最新1件のみ使う
+    // (fetchItemDetailと同じ方針)ため、埋め込みリソース側を最新順にソートしておく。
+    .order("inspected_at", { foreignTable: "inspections", ascending: false });
 
   if (sort === "model_asc") {
     query = query.order("model", { ascending: true, nullsFirst: false });
@@ -334,13 +342,18 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
         | { drive_folder_id: string | null; drive_folder_path: string; model_folder_name: string | null; item_folder_name: string | null; current_stage: string | null }
         | { drive_folder_id: string | null; drive_folder_path: string; model_folder_name: string | null; item_folder_name: string | null; current_stage: string | null }[]
         | null;
+      inspections:
+        | { condition_grade: string | null; functional_check_notes: string | null; inspected_at: string }
+        | { condition_grade: string | null; functional_check_notes: string | null; inspected_at: string }[]
+        | null;
     }
   >).map((row) => {
-    const { purchases, sales, item_drive_folders, ...item } = row;
+    const { purchases, sales, item_drive_folders, inspections, ...item } = row;
     const purchase = Array.isArray(purchases) ? purchases[0] : purchases;
     const saleArray = Array.isArray(sales) ? sales : sales ? [sales] : [];
     const latestSale = saleArray.sort((a, b) => (a.sale_date < b.sale_date ? 1 : -1))[0];
     const driveFolder = Array.isArray(item_drive_folders) ? item_drive_folders[0] : item_drive_folders;
+    const latestInspection = Array.isArray(inspections) ? inspections[0] : inspections;
     return {
       ...item,
       purchase_date: purchase?.purchase_date ?? null,
@@ -359,6 +372,8 @@ function mapItemListWithPurchaseRows(data: unknown): ItemWithPurchase[] {
       drive_model_folder_name: driveFolder?.model_folder_name ?? null,
       drive_item_folder_name: driveFolder?.item_folder_name ?? null,
       drive_current_stage: driveFolder?.current_stage ?? null,
+      condition_grade: latestInspection?.condition_grade ?? null,
+      functional_check_notes: latestInspection?.functional_check_notes ?? null,
     };
   });
 }

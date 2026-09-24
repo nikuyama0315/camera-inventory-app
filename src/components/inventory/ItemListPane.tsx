@@ -1,10 +1,13 @@
-import type { Item, ItemListFilters, ItemStatus } from "../../lib/types";
+import type { ItemListFilters, ItemStatus } from "../../lib/types";
 import { EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS, ITEM_STATUS_LABELS } from "../../lib/types";
 import { SOURCE_TYPE_OPTIONS } from "../../lib/constants";
-import type { ItemSortOption } from "../../lib/api/items";
+import type { ItemSortOption, ItemWithPurchase } from "../../lib/api/items";
 
 interface Props {
-  items: Item[];
+  // 2026-09-24変更: 状態ランク・状態チェック表下の自由記述を一覧に表示するため、
+  // 検品データも含むItemWithPurchase[]を受け取るようにした(呼び出し元のInventoryPage.tsxは
+  // 元々fetchItemListWithPurchase()の結果をそのまま渡していたため、呼び出し側の変更は不要)。
+  items: ItemWithPurchase[];
   loading: boolean;
   errorMessage: string | null;
   filters: ItemListFilters;
@@ -271,7 +274,14 @@ export default function ItemListPane({
               <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{item.management_no}</p>
               <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "2px 0 0" }}>
                 {[item.brand, item.model].filter(Boolean).join(" ")} ・ {ITEM_STATUS_LABELS[item.status]}
+                {item.condition_grade ? ` ・ ${item.condition_grade}` : ""}
               </p>
+              {/* 2026-09-24追加(ユーザー指示): 状態チェック表下の自由記述(functional_check_notes)を表示。 */}
+              {item.functional_check_notes && (
+                <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                  {item.functional_check_notes}
+                </p>
+              )}
             </div>
           );
         })}
