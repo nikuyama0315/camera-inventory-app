@@ -641,7 +641,10 @@ export interface ListingCheckResult {
   totalListedInSystem: number;
   shortage: ListingCheckShortageRow[];
   excess: ListingCheckExcessRow[];
-  modelStockIssues: ListingCheckModelStockRow[];
+  /** 機種名を単語単位に分解して先頭3単語で突合した結果(2026-09-25追加)。 */
+  modelStockIssues3: ListingCheckModelStockRow[];
+  /** 機種名を単語単位に分解して先頭4単語で突合した結果(2026-09-25追加)。 */
+  modelStockIssues4: ListingCheckModelStockRow[];
 }
 
 export async function runEbayListingCheck(

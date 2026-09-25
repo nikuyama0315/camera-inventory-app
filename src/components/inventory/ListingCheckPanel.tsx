@@ -1,6 +1,55 @@
 import { useState } from "react";
-import { runEbayListingCheck, type ListingCheckResult } from "../../lib/api/ebaySync";
+import { runEbayListingCheck, type ListingCheckResult, type ListingCheckModelStockRow } from "../../lib/api/ebaySync";
 import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
+
+/**
+ * 「在庫あり・eBay出品なし/QTY全て0の機種」表(2026-09-25追加)。3単語版・4単語版で
+ * マッチング精度が異なるため、共通の表コンポーネントとして切り出し2段で並べる。
+ */
+function ModelStockIssuesTable({ title, wordCount, rows }: { title: string; wordCount: number; rows: ListingCheckModelStockRow[] }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+        {title}({rows.length}件)
+      </p>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 0, marginBottom: 8 }}>
+        在庫アラート(Google Drive「@撮影済み・出品待ち」フォルダ)で在庫1件以上ある機種のうち、
+        機種名を含むeBayアクティブ出品(米国サイト)が1件も無いか、見つかってもQTY合計が0のものです
+        (機種名とeBay出品タイトルの突合は、ブランド名を含めて先頭{wordCount}単語までのあいまい一致)。
+      </p>
+      {rows.length === 0 ? (
+        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+      ) : (
+        <table style={{ width: "30%", fontSize: 12, borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+              <th style={{ padding: "4px" }}>機種名</th>
+              <th style={{ padding: "4px", textAlign: "right" }}>在庫数</th>
+              <th style={{ padding: "4px", textAlign: "right" }}>該当eBay出品数</th>
+              <th style={{ padding: "4px", textAlign: "right" }}>QTY合計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={row.modelFolderName}
+                style={{
+                  borderTop: "0.5px solid var(--border)",
+                  background: i % 2 === 1 ? "var(--surface-1)" : undefined,
+                }}
+              >
+                <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
+                <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
+                <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
+                <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 
 /**
  * 「出品チェック」タブ(2026-09-08新規)。システム上「出品中」ステータスの商品と、
@@ -152,48 +201,19 @@ export default function ListingCheckPanel() {
           </div>
 
           {/* 2026-09-25追加(ユーザー指示): 在庫アラートで在庫1件以上ある機種のうち、eBayに
-              同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。過剰の下に配置、
-              横幅50%・ゼブラ表示(2026-09-25変更)。 */}
-          <div style={{ marginBottom: 24 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-              在庫あり・eBay出品なし/QTY全て0の機種({result.modelStockIssues.length}件)
-            </p>
-            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 0, marginBottom: 8 }}>
-              在庫アラート(Google Drive「@撮影済み・出品待ち」フォルダ)で在庫1件以上ある機種のうち、
-              機種名を含むeBayアクティブ出品(米国サイト)が1件も無いか、見つかってもQTY合計が0のものです
-              (機種名とeBay出品タイトルの突合は、ブランド名を含めて先頭3単語までのあいまい一致)。
-            </p>
-            {result.modelStockIssues.length === 0 ? (
-              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
-            ) : (
-              <table style={{ width: "30%", fontSize: 12, borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
-                    <th style={{ padding: "4px" }}>機種名</th>
-                    <th style={{ padding: "4px", textAlign: "right" }}>在庫数</th>
-                    <th style={{ padding: "4px", textAlign: "right" }}>該当eBay出品数</th>
-                    <th style={{ padding: "4px", textAlign: "right" }}>QTY合計</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.modelStockIssues.map((row, i) => (
-                    <tr
-                      key={row.modelFolderName}
-                      style={{
-                        borderTop: "0.5px solid var(--border)",
-                        background: i % 2 === 1 ? "var(--surface-1)" : undefined,
-                      }}
-                    >
-                      <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
-                      <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
-                      <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
-                      <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+              同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。過剰の下に配置。
+              3単語版・4単語版のどちらが実態に合うか判断しづらいため、上下2段で両方表示する
+              (2026-09-25変更)。 */}
+          <ModelStockIssuesTable
+            title="在庫あり・eBay出品なし/QTY全て0の機種(3単語マッチング)"
+            wordCount={3}
+            rows={result.modelStockIssues3}
+          />
+          <ModelStockIssuesTable
+            title="在庫あり・eBay出品なし/QTY全て0の機種(4単語マッチング)"
+            wordCount={4}
+            rows={result.modelStockIssues4}
+          />
         </>
       )}
     </div>
