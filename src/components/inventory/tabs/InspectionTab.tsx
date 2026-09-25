@@ -18,7 +18,7 @@ import {
   type ItemAutofillCandidate,
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
-import { generateDescriptionHtml, generateSellerNoteText } from "../../../lib/descriptionGenerator";
+import { generateDescriptionHtml, generateSellerNoteText, generateSoulcameraItemInfo } from "../../../lib/descriptionGenerator";
 
 /** 2026-09-25追加: コピーボタン用のアイコン(コードブロックのコピーボタンと同じ、
  *  2枚の四角が重なったデザイン)。絵文字ではなくSVGで統一する。 */
@@ -174,10 +174,11 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [sellerNoteText, setSellerNoteText] = useState("");
+  const [soulcameraItemInfo, setSoulcameraItemInfo] = useState("");
   const descriptionSectionRef = useRef<HTMLDivElement>(null);
   // 2026-09-25追加: 生成したテキストボックスの内容をコピーするボタン用。コピー直後だけ
   // 「コピーしました」を表示するため、どちらのボックスをコピーしたかを保持する。
-  const [copiedField, setCopiedField] = useState<"html" | "text" | null>(null);
+  const [copiedField, setCopiedField] = useState<"html" | "text" | "soulcameraInfo" | null>(null);
   // 2026-09-25追加: 「登録済みアイテムからオートフィル」機能用。管理番号・ブランド/機種の
   // 部分一致で他の商品を検索し、選択した商品の検品内容(FIELDS・状態ランク・各チェック表)を
   // この画面の入力エリアへ丸ごとセットする(あくまで画面上の値のみ変更、保存は別途「検品内容を
@@ -197,6 +198,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   function handleGenerateDescription() {
     setDescriptionHtml(generateDescriptionHtml(detail, values));
     setSellerNoteText(generateSellerNoteText(detail, values));
+    setSoulcameraItemInfo(generateSoulcameraItemInfo(detail));
   }
 
   /** 2026-09-23追加: 生成したDescription HTMLを、そのままブラウザの新しいタブで開いて見た目を確認できるようにする。
@@ -217,7 +219,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
    * 何も起きていないように見えていた。非表示のtextarea+document.execCommand('copy')方式
    * (非HTTPSでも動作する旧来のAPI)にフォールバックする。
    */
-  async function handleCopyGeneratedText(text: string, field: "html" | "text") {
+  async function handleCopyGeneratedText(text: string, field: "html" | "text" | "soulcameraInfo") {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -794,7 +796,41 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
       )}
 
       <div ref={descriptionSectionRef} style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
-        <button onClick={handleGenerateDescription}>Description生成</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={handleGenerateDescription}>Description生成</button>
+          {soulcameraItemInfo && (
+            <>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Soulcamera Item Info:</span>
+              <input
+                type="text"
+                value={soulcameraItemInfo}
+                onChange={(e) => setSoulcameraItemInfo(e.target.value)}
+                style={{ fontFamily: "monospace", fontSize: 12, width: 260 }}
+              />
+              {copiedField === "soulcameraInfo" && (
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>コピーしました</span>
+              )}
+              <button
+                onClick={() => handleCopyGeneratedText(soulcameraItemInfo, "soulcameraInfo")}
+                title="コピー"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 26,
+                  height: 26,
+                  padding: 0,
+                  border: "0.5px solid var(--border-strong)",
+                  borderRadius: 6,
+                  background: "var(--surface-2)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <CopyIcon />
+              </button>
+            </>
+          )}
+        </div>
         {(descriptionHtml || sellerNoteText) && (
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
             <div style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column" }}>

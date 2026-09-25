@@ -337,3 +337,19 @@ export function generateSellerNoteText(detail: ItemDetail, values: Record<string
   const replacements = buildReplacements(detail, values, "");
   return applyReplacements(SELLER_NOTE_TEMPLATE, replacements);
 }
+
+/**
+ * eBay Item Specifics「Soulcamera Item Info」の値を生成する(2026-09-26追加)。
+ * 形式: 「管理番号 現在の日付(YYMMDD) 仕入高(円)」の空白区切り3項目。
+ * 日付は仕入日ではなく生成時点(出品直前が想定)の日付を使う。
+ */
+export function generateSoulcameraItemInfo(detail: ItemDetail): string {
+  const managementNo = detail.management_no ?? "";
+  const now = new Date();
+  const yy = String(now.getFullYear() % 100).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const yymmdd = `${yy}${mm}${dd}`;
+  const purchasePrice = detail.purchases?.[0]?.purchase_price ?? 0;
+  return `${managementNo} ${yymmdd} ${purchasePrice}`;
+}
