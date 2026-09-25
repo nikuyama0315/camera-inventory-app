@@ -17,6 +17,26 @@ import {
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
 import { generateDescriptionHtml, generateSellerNoteText } from "../../../lib/descriptionGenerator";
 
+/** 2026-09-25追加: コピーボタン用のアイコン(コードブロックのコピーボタンと同じ、
+ *  2枚の四角が重なったデザイン)。絵文字ではなくSVGで統一する。 */
+function CopyIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
 interface Props {
   detail: ItemDetail;
   onChanged: () => void;
@@ -152,6 +172,9 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [sellerNoteText, setSellerNoteText] = useState("");
   const descriptionSectionRef = useRef<HTMLDivElement>(null);
+  // 2026-09-25追加: 生成したテキストボックスの内容をコピーするボタン用。コピー直後だけ
+  // 「コピーしました」を表示するため、どちらのボックスをコピーしたかを保持する。
+  const [copiedField, setCopiedField] = useState<"html" | "text" | null>(null);
 
   // 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたとき、
   // このセクションまで自動スクロールする(0=初期値のときは何もしない)。
@@ -172,6 +195,18 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  /** 2026-09-25追加: Description(HTML)・セラーノート(プレーンテキスト)それぞれのテキストボックスの
+   *  内容をクリップボードへコピーする。1.5秒だけ「コピーしました」を表示する。 */
+  async function handleCopyGeneratedText(text: string, field: "html" | "text") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField((prev) => (prev === field ? null : prev)), 1500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "コピーに失敗しました");
+    }
   }
 
   function update(key: string, value: string) {
@@ -660,6 +695,32 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
         {(descriptionHtml || sellerNoteText) && (
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
             <div style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column" }}>
+              {/* 2026-09-25変更(ユーザー指示): コピーボタンをテキストボックスの外、右上端に配置。
+                  コードブロックのコピーボタンと同じアイコンデザイン(絵文字ではなくSVG)を使う。 */}
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                {copiedField === "html" && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>コピーしました</span>
+                )}
+                <button
+                  onClick={() => handleCopyGeneratedText(descriptionHtml, "html")}
+                  disabled={!descriptionHtml.trim()}
+                  title="コピー"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    padding: 0,
+                    border: "0.5px solid var(--border-strong)",
+                    borderRadius: 6,
+                    background: "var(--surface-2)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <CopyIcon />
+                </button>
+              </div>
               <textarea
                 rows={16}
                 value={descriptionHtml}
@@ -674,12 +735,38 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
                 ブラウザで見る
               </button>
             </div>
-            <textarea
-              rows={16}
-              value={sellerNoteText}
-              onChange={(e) => setSellerNoteText(e.target.value)}
-              style={{ flex: 1, minWidth: 320, fontFamily: "monospace", fontSize: 11 }}
-            />
+            <div style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                {copiedField === "text" && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>コピーしました</span>
+                )}
+                <button
+                  onClick={() => handleCopyGeneratedText(sellerNoteText, "text")}
+                  disabled={!sellerNoteText.trim()}
+                  title="コピー"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 26,
+                    height: 26,
+                    padding: 0,
+                    border: "0.5px solid var(--border-strong)",
+                    borderRadius: 6,
+                    background: "var(--surface-2)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <CopyIcon />
+                </button>
+              </div>
+              <textarea
+                rows={16}
+                value={sellerNoteText}
+                onChange={(e) => setSellerNoteText(e.target.value)}
+                style={{ fontFamily: "monospace", fontSize: 11 }}
+              />
+            </div>
           </div>
         )}
       </div>
