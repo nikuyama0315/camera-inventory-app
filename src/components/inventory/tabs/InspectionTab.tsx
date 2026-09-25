@@ -174,11 +174,12 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   // Description生成(2026-09-22追加)。生成結果をテキストボックスに表示、その場で編集も可能。
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [sellerNoteText, setSellerNoteText] = useState("");
+  const [itemTitleText, setItemTitleText] = useState("");
   const [soulcameraItemInfo, setSoulcameraItemInfo] = useState("");
   const descriptionSectionRef = useRef<HTMLDivElement>(null);
   // 2026-09-25追加: 生成したテキストボックスの内容をコピーするボタン用。コピー直後だけ
   // 「コピーしました」を表示するため、どちらのボックスをコピーしたかを保持する。
-  const [copiedField, setCopiedField] = useState<"html" | "text" | "soulcameraInfo" | null>(null);
+  const [copiedField, setCopiedField] = useState<"html" | "text" | "itemTitle" | "soulcameraInfo" | null>(null);
   // 2026-09-25追加: 「登録済みアイテムからオートフィル」機能用。管理番号・ブランド/機種の
   // 部分一致で他の商品を検索し、選択した商品の検品内容(FIELDS・状態ランク・各チェック表)を
   // この画面の入力エリアへ丸ごとセットする(あくまで画面上の値のみ変更、保存は別途「検品内容を
@@ -198,6 +199,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   function handleGenerateDescription() {
     setDescriptionHtml(generateDescriptionHtml(detail, values));
     setSellerNoteText(generateSellerNoteText(detail, values));
+    setItemTitleText(detail.item_title ?? "");
     setSoulcameraItemInfo(generateSoulcameraItemInfo(detail));
   }
 
@@ -219,7 +221,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
    * 何も起きていないように見えていた。非表示のtextarea+document.execCommand('copy')方式
    * (非HTTPSでも動作する旧来のAPI)にフォールバックする。
    */
-  async function handleCopyGeneratedText(text: string, field: "html" | "text" | "soulcameraInfo") {
+  async function handleCopyGeneratedText(text: string, field: "html" | "text" | "itemTitle" | "soulcameraInfo") {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
@@ -796,11 +798,45 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
       )}
 
       <div ref={descriptionSectionRef} style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={handleGenerateDescription}>Description生成</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={handleGenerateDescription} style={{ width: "fit-content" }}>
+            Description生成
+          </button>
+          {itemTitleText && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", width: 150 }}>ITEM TITLE:</span>
+              <input
+                type="text"
+                value={itemTitleText}
+                onChange={(e) => setItemTitleText(e.target.value)}
+                style={{ fontFamily: "monospace", fontSize: 12, width: 400 }}
+              />
+              {copiedField === "itemTitle" && (
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>コピーしました</span>
+              )}
+              <button
+                onClick={() => handleCopyGeneratedText(itemTitleText, "itemTitle")}
+                title="コピー"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 26,
+                  height: 26,
+                  padding: 0,
+                  border: "0.5px solid var(--border-strong)",
+                  borderRadius: 6,
+                  background: "var(--surface-2)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <CopyIcon />
+              </button>
+            </div>
+          )}
           {soulcameraItemInfo && (
-            <>
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Soulcamera Item Info:</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", width: 150 }}>Soulcamera Item Info:</span>
               <input
                 type="text"
                 value={soulcameraItemInfo}
@@ -828,7 +864,7 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
               >
                 <CopyIcon />
               </button>
-            </>
+            </div>
           )}
         </div>
         {(descriptionHtml || sellerNoteText) && (
