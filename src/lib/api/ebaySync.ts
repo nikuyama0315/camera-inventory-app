@@ -625,7 +625,7 @@ export interface ListingCheckExcessRow {
 /**
  * 在庫アラート(model_drive_stock_counts)で在庫1件以上ある機種のうち、同一機種名を含む
  * eBayアクティブ出品(米国サイト、QTY問わず)が1件も無い、または見つかってもQTY合計が0の機種
- * (2026-09-25追加)。
+ * (2026-09-25追加、機種名とeBay出品タイトルの突合は単語単位のあいまい一致)。
  */
 export interface ListingCheckModelStockRow {
   modelFolderName: string;
