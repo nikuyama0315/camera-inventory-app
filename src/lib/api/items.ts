@@ -114,6 +114,11 @@ export interface ItemAutofillCandidate {
  * 検品タブの「登録済みアイテムからオートフィル」機能用(2026-09-25追加、ユーザー指示)。
  * 管理番号・ブランド・機種のいずれかに部分一致する商品を検索する(単純なOR、単語分割はしない)。
  * excludeItemIdで検品対象の商品自身を候補から除外する。
+ * 【2026-09-25追加・ユーザー指示】候補は「全体」の翻訳フィールド(inspections.overall_notes_en)に
+ * 登録があるものだけに絞る(≒実際に検品内容が入力済みの商品のみをオートフィル元として表示する)。
+ * inspectionsテーブル側から検索し、items側をinner結合することでこの絞り込みを行う。
+ * 1商品に複数inspections行が残っているケース(旧データ)を考慮し、inspected_at降順で多めに取得した上で
+ * item_idの重複をクライアント側で除去する(先頭行=最新のものを残す)。
  */
 export async function searchItemsForInspectionAutofill(
   query: string,
@@ -123,14 +128,31 @@ export async function searchItemsForInspectionAutofill(
   const q = query.trim();
   if (!q) return [];
   const { data, error } = await supabase
-    .from("items")
-    .select("id, management_no, brand, model")
-    .neq("id", excludeItemId)
-    .or(`management_no.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .from("inspections")
+    .select("item_id, inspected_at, items!inner(id, management_no, brand, model)")
+    .neq("item_id", excludeItemId)
+    .not("overall_notes_en", "is", null)
+    .neq("overall_notes_en", "")
+    .or(`management_no.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`, { foreignTable: "items" })
+    .order("inspected_at", { ascending: false })
+    .limit(limit * 3);
   if (error) throw error;
-  return data as ItemAutofillCandidate[];
+
+  const rows = data as unknown as Array<{
+    item_id: string;
+    items: ItemAutofillCandidate | ItemAutofillCandidate[] | null;
+  }>;
+  const seen = new Set<string>();
+  const results: ItemAutofillCandidate[] = [];
+  for (const row of rows) {
+    if (seen.has(row.item_id)) continue;
+    const item = Array.isArray(row.items) ? row.items[0] : row.items;
+    if (!item) continue;
+    seen.add(row.item_id);
+    results.push(item);
+    if (results.length >= limit) break;
+  }
+  return results;
 }
 
 export interface ItemWithPurchase extends Item {
