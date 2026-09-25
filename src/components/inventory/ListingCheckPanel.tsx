@@ -4,9 +4,21 @@ import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
 
 /**
  * 「在庫あり・eBay出品なし/QTY全て0の機種」表(2026-09-25追加)。3単語版・4単語版で
- * マッチング精度が異なるため、共通の表コンポーネントとして切り出し2段で並べる。
+ * マッチング精度が異なるため、共通の表コンポーネントとして切り出し左右に並べる。
+ * 【2026-09-25追加・ユーザー指示】もう一方の単語数版の結果には出てこない(=3単語版と
+ * 4単語版で判定が食い違っている)機種名を赤字で強調表示する(otherModelNames)。
  */
-function ModelStockIssuesTable({ title, wordCount, rows }: { title: string; wordCount: number; rows: ListingCheckModelStockRow[] }) {
+function ModelStockIssuesTable({
+  title,
+  wordCount,
+  rows,
+  otherModelNames,
+}: {
+  title: string;
+  wordCount: number;
+  rows: ListingCheckModelStockRow[];
+  otherModelNames: Set<string>;
+}) {
   return (
     <div style={{ marginBottom: 24 }}>
       <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
@@ -16,6 +28,7 @@ function ModelStockIssuesTable({ title, wordCount, rows }: { title: string; word
         在庫アラート(Google Drive「@撮影済み・出品待ち」フォルダ)で在庫1件以上ある機種のうち、
         機種名を含むeBayアクティブ出品(米国サイト)が1件も無いか、見つかってもQTY合計が0のものです
         (機種名とeBay出品タイトルの突合は、ブランド名を含めて先頭{wordCount}単語までのあいまい一致)。
+        赤字はもう一方の単語数版では該当しなかった機種(3単語版・4単語版で判定が食い違っているもの)です。
       </p>
       {rows.length === 0 ? (
         <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
@@ -30,20 +43,24 @@ function ModelStockIssuesTable({ title, wordCount, rows }: { title: string; word
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={row.modelFolderName}
-                style={{
-                  borderTop: "0.5px solid var(--border)",
-                  background: i % 2 === 1 ? "var(--surface-1)" : undefined,
-                }}
-              >
-                <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
-                <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
-                <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
-                <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
-              </tr>
-            ))}
+            {rows.map((row, i) => {
+              const isMismatch = !otherModelNames.has(row.modelFolderName);
+              return (
+                <tr
+                  key={row.modelFolderName}
+                  style={{
+                    borderTop: "0.5px solid var(--border)",
+                    background: i % 2 === 1 ? "var(--surface-1)" : undefined,
+                    color: isMismatch ? "var(--highlight-text)" : undefined,
+                  }}
+                >
+                  <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
+                  <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
+                  <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
+                  <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -107,7 +124,10 @@ export default function ListingCheckPanel() {
         <p style={{ fontSize: 13, color: "var(--danger-text)", marginBottom: 12 }}>{errorMessage}</p>
       )}
 
-      {result && (
+      {result && (() => {
+        const modelNames3 = new Set(result.modelStockIssues3.map((r) => r.modelFolderName));
+        const modelNames4 = new Set(result.modelStockIssues4.map((r) => r.modelFolderName));
+        return (
         <>
           <div
             style={{
@@ -204,13 +224,15 @@ export default function ListingCheckPanel() {
               同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。過剰の下に配置。
               3単語版・4単語版のどちらが実態に合うか判断しづらいため、上下2段で両方表示する
               (2026-09-25変更)。 */}
-          {/* 2026-09-25変更(ユーザー指示): 上下2段ではなく左右に並べて表示。 */}
+          {/* 2026-09-25変更(ユーザー指示): 上下2段ではなく左右に並べて表示。
+              3単語版・4単語版で判定が食い違う機種(過不足)は赤字で強調する。 */}
           <div style={{ display: "flex", gap: 24, marginBottom: 24 }}>
             <div style={{ flex: "0 0 30%" }}>
               <ModelStockIssuesTable
                 title="在庫あり・eBay出品なし/QTY全て0の機種(3単語マッチング)"
                 wordCount={3}
                 rows={result.modelStockIssues3}
+                otherModelNames={modelNames4}
               />
             </div>
             <div style={{ flex: "0 0 30%" }}>
@@ -218,11 +240,13 @@ export default function ListingCheckPanel() {
                 title="在庫あり・eBay出品なし/QTY全て0の機種(4単語マッチング)"
                 wordCount={4}
                 rows={result.modelStockIssues4}
+                otherModelNames={modelNames3}
               />
             </div>
           </div>
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }
