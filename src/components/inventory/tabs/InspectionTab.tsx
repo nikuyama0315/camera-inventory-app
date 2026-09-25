@@ -210,9 +210,30 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
 
   /** 2026-09-25追加: Description(HTML)・セラーノート(プレーンテキスト)それぞれのテキストボックスの
    *  内容をクリップボードへコピーする。1.5秒だけ「コピーしました」を表示する。 */
+  /**
+   * 2026-09-25修正(ユーザー報告「コピーボタンを押してもコピーされない」): このアプリは
+   * http://(非HTTPS)で配信しているため、ブラウザは非セキュアコンテキストとしてnavigator.clipboard
+   * 自体を無効化する(Chrome等)。navigator.clipboard.writeText()を呼ぶとTypeError/例外になり、
+   * 何も起きていないように見えていた。非表示のtextarea+document.execCommand('copy')方式
+   * (非HTTPSでも動作する旧来のAPI)にフォールバックする。
+   */
   async function handleCopyGeneratedText(text: string, field: "html" | "text") {
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!ok) throw new Error("コピーに失敗しました(このブラウザではサポートされていません)");
+      }
       setCopiedField(field);
       setTimeout(() => setCopiedField((prev) => (prev === field ? null : prev)), 1500);
     } catch (err) {
