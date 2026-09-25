@@ -2,6 +2,10 @@ import { useState } from "react";
 import { runEbayListingCheck, type ListingCheckResult, type ListingCheckModelStockRow } from "../../lib/api/ebaySync";
 import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
 
+// 2026-09-25追加(ユーザー指示): メモ欄の「保存」ボタン用。localStorageに保存し、
+// 次回このタブを開いたときも内容を保持する(サーバー側DBへは保存しない、この端末のブラウザのみ)。
+const MODEL_STOCK_MEMO_STORAGE_KEY = "listingCheckModelStockMemo";
+
 /**
  * 「在庫あり・eBay出品なし/QTY全て0の機種」表(2026-09-25追加)。3単語版・4単語版で
  * マッチング精度が異なるため、共通の表コンポーネントとして切り出し左右に並べる。
@@ -108,8 +112,26 @@ export default function ListingCheckPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<ListingCheckResult | null>(null);
   // 2026-09-25追加(ユーザー指示): 機種在庫/eBay出品未検出表の右にメモ欄を設置。
-  // 確認結果や対応状況などを自由記述で残せるようにする(保存はせず画面上のみ)。
-  const [modelStockMemo, setModelStockMemo] = useState("");
+  // 確認結果や対応状況などを自由記述で残せるようにする。「保存」ボタンでlocalStorageへ保存し、
+  // 初期値もそこから読み込む(2026-09-25追加、保存ボタン設置に伴う変更)。
+  const [modelStockMemo, setModelStockMemo] = useState(() => {
+    try {
+      return localStorage.getItem(MODEL_STOCK_MEMO_STORAGE_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [memoSaved, setMemoSaved] = useState(false);
+
+  function handleSaveMemo() {
+    try {
+      localStorage.setItem(MODEL_STOCK_MEMO_STORAGE_KEY, modelStockMemo);
+      setMemoSaved(true);
+      setTimeout(() => setMemoSaved(false), 1500);
+    } catch {
+      // localStorageが使えない環境(プライベートブラウジング等)では保存自体をあきらめる
+    }
+  }
   // 2026-09-25追加(ユーザー指示): 機種名の先頭に星バッジを配置し、クリックで星と機種名を
   // 赤字太字にする(確認済み等のマーキング用、画面上のみで保持、DB保存はしない)。
   // 3単語版・4単語版で機種名が重複する場合は同じマーク状態を共有する。
@@ -118,8 +140,18 @@ export default function ListingCheckPanel() {
   function handleToggleStar(modelFolderName: string) {
     setStarredModels((prev) => {
       const next = new Set(prev);
-      if (next.has(modelFolderName)) next.delete(modelFolderName);
-      else next.add(modelFolderName);
+      if (next.has(modelFolderName)) {
+        next.delete(modelFolderName);
+      } else {
+        next.add(modelFolderName);
+        // 2026-09-25追加(ユーザー指示): 星をつけた機種名をメモへ転記する(既に同じ行があれば
+        // 追加しない)。星を外す操作では対応する行は削除しない(手入力で編集済みの可能性があるため)。
+        setModelStockMemo((prevMemo) => {
+          const lines = prevMemo.split("\n");
+          if (lines.includes(modelFolderName)) return prevMemo;
+          return prevMemo.trim() ? `${prevMemo}\n${modelFolderName}` : modelFolderName;
+        });
+      }
       return next;
     });
   }
@@ -298,9 +330,15 @@ export default function ListingCheckPanel() {
               <textarea
                 value={modelStockMemo}
                 onChange={(e) => setModelStockMemo(e.target.value)}
-                placeholder="確認結果や対応状況などを自由に記入できます"
+                placeholder="確認結果や対応状況などを自由に記入できます(星をつけた機種名も自動で転記されます)"
                 style={{ width: "100%", minHeight: 300, fontSize: 12, boxSizing: "border-box" }}
               />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                <button onClick={handleSaveMemo}>保存</button>
+                {memoSaved && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>保存しました</span>
+                )}
+              </div>
             </div>
           </div>
         </>
