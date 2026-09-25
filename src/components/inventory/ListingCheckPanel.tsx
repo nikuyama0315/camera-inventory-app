@@ -20,7 +20,7 @@ function ModelStockIssuesTable({ title, wordCount, rows }: { title: string; word
       {rows.length === 0 ? (
         <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
       ) : (
-        <table style={{ width: "30%", fontSize: 12, borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
               <th style={{ padding: "4px" }}>機種名</th>
@@ -204,16 +204,23 @@ export default function ListingCheckPanel() {
               同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。過剰の下に配置。
               3単語版・4単語版のどちらが実態に合うか判断しづらいため、上下2段で両方表示する
               (2026-09-25変更)。 */}
-          <ModelStockIssuesTable
-            title="在庫あり・eBay出品なし/QTY全て0の機種(3単語マッチング)"
-            wordCount={3}
-            rows={result.modelStockIssues3}
-          />
-          <ModelStockIssuesTable
-            title="在庫あり・eBay出品なし/QTY全て0の機種(4単語マッチング)"
-            wordCount={4}
-            rows={result.modelStockIssues4}
-          />
+          {/* 2026-09-25変更(ユーザー指示): 上下2段ではなく左右に並べて表示。 */}
+          <div style={{ display: "flex", gap: 24, marginBottom: 24 }}>
+            <div style={{ flex: "0 0 30%" }}>
+              <ModelStockIssuesTable
+                title="在庫あり・eBay出品なし/QTY全て0の機種(3単語マッチング)"
+                wordCount={3}
+                rows={result.modelStockIssues3}
+              />
+            </div>
+            <div style={{ flex: "0 0 30%" }}>
+              <ModelStockIssuesTable
+                title="在庫あり・eBay出品なし/QTY全て0の機種(4単語マッチング)"
+                wordCount={4}
+                rows={result.modelStockIssues4}
+              />
+            </div>
+          </div>
         </>
       )}
     </div>
