@@ -255,7 +255,7 @@ function buildReplacements(
     // 2026-09-23追加(ユーザー指示): 状態チェック表の下の自由記述欄(functional_check_notes)を、
     // Functional CheckテーブルのSelf timer行の下に、入力があるときのみ行として追加する。
     FUNCTIONALNOTES: (values.functional_check_notes || "").trim()
-      ? `<tr><td colspan="3" style="padding:8px 0 0;">${values.functional_check_notes}</td></tr>`
+      ? `<tr><td colspan="3" style="padding:8px 0 0;color:#e0392e;">${values.functional_check_notes}</td></tr>`
       : "",
     // 2026-09-23追加(ユーザー指示): 光学チェック表(レンズ/ファインダー)の下の自由記述欄を、
     // Optics Inspectionの下に、入力があるものだけ縦積みで表示する。表示位置は表のすぐ下に

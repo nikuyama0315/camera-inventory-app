@@ -622,6 +622,18 @@ export interface ListingCheckExcessRow {
   matchSource: "soulcamera_item_info" | "sku" | null;
 }
 
+/**
+ * 在庫アラート(model_drive_stock_counts)で在庫1件以上ある機種のうち、同一機種名を含む
+ * eBayアクティブ出品(米国サイト、QTY問わず)が1件も無い、または見つかってもQTY合計が0の機種
+ * (2026-09-25追加)。
+ */
+export interface ListingCheckModelStockRow {
+  modelFolderName: string;
+  inStockCount: number;
+  matchedListingsCount: number;
+  totalQuantityAvailable: number;
+}
+
 export interface ListingCheckResult {
   shopId: "soulcamera" | "soulmenjapan";
   totalEbayActiveListings: number;
@@ -629,6 +641,7 @@ export interface ListingCheckResult {
   totalListedInSystem: number;
   shortage: ListingCheckShortageRow[];
   excess: ListingCheckExcessRow[];
+  modelStockIssues: ListingCheckModelStockRow[];
 }
 
 export async function runEbayListingCheck(

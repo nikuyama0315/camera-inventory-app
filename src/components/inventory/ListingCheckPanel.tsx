@@ -77,6 +77,42 @@ export default function ListingCheckPanel() {
             <span>うち米国サイト・ストック1以上: {result.totalEbayActiveUsListings}件</span>
           </div>
 
+          {/* 2026-09-25追加(ユーザー指示): 在庫アラートで在庫1件以上ある機種のうち、
+              eBayに同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。 */}
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              在庫あり・eBay出品なし/QTY全て0の機種({result.modelStockIssues.length}件)
+            </p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 0, marginBottom: 8 }}>
+              在庫アラート(Google Drive「@撮影済み・出品待ち」フォルダ)で在庫1件以上ある機種のうち、
+              機種名を含むeBayアクティブ出品(米国サイト)が1件も無いか、見つかってもQTY合計が0のものです。
+            </p>
+            {result.modelStockIssues.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                    <th style={{ padding: "4px" }}>機種名</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>在庫数</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>該当eBay出品数</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>QTY合計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.modelStockIssues.map((row) => (
+                    <tr key={row.modelFolderName} style={{ borderTop: "0.5px solid var(--border)" }}>
+                      <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <div style={{ marginBottom: 24 }}>
             <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
               不足: システムでは「出品中」だが、eBay(米国サイト)に見つからない({result.shortage.length}件)
