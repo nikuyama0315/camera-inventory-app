@@ -331,10 +331,12 @@ export function generateDescriptionHtml(detail: ItemDetail, values: Record<strin
 /**
  * 検品タブの入力値と基本情報から、セラーノート用のプレーンテキストを生成する(2026-09-22追加)。
  * 変数の置換ルールはgenerateDescriptionHtmlと共通(buildReplacements)だが、OPTICALTEXTは
- * レンズ・ファインダーの翻訳文を区切り無しでそのまま連結する(ユーザー指示、改行等は入れない)。
+ * レンズ・ファインダーの翻訳文を改行無しで半角スペース区切りで連結する(2026-09-26修正:
+ * 区切り無しで連結すると「...present.The viewfinder...」のように文末と次の文がくっついて
+ * しまうバグがあったため、半角スペースを挟むよう変更)。
  */
 export function generateSellerNoteText(detail: ItemDetail, values: Record<string, string>): string {
-  const replacements = buildReplacements(detail, values, "");
+  const replacements = buildReplacements(detail, values, " ");
   return applyReplacements(SELLER_NOTE_TEMPLATE, replacements);
 }
 
