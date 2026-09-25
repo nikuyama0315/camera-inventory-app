@@ -163,7 +163,7 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
   let query = supabase
     .from("items")
     .select(
-      `id, management_no, category, brand, model, serial_number, title, status, created_at, updated_at, account, ${purchasesEmbed}, ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage), inspections(condition_grade, functional_check_notes, inspected_at)`,
+      `id, management_no, category, brand, model, serial_number, title, item_title, status, created_at, updated_at, account, ${purchasesEmbed}, ${salesEmbed}, item_drive_folders(drive_folder_id, drive_folder_path, model_folder_name, item_folder_name, current_stage), inspections(condition_grade, functional_check_notes, inspected_at)`,
     )
     // 2026-09-24追加(ユーザー指示): 詳細編集モード左ペインの一覧に状態ランク・状態チェック表下の
     // 自由記述を表示するため。inspectionsは1対多だが「現在の検品データ」は最新1件のみ使う

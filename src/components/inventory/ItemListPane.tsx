@@ -281,6 +281,12 @@ export default function ItemListPane({
                 {` ・ ${ITEM_STATUS_LABELS[item.status]}`}
                 {item.condition_grade ? ` ・ ${item.condition_grade}` : ""}
               </p>
+              {/* 2026-09-25追加(ユーザー指示): ITEM TITLEが登録されている場合、2行目に表示。 */}
+              {item.item_title && (
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "2px 0 0" }}>
+                  {item.item_title}
+                </p>
+              )}
               {/* 2026-09-24追加(ユーザー指示): 状態チェック表下の自由記述(functional_check_notes)を表示。 */}
               {item.functional_check_notes && (
                 <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
