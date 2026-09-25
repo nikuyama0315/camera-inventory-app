@@ -19,6 +19,7 @@ import {
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
 import { generateDescriptionHtml, generateSellerNoteText, generateSoulcameraItemInfo } from "../../../lib/descriptionGenerator";
+import { computeDriveLocalPath, windowsPathToOpenFolderUrl } from "../../../lib/constants";
 
 /** 2026-09-25追加: コピーボタン用のアイコン(コードブロックのコピーボタンと同じ、
  *  2枚の四角が重なったデザイン)。絵文字ではなくSVGで統一する。 */
@@ -201,6 +202,21 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
     setSellerNoteText(generateSellerNoteText(detail, values));
     setItemTitleText(detail.item_title ?? "");
     setSoulcameraItemInfo(generateSoulcameraItemInfo(detail));
+  }
+
+  /** 2026-09-26追加: 「画像保管フォルダを開く」ボタン用。BasicInfoTab.tsxの同名機能と同じ
+   *  openfolder:// ハンドラ方式(各PCにインストール済み)でWindowsのエクスプローラーを直接開く。 */
+  const imageFolderDriveFolder = detail.item_drive_folders?.[0];
+  const imageFolderLocalPath = imageFolderDriveFolder
+    ? computeDriveLocalPath(
+        imageFolderDriveFolder.current_stage,
+        imageFolderDriveFolder.model_folder_name,
+        imageFolderDriveFolder.item_folder_name,
+      )
+    : null;
+  function handleOpenImageFolder() {
+    if (!imageFolderLocalPath) return;
+    window.open(windowsPathToOpenFolderUrl(imageFolderLocalPath), "_blank", "noopener,noreferrer");
   }
 
   /** 2026-09-23追加: 生成したDescription HTMLを、そのままブラウザの新しいタブで開いて見た目を確認できるようにする。
@@ -799,9 +815,20 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
 
       <div ref={descriptionSectionRef} style={{ borderTop: "0.5px solid var(--border)", paddingTop: 12, marginBottom: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button onClick={handleGenerateDescription} style={{ width: "fit-content" }}>
-            Description生成
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={handleGenerateDescription} style={{ width: "fit-content" }}>
+              Description生成
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenImageFolder}
+              disabled={!imageFolderLocalPath}
+              title={imageFolderLocalPath ?? "画像保管フォルダの場所が特定できません"}
+              style={{ width: "fit-content" }}
+            >
+              画像保管フォルダを開く
+            </button>
+          </div>
           {itemTitleText && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--text-secondary)", width: 150 }}>ITEM TITLE:</span>
