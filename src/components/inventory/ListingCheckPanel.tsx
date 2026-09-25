@@ -77,6 +77,9 @@ export default function ListingCheckPanel() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<ListingCheckResult | null>(null);
+  // 2026-09-25追加(ユーザー指示): 機種在庫/eBay出品未検出表の右にメモ欄を設置。
+  // 確認結果や対応状況などを自由記述で残せるようにする(保存はせず画面上のみ)。
+  const [modelStockMemo, setModelStockMemo] = useState("");
 
   async function handleRun() {
     setBusy(true);
@@ -241,6 +244,15 @@ export default function ListingCheckPanel() {
                 wordCount={4}
                 rows={result.modelStockIssues4}
                 otherModelNames={modelNames3}
+              />
+            </div>
+            <div style={{ flex: "0 0 30%" }}>
+              <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>メモ</p>
+              <textarea
+                value={modelStockMemo}
+                onChange={(e) => setModelStockMemo(e.target.value)}
+                placeholder="確認結果や対応状況などを自由に記入できます"
+                style={{ width: "100%", minHeight: 300, fontSize: 12, boxSizing: "border-box" }}
               />
             </div>
           </div>
