@@ -13,11 +13,16 @@ function ModelStockIssuesTable({
   wordCount,
   rows,
   otherModelNames,
+  starredModels,
+  onToggleStar,
 }: {
   title: string;
   wordCount: number;
   rows: ListingCheckModelStockRow[];
   otherModelNames: Set<string>;
+  /** 星マーク済みの機種名(2026-09-25追加、ユーザー指示。画面上のみで保持、DB保存はしない)。 */
+  starredModels: Set<string>;
+  onToggleStar: (modelFolderName: string) => void;
 }) {
   return (
     <div style={{ marginBottom: 24 }}>
@@ -45,6 +50,7 @@ function ModelStockIssuesTable({
           <tbody>
             {rows.map((row, i) => {
               const isMismatch = !otherModelNames.has(row.modelFolderName);
+              const isStarred = starredModels.has(row.modelFolderName);
               return (
                 <tr
                   key={row.modelFolderName}
@@ -54,7 +60,31 @@ function ModelStockIssuesTable({
                     color: isMismatch ? "var(--highlight-text)" : undefined,
                   }}
                 >
-                  <td style={{ padding: "4px" }}>{row.modelFolderName}</td>
+                  <td
+                    style={{
+                      padding: "4px",
+                      color: isStarred ? "var(--highlight-text)" : undefined,
+                      fontWeight: isStarred ? 700 : undefined,
+                    }}
+                  >
+                    <button
+                      onClick={() => onToggleStar(row.modelFolderName)}
+                      title="星をつける/外す"
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        marginRight: 4,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: isStarred ? "var(--highlight-text)" : "var(--text-muted)",
+                        fontWeight: isStarred ? 700 : undefined,
+                      }}
+                    >
+                      {isStarred ? "★" : "☆"}
+                    </button>
+                    {row.modelFolderName}
+                  </td>
                   <td style={{ padding: "4px", textAlign: "right" }}>{row.inStockCount}</td>
                   <td style={{ padding: "4px", textAlign: "right" }}>{row.matchedListingsCount}</td>
                   <td style={{ padding: "4px", textAlign: "right" }}>{row.totalQuantityAvailable}</td>
@@ -80,6 +110,19 @@ export default function ListingCheckPanel() {
   // 2026-09-25追加(ユーザー指示): 機種在庫/eBay出品未検出表の右にメモ欄を設置。
   // 確認結果や対応状況などを自由記述で残せるようにする(保存はせず画面上のみ)。
   const [modelStockMemo, setModelStockMemo] = useState("");
+  // 2026-09-25追加(ユーザー指示): 機種名の先頭に星バッジを配置し、クリックで星と機種名を
+  // 赤字太字にする(確認済み等のマーキング用、画面上のみで保持、DB保存はしない)。
+  // 3単語版・4単語版で機種名が重複する場合は同じマーク状態を共有する。
+  const [starredModels, setStarredModels] = useState<Set<string>>(new Set());
+
+  function handleToggleStar(modelFolderName: string) {
+    setStarredModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(modelFolderName)) next.delete(modelFolderName);
+      else next.add(modelFolderName);
+      return next;
+    });
+  }
 
   async function handleRun() {
     setBusy(true);
@@ -236,6 +279,8 @@ export default function ListingCheckPanel() {
                 wordCount={3}
                 rows={result.modelStockIssues3}
                 otherModelNames={modelNames4}
+                starredModels={starredModels}
+                onToggleStar={handleToggleStar}
               />
             </div>
             <div style={{ flex: "0 0 30%" }}>
@@ -244,6 +289,8 @@ export default function ListingCheckPanel() {
                 wordCount={4}
                 rows={result.modelStockIssues4}
                 otherModelNames={modelNames3}
+                starredModels={starredModels}
+                onToggleStar={handleToggleStar}
               />
             </div>
             <div style={{ flex: "0 0 30%" }}>
