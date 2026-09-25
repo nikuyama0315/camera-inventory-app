@@ -324,6 +324,14 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
     }
   }
 
+  /** 2026-09-25追加(ユーザー指示): 画像保管フォルダの「フォルダを開く」ボタン用
+   *  (在庫アラート画面の同名ボタンと同じ、URLを新しいタブで開くだけの実装)。 */
+  function handleOpenDriveFolder(url: string | null | undefined) {
+    const trimmed = (url ?? "").trim();
+    if (!trimmed) return;
+    window.open(trimmed, "_blank", "noopener,noreferrer");
+  }
+
   async function handleSaveEdit() {
     if (!editForm) return;
     if (!editForm.management_no.trim() || !editForm.category.trim()) {
@@ -733,6 +741,13 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
               <button type="button" onClick={handleFetchDriveInfo} disabled={fetchingDriveInfo}>
                 {fetchingDriveInfo ? "取得中..." : "Driveから取得"}
               </button>
+              <button
+                type="button"
+                onClick={() => handleOpenDriveFolder(editForm.drive_folder_url)}
+                disabled={!editForm.drive_folder_url.trim()}
+              >
+                フォルダを開く
+              </button>
             </div>
             {/* 2026-09-05追加: 上のボタンで実際のGoogle Driveフォルダ名(商品フォルダ)と親フォルダ名
                 (機種名フォルダ)を取得し、下記2項目に反映する(常に上書き、保存は別途「保存」ボタンで確定)。 */}
@@ -1038,6 +1053,15 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
                   ? `(ローカルパス未確定) https://drive.google.com/drive/folders/${driveFolder.drive_folder_id}`
                   : "-"))}
           </span>
+          {driveFolder.drive_folder_id && (
+            <button
+              type="button"
+              onClick={() => handleOpenDriveFolder(`https://drive.google.com/drive/folders/${driveFolder.drive_folder_id}`)}
+              style={{ fontSize: 12, padding: "2px 8px" }}
+            >
+              フォルダを開く
+            </button>
+          )}
         </div>
       )}
 
