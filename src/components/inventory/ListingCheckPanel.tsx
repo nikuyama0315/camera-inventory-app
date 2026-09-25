@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { runEbayListingCheck, type ListingCheckResult, type ListingCheckModelStockRow } from "../../lib/api/ebaySync";
+import {
+  runEbayListingCheck,
+  runModelStockCheck,
+  type ListingCheckResult,
+  type ListingCheckModelStockRow,
+  type ModelStockCheckResult,
+} from "../../lib/api/ebaySync";
 import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
 
 // 2026-09-25追加(ユーザー指示): メモ欄の「保存」ボタン用。localStorageに保存し、
@@ -170,6 +176,26 @@ export default function ListingCheckPanel() {
     }
   }
 
+  // 2026-09-26追加(ユーザー指示): 機種在庫チェックを「チェック実行」(不足/過剰)とは独立した
+  // 別ボタンから実行できるようにする。互いの実行状態・結果は影響し合わない。
+  const [modelStockBusy, setModelStockBusy] = useState(false);
+  const [modelStockErrorMessage, setModelStockErrorMessage] = useState<string | null>(null);
+  const [modelStockResult, setModelStockResult] = useState<ModelStockCheckResult | null>(null);
+
+  async function handleRunModelStockCheck() {
+    setModelStockBusy(true);
+    setModelStockErrorMessage(null);
+    setModelStockResult(null);
+    try {
+      const r = await runModelStockCheck(shopId);
+      setModelStockResult(r);
+    } catch (err) {
+      setModelStockErrorMessage(err instanceof Error ? err.message : "チェックに失敗しました");
+    } finally {
+      setModelStockBusy(false);
+    }
+  }
+
   return (
     <div style={{ padding: "1.5rem", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>出品チェック</h3>
@@ -196,16 +222,19 @@ export default function ListingCheckPanel() {
         <button onClick={handleRun} disabled={busy}>
           {busy ? "チェック中..." : "チェック実行"}
         </button>
+        <button onClick={handleRunModelStockCheck} disabled={modelStockBusy}>
+          {modelStockBusy ? "チェック中..." : "在庫あり・eBay出品なしチェック実行"}
+        </button>
       </div>
 
       {errorMessage && (
         <p style={{ fontSize: 13, color: "var(--danger-text)", marginBottom: 12 }}>{errorMessage}</p>
       )}
+      {modelStockErrorMessage && (
+        <p style={{ fontSize: 13, color: "var(--danger-text)", marginBottom: 12 }}>{modelStockErrorMessage}</p>
+      )}
 
-      {result && (() => {
-        const modelNames3 = new Set(result.modelStockIssues3.map((r) => r.modelFolderName));
-        const modelNames4 = new Set(result.modelStockIssues4.map((r) => r.modelFolderName));
-        return (
+      {result && (
         <>
           <div
             style={{
@@ -298,18 +327,22 @@ export default function ListingCheckPanel() {
             )}
           </div>
 
-          {/* 2026-09-25追加(ユーザー指示): 在庫アラートで在庫1件以上ある機種のうち、eBayに
-              同一機種の出品が1件も無い、またはQTYが全て0の機種を一覧表示する。過剰の下に配置。
-              3単語版・4単語版のどちらが実態に合うか判断しづらいため、上下2段で両方表示する
-              (2026-09-25変更)。 */}
-          {/* 2026-09-25変更(ユーザー指示): 上下2段ではなく左右に並べて表示。
-              3単語版・4単語版で判定が食い違う機種(過不足)は赤字で強調する。 */}
+        </>
+      )}
+
+      {/* 2026-09-26変更(ユーザー指示): 「チェック実行」(不足/過剰)とは別ボタン・別結果状態で
+          独立して実行できるようにした。以下はmodelStockResult(在庫あり・eBay出品なしチェック)
+          専用のセクション。 */}
+      {modelStockResult && (() => {
+        const modelNames3 = new Set(modelStockResult.modelStockIssues3.map((r) => r.modelFolderName));
+        const modelNames4 = new Set(modelStockResult.modelStockIssues4.map((r) => r.modelFolderName));
+        return (
           <div style={{ display: "flex", gap: 24, marginBottom: 24 }}>
             <div style={{ flex: "0 0 30%" }}>
               <ModelStockIssuesTable
                 title="在庫あり・eBay出品なし/QTY全て0の機種(3単語マッチング)"
                 wordCount={3}
-                rows={result.modelStockIssues3}
+                rows={modelStockResult.modelStockIssues3}
                 otherModelNames={modelNames4}
                 starredModels={starredModels}
                 onToggleStar={handleToggleStar}
@@ -319,7 +352,7 @@ export default function ListingCheckPanel() {
               <ModelStockIssuesTable
                 title="在庫あり・eBay出品なし/QTY全て0の機種(4単語マッチング)"
                 wordCount={4}
-                rows={result.modelStockIssues4}
+                rows={modelStockResult.modelStockIssues4}
                 otherModelNames={modelNames3}
                 starredModels={starredModels}
                 onToggleStar={handleToggleStar}
@@ -341,7 +374,6 @@ export default function ListingCheckPanel() {
               </div>
             </div>
           </div>
-        </>
         );
       })()}
     </div>

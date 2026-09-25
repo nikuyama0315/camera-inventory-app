@@ -641,12 +641,13 @@ export interface ListingCheckResult {
   totalListedInSystem: number;
   shortage: ListingCheckShortageRow[];
   excess: ListingCheckExcessRow[];
-  /** 機種名を単語単位に分解して先頭3単語で突合した結果(2026-09-25追加)。 */
-  modelStockIssues3: ListingCheckModelStockRow[];
-  /** 機種名を単語単位に分解して先頭4単語で突合した結果(2026-09-25追加)。 */
-  modelStockIssues4: ListingCheckModelStockRow[];
 }
 
+/**
+ * 「不足」「過剰」のみを計算する(2026-09-26変更: 機種在庫チェックとは独立した別ボタンに
+ * 分離したため、こちらはmodeを指定せず呼び出す。Edge Function側はmode省略時"full"として
+ * 扱い、Soulcamera Item Info取得を含む従来通りの重い処理を行う)。
+ */
 export async function runEbayListingCheck(
   shopId: "soulcamera" | "soulmenjapan",
 ): Promise<ListingCheckResult> {
@@ -655,4 +656,32 @@ export async function runEbayListingCheck(
   });
   if (error) throw error;
   return data as ListingCheckResult;
+}
+
+/**
+ * 在庫あり・eBay出品なし/QTY全て0の機種チェック結果(2026-09-26追加、不足/過剰チェックとは
+ * 独立した別ボタンから実行する)。
+ */
+export interface ModelStockCheckResult {
+  shopId: "soulcamera" | "soulmenjapan";
+  totalEbayActiveListings: number;
+  /** 機種名を単語単位に分解して先頭3単語で突合した結果。 */
+  modelStockIssues3: ListingCheckModelStockRow[];
+  /** 機種名を単語単位に分解して先頭4単語で突合した結果。 */
+  modelStockIssues4: ListingCheckModelStockRow[];
+}
+
+/**
+ * 機種在庫チェックのみを実行する(2026-09-26追加)。Edge Function側にmode: "modelStockOnly"を
+ * 渡すことで、Soulcamera Item Info取得(GetItem並列呼び出し)・DB商品全件取得・不足/過剰の
+ * 計算を一切行わない軽量な経路を通る(runEbayListingCheckとは完全に独立、互いに影響しない)。
+ */
+export async function runModelStockCheck(
+  shopId: "soulcamera" | "soulmenjapan",
+): Promise<ModelStockCheckResult> {
+  const { data, error } = await supabase.functions.invoke("ebay-listing-check", {
+    body: { shopId, mode: "modelStockOnly" },
+  });
+  if (error) throw error;
+  return data as ModelStockCheckResult;
 }
