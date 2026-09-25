@@ -11,6 +11,7 @@ import {
   PLATFORM_CATEGORY_OPTIONS,
   GRADE_OPTIONS,
   computeDriveLocalPath,
+  windowsPathToOpenFolderUrl,
 } from "../../../lib/constants";
 import { COUNTERPARTY_TYPE_OPTIONS, type CounterpartyType } from "../../../lib/taxDeduction";
 import DeductionBadge from "../../shared/DeductionBadge";
@@ -324,10 +325,15 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
     }
   }
 
-  /** 2026-09-25追加(ユーザー指示): 画像保管フォルダの「フォルダを開く」ボタン用
-   *  (在庫アラート画面の同名ボタンと同じ、URLを新しいタブで開くだけの実装)。 */
-  function handleOpenDriveFolder(url: string | null | undefined) {
-    const trimmed = (url ?? "").trim();
+  /**
+   * 2026-09-25追加・同日修正(ユーザー指示): 画像保管フォルダの「フォルダを開く」ボタン用。
+   * 当初Google DriveのWebページを新しいタブで開く実装にしていたが、ユーザーの意図は
+   * Windowsのエクスプローラーでローカルの同期フォルダを直接開くことだったため、
+   * 一覧表示タブの「フォルダを開く」(ItemTableView.tsx)と同じ openfolder:// ハンドラ方式に
+   * 変更した(windowsPathToOpenFolderUrlで変換したURLを渡す)。
+   */
+  function handleOpenDriveFolder(openFolderUrl: string | null | undefined) {
+    const trimmed = (openFolderUrl ?? "").trim();
     if (!trimmed) return;
     window.open(trimmed, "_blank", "noopener,noreferrer");
   }
@@ -743,8 +749,16 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
               </button>
               <button
                 type="button"
-                onClick={() => handleOpenDriveFolder(editForm.drive_folder_url)}
-                disabled={!editForm.drive_folder_url.trim()}
+                onClick={() =>
+                  handleOpenDriveFolder(
+                    windowsPathToOpenFolderUrl(
+                      computeDriveLocalPath(driveFolder?.current_stage ?? null, editForm.model_folder_name, editForm.item_folder_name) ?? "",
+                    ),
+                  )
+                }
+                disabled={
+                  !computeDriveLocalPath(driveFolder?.current_stage ?? null, editForm.model_folder_name, editForm.item_folder_name)
+                }
               >
                 フォルダを開く
               </button>
@@ -1053,15 +1067,24 @@ export default function BasicInfoTab({ item, onChanged, editTrigger, onEditingCh
                   ? `(ローカルパス未確定) https://drive.google.com/drive/folders/${driveFolder.drive_folder_id}`
                   : "-"))}
           </span>
-          {driveFolder.drive_folder_id && (
-            <button
-              type="button"
-              onClick={() => handleOpenDriveFolder(`https://drive.google.com/drive/folders/${driveFolder.drive_folder_id}`)}
-              style={{ fontSize: 12, padding: "2px 8px" }}
-            >
-              フォルダを開く
-            </button>
-          )}
+          {(() => {
+            const localPath = computeDriveLocalPath(
+              driveFolder.current_stage,
+              driveFolder.model_folder_name,
+              driveFolder.item_folder_name,
+            );
+            if (!localPath) return null;
+            return (
+              <button
+                type="button"
+                onClick={() => handleOpenDriveFolder(windowsPathToOpenFolderUrl(localPath))}
+                title={localPath}
+                style={{ fontSize: 12, padding: "2px 8px" }}
+              >
+                フォルダを開く
+              </button>
+            );
+          })()}
         </div>
       )}
 
