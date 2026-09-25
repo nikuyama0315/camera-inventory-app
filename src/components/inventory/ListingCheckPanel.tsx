@@ -166,7 +166,7 @@ export default function ListingCheckPanel() {
             {result.modelStockIssues.length === 0 ? (
               <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
             ) : (
-              <table style={{ width: "50%", fontSize: 12, borderCollapse: "collapse" }}>
+              <table style={{ width: "60%", fontSize: 12, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>機種名</th>
