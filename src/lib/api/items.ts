@@ -78,7 +78,16 @@ export async function fetchItemList(
     // brand列のみへの絞り込みでは取込商品が一件もヒットしない不具合があった。
     // brand・model両方に対する部分一致(OR)に変更し、他タブ(一覧表示・CSV出力)の
     // 「ブランド/機種」絞り込みと同じ挙動に揃えた(2026-09-02)。
-    query = query.or(`brand.ilike.%${filters.brand}%,model.ilike.%${filters.brand}%`);
+    // 【2026-09-25修正・ユーザー指摘】一覧表示モード(ItemTableView.tsx)は`${brand} ${model}`を
+    // 連結した文字列に対して部分一致させるため、「kyocera td」のようにbrand(Kyocera)とmodel(TD)に
+    // またがる複合語でもヒットするが、この関数は単一カラムずつしか見ていなかったため
+    // (brand列単体・model列単体のどちらにも「kyocera td」全体は含まれない)、詳細編集モードの
+    // 絞り込みだけヒット件数が少なくなる不整合があった。空白区切りの単語ごとにAND、各単語は
+    // brand/model列のどちらかに部分一致すればOK(OR)、という方式に変更し、一覧表示モードの挙動に揃えた。
+    const brandWords = filters.brand.trim().split(/\s+/).filter(Boolean);
+    for (const word of brandWords) {
+      query = query.or(`brand.ilike.%${word}%,model.ilike.%${word}%`);
+    }
   }
   if (filters.keyword) {
     query = query.or(
@@ -198,7 +207,16 @@ function buildItemListWithPurchaseQuery(filters: ItemListFilters, sort: ItemSort
     // brand列のみへの絞り込みでは取込商品が一件もヒットしない不具合があった。
     // brand・model両方に対する部分一致(OR)に変更し、他タブ(一覧表示・CSV出力)の
     // 「ブランド/機種」絞り込みと同じ挙動に揃えた(2026-09-02)。
-    query = query.or(`brand.ilike.%${filters.brand}%,model.ilike.%${filters.brand}%`);
+    // 【2026-09-25修正・ユーザー指摘】一覧表示モード(ItemTableView.tsx)は`${brand} ${model}`を
+    // 連結した文字列に対して部分一致させるため、「kyocera td」のようにbrand(Kyocera)とmodel(TD)に
+    // またがる複合語でもヒットするが、この関数は単一カラムずつしか見ていなかったため
+    // (brand列単体・model列単体のどちらにも「kyocera td」全体は含まれない)、詳細編集モードの
+    // 絞り込みだけヒット件数が少なくなる不整合があった。空白区切りの単語ごとにAND、各単語は
+    // brand/model列のどちらかに部分一致すればOK(OR)、という方式に変更し、一覧表示モードの挙動に揃えた。
+    const brandWords = filters.brand.trim().split(/\s+/).filter(Boolean);
+    for (const word of brandWords) {
+      query = query.or(`brand.ilike.%${word}%,model.ilike.%${word}%`);
+    }
   }
   if (filters.keyword) {
     query = query.or(
