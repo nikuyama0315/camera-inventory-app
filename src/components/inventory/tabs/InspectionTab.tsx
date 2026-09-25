@@ -13,6 +13,9 @@ import {
   completeInspectionToReturnRequest,
   completeInspectionToReturned,
   markItemListed,
+  fetchItemDetail,
+  searchItemsForInspectionAutofill,
+  type ItemAutofillCandidate,
 } from "../../../lib/api/items";
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
 import { generateDescriptionHtml, generateSellerNoteText } from "../../../lib/descriptionGenerator";
@@ -175,6 +178,14 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   // 2026-09-25追加: 生成したテキストボックスの内容をコピーするボタン用。コピー直後だけ
   // 「コピーしました」を表示するため、どちらのボックスをコピーしたかを保持する。
   const [copiedField, setCopiedField] = useState<"html" | "text" | null>(null);
+  // 2026-09-25追加: 「登録済みアイテムからオートフィル」機能用。管理番号・ブランド/機種の
+  // 部分一致で他の商品を検索し、選択した商品の検品内容(FIELDS・状態ランク・各チェック表)を
+  // この画面の入力エリアへ丸ごとセットする(あくまで画面上の値のみ変更、保存は別途「検品内容を
+  // 保存」を押すまで行われない)。
+  const [autofillQuery, setAutofillQuery] = useState("");
+  const [autofillCandidates, setAutofillCandidates] = useState<ItemAutofillCandidate[]>([]);
+  const [autofillBusy, setAutofillBusy] = useState(false);
+  const [autofillFeedback, setAutofillFeedback] = useState<string | null>(null);
 
   // 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたとき、
   // このセクションまで自動スクロールする(0=初期値のときは何もしない)。
@@ -236,6 +247,46 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   useEffect(() => {
     void loadCandidates();
   }, []);
+
+  // 2026-09-25追加: オートフィル検索欄の入力を300msデバウンスして検索する。
+  useEffect(() => {
+    const q = autofillQuery.trim();
+    if (!q) {
+      setAutofillCandidates([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      searchItemsForInspectionAutofill(q, detail.id)
+        .then(setAutofillCandidates)
+        .catch(() => setAutofillCandidates([]));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [autofillQuery, detail.id]);
+
+  function autofillCandidateLabel(c: ItemAutofillCandidate): string {
+    const brandModel = [c.brand, c.model].filter(Boolean).join(" ");
+    return brandModel ? `${c.management_no} ・ ${brandModel}` : c.management_no;
+  }
+
+  async function handleApplyAutofill(candidate: ItemAutofillCandidate) {
+    setAutofillBusy(true);
+    setAutofillFeedback(null);
+    try {
+      const srcDetail = await fetchItemDetail(candidate.id);
+      if (!srcDetail.inspections || srcDetail.inspections.length === 0) {
+        setAutofillFeedback(`${candidate.management_no}には検品データが登録されていません`);
+        return;
+      }
+      setValues(buildInitialValues(srcDetail));
+      setAutofillFeedback(`${candidate.management_no}の検品内容を反映しました(画面上の値のみ変更、保存は「検品内容を保存」を押すまで行われません)`);
+    } catch (err) {
+      setAutofillFeedback(err instanceof Error ? err.message : "取得に失敗しました");
+    } finally {
+      setAutofillBusy(false);
+      setAutofillQuery("");
+      setAutofillCandidates([]);
+    }
+  }
 
   async function handleTranslate(field: FieldDef) {
     const text = values[field.key];
@@ -394,6 +445,37 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
 
   return (
     <div>
+      {/* 2026-09-25追加(ユーザー指示): 登録済みアイテムからオートフィル。管理番号・ブランド/機種の
+          部分一致で検索し、選択した商品の検品内容(FIELDS・状態ランク・各チェック表)をこの画面の
+          入力エリアへ丸ごとセットする。 */}
+      <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "0.5px solid var(--border)" }}>
+        <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+          登録済みアイテムからオートフィル(管理番号またはブランド/機種で検索)
+        </label>
+        <input
+          type="text"
+          list="inspection-autofill-candidates"
+          value={autofillQuery}
+          onChange={(e) => {
+            const v = e.target.value;
+            setAutofillQuery(v);
+            const match = autofillCandidates.find((c) => autofillCandidateLabel(c) === v);
+            if (match) void handleApplyAutofill(match);
+          }}
+          placeholder="例: 260913-14 / Kyocera TD"
+          disabled={autofillBusy}
+          style={{ width: 340 }}
+        />
+        <datalist id="inspection-autofill-candidates">
+          {autofillCandidates.map((c) => (
+            <option key={c.id} value={autofillCandidateLabel(c)} />
+          ))}
+        </datalist>
+        {autofillFeedback && (
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>{autofillFeedback}</p>
+        )}
+      </div>
+
       {FIELDS.map((field) => (
         <div key={field.key} style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>

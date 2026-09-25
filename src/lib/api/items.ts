@@ -103,6 +103,36 @@ export async function fetchItemList(
   return data as Item[];
 }
 
+export interface ItemAutofillCandidate {
+  id: string;
+  management_no: string;
+  brand: string | null;
+  model: string | null;
+}
+
+/**
+ * 検品タブの「登録済みアイテムからオートフィル」機能用(2026-09-25追加、ユーザー指示)。
+ * 管理番号・ブランド・機種のいずれかに部分一致する商品を検索する(単純なOR、単語分割はしない)。
+ * excludeItemIdで検品対象の商品自身を候補から除外する。
+ */
+export async function searchItemsForInspectionAutofill(
+  query: string,
+  excludeItemId: string,
+  limit = 20,
+): Promise<ItemAutofillCandidate[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const { data, error } = await supabase
+    .from("items")
+    .select("id, management_no, brand, model")
+    .neq("id", excludeItemId)
+    .or(`management_no.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as ItemAutofillCandidate[];
+}
+
 export interface ItemWithPurchase extends Item {
   purchase_date: string | null;
   purchase_price: number | null;
