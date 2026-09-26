@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ItemDetail, ListingPhoto } from "../../../lib/types";
 import { computeDriveLocalPath, windowsPathToOpenFolderUrl } from "../../../lib/constants";
+import { markItemListed } from "../../../lib/api/items";
+import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
 import {
   LISTING_CONDITION_DEFAULT,
   LISTING_CONDITION_OPTIONS,
@@ -137,6 +139,7 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [publishResult, setPublishResult] = useState<{ success: boolean; ebayItemId?: string; error?: string } | null>(
     null,
   );
+  const [statusUpdateWarning, setStatusUpdateWarning] = useState<string | null>(null);
 
   // 2026-09-27追加(ユーザー指示): 「利益簡易計算」ボタン用。仕入高(円)はitem.purchases[0]から、
   // 開いた時点のItem price(USD)・Shipping policyのドル数値をそれぞれ初期値として渡す。
@@ -358,9 +361,22 @@ export default function ListingTab({ item, onChanged }: Props) {
     setPublishResult(null);
     try {
       await handleSave();
+      setStatusUpdateWarning(null);
       const result = await publishListing(item.id, shopId);
       setPublishResult(result);
-      if (result.success) onChanged();
+      if (result.success) {
+        // 2026-09-27追加(ユーザー指示): 出品成功時、ステータスを「出品中」に変更する
+        // (検品タブの既存フローと同じmark_item_listed RPC + Driveフォルダ移動を使う)。
+        try {
+          await markItemListed(item.id);
+          await triggerDriveFolderMove(item.id);
+        } catch (statusErr) {
+          setStatusUpdateWarning(
+            `出品自体は成功しましたが、ステータス更新に失敗しました: ${statusErr instanceof Error ? statusErr.message : "unknown error"}`,
+          );
+        }
+        onChanged();
+      }
     } catch (err) {
       setPublishResult({ success: false, error: err instanceof Error ? err.message : "出品に失敗しました" });
     } finally {
@@ -698,7 +714,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         <p
           style={{
             fontSize: 13,
-            color: publishResult.success ? "var(--text-primary)" : "var(--danger-text)",
+            color: publishResult.success ? "var(--highlight-text)" : "var(--danger-text)",
             fontWeight: 700,
           }}
         >
@@ -706,6 +722,9 @@ export default function ListingTab({ item, onChanged }: Props) {
             ? `出品に成功しました。ItemID: ${publishResult.ebayItemId}`
             : `出品に失敗しました: ${publishResult.error}`}
         </p>
+      )}
+      {statusUpdateWarning && (
+        <p style={{ fontSize: 12, color: "var(--danger-text)" }}>{statusUpdateWarning}</p>
       )}
 
       <ProfitCalcModal
