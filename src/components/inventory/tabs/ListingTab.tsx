@@ -407,7 +407,8 @@ export default function ListingTab({ item, onChanged }: Props) {
             onChange={(e) => setItemSpecificsText(e.target.value)}
             placeholder="機種名などを入力して「サンプルデータ取得」を押すと、直近の販売済みデータからItem Specificsを取得してここに表示します(Name: Value の1行1項目形式)"
             rows={10}
-            style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+            cols={30}
+            style={{ width: "30ch", flexShrink: 0, fontFamily: "monospace", fontSize: 12 }}
           />
           <button type="button" onClick={() => void handleFetchSample()} disabled={sampleBusy} style={{ width: "fit-content", flexShrink: 0 }}>
             {sampleBusy ? "取得中..." : "サンプルデータ取得"}
