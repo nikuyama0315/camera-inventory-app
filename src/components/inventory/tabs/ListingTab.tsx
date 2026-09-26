@@ -123,6 +123,9 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [itemPrice, setItemPrice] = useState("");
   const [paymentPolicy, setPaymentPolicy] = useState<string>(LISTING_PAYMENT_POLICY_DEFAULT);
   const [shippingPolicy, setShippingPolicy] = useState<string>(LISTING_SHIPPING_POLICY_DEFAULT);
+  // 2026-09-27追加(ユーザー指示): Promote listing(General入札率%・Priority ON/OFF)。
+  const [promotedGeneralRate, setPromotedGeneralRate] = useState("");
+  const [promotedPriority, setPromotedPriority] = useState(false);
   // 2026-09-27追加(ユーザー指摘): ハードコードしたShipping policy一覧が実際のアカウント登録数(38件)と
   // 一致していなかったため、eBay Account APIからライブ取得する。取得できるまでは静的な既定値を暫定表示。
   const [paymentPolicyOptions, setPaymentPolicyOptions] = useState<string[]>([...LISTING_PAYMENT_POLICY_OPTIONS]);
@@ -136,7 +139,9 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const [publishBusy, setPublishBusy] = useState(false);
-  const [publishResult, setPublishResult] = useState<{ success: boolean; ebayItemId?: string; error?: string } | null>(
+  const [publishResult, setPublishResult] = useState<
+    { success: boolean; ebayItemId?: string; error?: string; promotedWarning?: string | null } | null
+  >(
     null,
   );
   const [statusUpdateWarning, setStatusUpdateWarning] = useState<string | null>(null);
@@ -170,6 +175,8 @@ export default function ListingTab({ item, onChanged }: Props) {
         setItemPrice(draft?.item_price || "");
         setPaymentPolicy(draft?.payment_policy || LISTING_PAYMENT_POLICY_DEFAULT);
         setShippingPolicy(draft?.shipping_policy || LISTING_SHIPPING_POLICY_DEFAULT);
+        setPromotedGeneralRate(draft?.promoted_general_rate || "");
+        setPromotedPriority(draft?.promoted_priority ?? false);
         setPhotos(draft?.photos || []);
         setPublishResult(
           draft?.published_item_id ? { success: true, ebayItemId: draft.published_item_id } : null,
@@ -320,6 +327,8 @@ export default function ListingTab({ item, onChanged }: Props) {
         item_price: itemPrice,
         payment_policy: paymentPolicy,
         shipping_policy: shippingPolicy,
+        promoted_general_rate: promotedGeneralRate,
+        promoted_priority: promotedPriority,
         photos,
       });
       setSaveMessage("保存しました");
@@ -348,6 +357,8 @@ export default function ListingTab({ item, onChanged }: Props) {
     setItemPrice("");
     setPaymentPolicy(LISTING_PAYMENT_POLICY_DEFAULT);
     setShippingPolicy(LISTING_SHIPPING_POLICY_DEFAULT);
+    setPromotedGeneralRate("");
+    setPromotedPriority(false);
     setSaveMessage(null);
   }
 
@@ -697,6 +708,42 @@ export default function ListingTab({ item, onChanged }: Props) {
         </div>
       </section>
 
+      {/* Promote listing エリア(2026-09-27追加、ユーザー指示) */}
+      <section>
+        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Promote listing</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            General
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+              <input
+                type="text"
+                value={promotedGeneralRate}
+                onChange={(e) => setPromotedGeneralRate(e.target.value)}
+                placeholder="例: 9.0"
+                style={{ width: 100 }}
+              />
+              <span>%</span>
+            </div>
+          </label>
+          <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Priority
+            <button
+              type="button"
+              onClick={() => setPromotedPriority((v) => !v)}
+              style={{
+                display: "block",
+                marginTop: 4,
+                width: 80,
+                fontWeight: 700,
+                color: promotedPriority ? "var(--highlight-text)" : "var(--text-muted)",
+              }}
+            >
+              {promotedPriority ? "ON" : "OFF"}
+            </button>
+          </label>
+        </div>
+      </section>
+
       <section style={{ display: "flex", alignItems: "center", gap: 12, borderTop: "0.5px solid var(--border)", paddingTop: 16 }}>
         <button type="button" onClick={() => void handleSave()} disabled={saveBusy}>
           {saveBusy ? "保存中..." : "保存"}
@@ -725,6 +772,9 @@ export default function ListingTab({ item, onChanged }: Props) {
       )}
       {statusUpdateWarning && (
         <p style={{ fontSize: 12, color: "var(--danger-text)" }}>{statusUpdateWarning}</p>
+      )}
+      {publishResult?.promotedWarning && (
+        <p style={{ fontSize: 12, color: "var(--danger-text)" }}>{publishResult.promotedWarning}</p>
       )}
 
       <ProfitCalcModal

@@ -93,6 +93,8 @@ export interface PublishListingResult {
   success: boolean;
   ebayItemId?: string;
   error?: string;
+  /** Promoted Listings General/Priorityへの登録に失敗した場合の警告(出品自体は成功)。2026-09-27追加。 */
+  promotedWarning?: string | null;
 }
 
 /** 「出品する」ボタン用。Edge Function経由でeBay Trading API AddFixedPriceItemを実行する。 */

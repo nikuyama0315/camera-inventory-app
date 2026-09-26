@@ -264,6 +264,10 @@ export interface ItemListingDraft {
   payment_policy: string | null;
   shipping_policy: string | null;
   photos: ListingPhoto[];
+  /** Promoted Listings General(固定入札率)の入札率(%、テキスト)。2026-09-27追加。 */
+  promoted_general_rate: string | null;
+  /** Promoted Listings Priority(クリック課金)のON/OFF。2026-09-27追加。 */
+  promoted_priority: boolean;
   published_item_id: string | null;
   published_at: string | null;
 }
