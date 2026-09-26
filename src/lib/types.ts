@@ -268,6 +268,10 @@ export interface ItemListingDraft {
   promoted_general_rate: string | null;
   /** Promoted Listings Priority(クリック課金)のON/OFF。2026-09-27追加。 */
   promoted_priority: boolean;
+  /** 2026-09-27追加(ユーザー指示): 「既存出品データ取得」で指定された既存eBay ItemID。設定されている間は
+   *  「出品する」がAddFixedPriceItemではなくReviseItem(Sold積み出品)になる。「サンプルデータ取得」を
+   *  押すとnullに戻り、新規出品モードになる。 */
+  existing_item_id: string | null;
   published_item_id: string | null;
   published_at: string | null;
 }

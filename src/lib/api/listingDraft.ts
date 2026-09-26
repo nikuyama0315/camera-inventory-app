@@ -89,6 +89,22 @@ export async function fetchItemSpecificsSample(
   return data as ItemSpecificsSampleResult;
 }
 
+/** 「Item specifics」欄の「既存出品データ取得」ボタン用(2026-09-27追加、ユーザー指示)。
+ *  Restock待ち(QTY=0)等の既存eBay ItemIDを直接指定してItem Specificsを取得する(=Sold積み出品用)。 */
+export async function fetchItemSpecificsByExistingItem(
+  existingItemId: string,
+  shopId: "soulcamera" | "soulmenjapan",
+): Promise<ItemSpecificsSampleResult> {
+  const { data, error } = await supabase.functions.invoke("listing-item-specifics-lookup", {
+    body: { itemId: existingItemId, shopId },
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object" || "error" in data) {
+    throw new Error((data as { error?: string })?.error ?? "既存出品データの取得に失敗しました");
+  }
+  return data as ItemSpecificsSampleResult;
+}
+
 export interface PublishListingResult {
   success: boolean;
   ebayItemId?: string;

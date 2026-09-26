@@ -18,6 +18,7 @@ import {
 import {
   LISTING_PHOTOS_MAX_COUNT,
   deleteListingPhoto,
+  fetchItemSpecificsByExistingItem,
   fetchItemSpecificsSample,
   fetchListingDraft,
   fetchSellerPolicies,
@@ -134,6 +135,13 @@ export default function ListingTab({ item, onChanged }: Props) {
 
   const [sampleBusy, setSampleBusy] = useState(false);
   const [sampleMessage, setSampleMessage] = useState<string | null>(null);
+  // 2026-09-27追加(ユーザー指示): 「既存出品データ取得」用。既存eBay ItemIDを指定するテキストボックスと、
+  // 取得成功時に設定される「更新出品(Sold積み出品)対象ItemID」。設定されている間は「出品する」が
+  // AddFixedPriceItemではなくReviseItemになる。「サンプルデータ取得」を押すとnullに戻る(新規出品)。
+  const [existingItemIdInput, setExistingItemIdInput] = useState("");
+  const [reviseTargetItemId, setReviseTargetItemId] = useState<string | null>(null);
+  const [existingFetchBusy, setExistingFetchBusy] = useState(false);
+  const [existingFetchMessage, setExistingFetchMessage] = useState<string | null>(null);
 
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -169,6 +177,8 @@ export default function ListingTab({ item, onChanged }: Props) {
         setEbayCategory(draft?.ebay_category || LISTING_EBAY_CATEGORY_DEFAULT);
         setStoreCategory(draft?.store_category || LISTING_STORE_CATEGORY_DEFAULT);
         setItemSpecificsPairs(parseSpecificsText(draft?.item_specifics_text || ""));
+        setReviseTargetItemId(draft?.existing_item_id || null);
+        setExistingItemIdInput(draft?.existing_item_id || "");
         setItemCondition(draft?.item_condition || LISTING_CONDITION_DEFAULT);
         setConditionDescription(draft?.condition_description || draft?.seller_note_text || "");
         setDescriptionHtml(draft?.description_html || "");
@@ -292,6 +302,10 @@ export default function ListingTab({ item, onChanged }: Props) {
       const result = await fetchItemSpecificsSample(query, shopId);
       setItemSpecificsPairs(parseSpecificsText(result.itemSpecificsText));
       if (result.itemPrice) setItemPrice(result.itemPrice);
+      // ユーザー指示: 「サンプルデータ取得」を使ったら新規出品とする(更新出品モードを解除)。
+      setReviseTargetItemId(null);
+      setExistingItemIdInput("");
+      setExistingFetchMessage(null);
       setSampleMessage(
         `取得しました(参照元: ${result.sourceItemTitle ?? result.sourceItemId}${
           result.sourceOrderNumber ? " / Order No. " + result.sourceOrderNumber : ""
@@ -301,6 +315,32 @@ export default function ListingTab({ item, onChanged }: Props) {
       setSampleMessage(err instanceof Error ? err.message : "サンプルデータの取得に失敗しました");
     } finally {
       setSampleBusy(false);
+    }
+  }
+
+  /** 2026-09-27追加(ユーザー指示): 「既存出品データ取得」ボタン用。指定した既存ItemIDのItem Specifics
+   *  を取得して表示し、この商品を「更新出品(Sold積み出品、ReviseItem)」対象としてマークする。 */
+  async function handleFetchExistingItemData() {
+    if (!shopId) {
+      setExistingFetchMessage("この商品にはeBayアカウント(soulcamera/soulmenjapan)が設定されていません");
+      return;
+    }
+    const targetId = existingItemIdInput.trim();
+    if (!targetId) {
+      setExistingFetchMessage("既存のeBay ItemIDを入力してから押してください");
+      return;
+    }
+    setExistingFetchBusy(true);
+    setExistingFetchMessage(null);
+    try {
+      const result = await fetchItemSpecificsByExistingItem(targetId, shopId);
+      setItemSpecificsPairs(parseSpecificsText(result.itemSpecificsText));
+      setReviseTargetItemId(targetId);
+      setExistingFetchMessage(`取得しました(${result.sourceItemTitle ?? targetId})。「出品する」を押すとこのItemIDへの更新出品(Sold積み出品)になります。`);
+    } catch (err) {
+      setExistingFetchMessage(err instanceof Error ? err.message : "既存出品データの取得に失敗しました");
+    } finally {
+      setExistingFetchBusy(false);
     }
   }
 
@@ -321,6 +361,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         ebay_category: ebayCategory,
         store_category: storeCategory,
         item_specifics_text: serializeSpecificsPairs(itemSpecificsPairs),
+        existing_item_id: reviseTargetItemId,
         item_condition: itemCondition,
         condition_description: conditionDescription,
         description_html: descriptionHtml,
@@ -350,6 +391,9 @@ export default function ListingTab({ item, onChanged }: Props) {
     setEbayCategory(LISTING_EBAY_CATEGORY_DEFAULT);
     setStoreCategory(LISTING_STORE_CATEGORY_DEFAULT);
     setItemSpecificsPairs([]);
+    setExistingItemIdInput("");
+    setReviseTargetItemId(null);
+    setExistingFetchMessage(null);
     setSpecificsSearchQuery("");
     setItemCondition(LISTING_CONDITION_DEFAULT);
     setConditionDescription("");
@@ -367,7 +411,10 @@ export default function ListingTab({ item, onChanged }: Props) {
       setPublishResult({ success: false, error: "この商品にはeBayアカウント(soulcamera/soulmenjapan)が設定されていません" });
       return;
     }
-    if (!window.confirm("実際にeBayへ出品します。よろしいですか?(この操作は取り消せません)")) return;
+    const confirmMessage = reviseTargetItemId
+      ? `既存のItemID ${reviseTargetItemId} をReviseItemで更新します(Sold積み出品)。よろしいですか?(この操作は取り消せません)`
+      : "実際にeBayへ新規出品します。よろしいですか?(この操作は取り消せません)";
+    if (!window.confirm(confirmMessage)) return;
     setPublishBusy(true);
     setPublishResult(null);
     try {
@@ -581,6 +628,31 @@ export default function ListingTab({ item, onChanged }: Props) {
           </button>
         </div>
         {sampleMessage && <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>{sampleMessage}</p>}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <input
+            type="text"
+            value={existingItemIdInput}
+            onChange={(e) => setExistingItemIdInput(e.target.value)}
+            placeholder="既存のeBay ItemID(Restock待ちの出品等)"
+            style={{ width: "30ch" }}
+          />
+          <button
+            type="button"
+            onClick={() => void handleFetchExistingItemData()}
+            disabled={existingFetchBusy}
+            style={{ width: "fit-content", flexShrink: 0 }}
+          >
+            {existingFetchBusy ? "取得中..." : "既存出品データ取得"}
+          </button>
+        </div>
+        {existingFetchMessage && (
+          <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>{existingFetchMessage}</p>
+        )}
+        {reviseTargetItemId && (
+          <p style={{ fontSize: 12, color: "var(--highlight-text)", fontWeight: 700, marginBottom: 10 }}>
+            更新出品(Sold積み出品)モード: ItemID {reviseTargetItemId} をReviseItemで更新します
+          </p>
+        )}
         {itemSpecificsPairs.length === 0 ? (
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
             「サンプルデータ取得」を押すと、直近の販売済みデータからItem Specificsを項目ごとに取得して表示します。
@@ -752,7 +824,7 @@ export default function ListingTab({ item, onChanged }: Props) {
           クリア
         </button>
         <button type="button" onClick={() => void handlePublish()} disabled={publishBusy || !shopId}>
-          {publishBusy ? "出品処理中..." : "出品する"}
+          {publishBusy ? "出品処理中..." : reviseTargetItemId ? "更新出品する" : "出品する"}
         </button>
         {saveMessage && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{saveMessage}</span>}
       </section>
