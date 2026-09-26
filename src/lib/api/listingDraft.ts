@@ -31,6 +31,18 @@ export async function upsertListingDraft(itemId: string, patch: Partial<ItemList
   if (error) throw error;
 }
 
+/** 2026-09-27修正(ユーザー報告「crypto.randomUUID is not a function」): このアプリはhttp://
+ *  (非HTTPS)で配信しているため非セキュアコンテキストとなり、crypto.randomUUID()自体が存在しない
+ *  ブラウザがある(navigator.clipboardが非セキュアコンテキストで無効化されるのと同じ理由)。
+ *  crypto.randomUUID()が使えればそれを使い、無ければMath.random()ベースの簡易UUID風文字列に
+ *  フォールバックする(ファイルパスの一意性確保が目的のため、暗号学的な強度は不要)。 */
+function generateId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function extFromFileName(name: string): string {
   const dot = name.lastIndexOf(".");
   if (dot === -1 || dot === name.length - 1) return "jpg";
@@ -41,7 +53,7 @@ function extFromFileName(name: string): string {
  *  eBayのPictureURLにそのまま渡せる公開URLを返す。 */
 export async function uploadListingPhoto(itemId: string, file: File): Promise<ListingPhoto> {
   const ext = extFromFileName(file.name);
-  const path = `${itemId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${itemId}/${generateId()}.${ext}`;
   const { error } = await supabase.storage.from(LISTING_PHOTOS_BUCKET).upload(path, file, { upsert: false });
   if (error) throw error;
   const { data } = supabase.storage.from(LISTING_PHOTOS_BUCKET).getPublicUrl(path);
@@ -93,4 +105,27 @@ export async function publishListing(
   });
   if (error) throw error;
   return data as PublishListingResult;
+}
+
+export interface SellerPolicyOption {
+  id: string;
+  name: string;
+}
+
+export interface SellerPoliciesResult {
+  shippingPolicies: SellerPolicyOption[];
+  paymentPolicies: SellerPolicyOption[];
+}
+
+/** Payment policy・Shipping policyプルダウンの選択肢一覧を取得する(2026-09-27追加、ユーザー指摘)。
+ *  当初ハードコードしていたShipping policy一覧(GetItemサンプリングで収集した18件)が、実際に
+ *  アカウントへ登録されている38件のEXP_$系プリセットと一致していなかったため、eBay Account API
+ *  (fulfillment_policy/payment_policy)から毎回ライブ取得する方式に変更した。 */
+export async function fetchSellerPolicies(shopId: "soulcamera" | "soulmenjapan"): Promise<SellerPoliciesResult> {
+  const { data, error } = await supabase.functions.invoke("listing-seller-policies", { body: { shopId } });
+  if (error) throw error;
+  if (!data || typeof data !== "object" || "error" in data) {
+    throw new Error((data as { error?: string })?.error ?? "Payment/Shipping policy一覧の取得に失敗しました");
+  }
+  return data as SellerPoliciesResult;
 }

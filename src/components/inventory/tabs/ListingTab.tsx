@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ItemDetail, ListingPhoto } from "../../../lib/types";
+import { computeDriveLocalPath, windowsPathToOpenFolderUrl } from "../../../lib/constants";
 import {
   LISTING_CONDITION_DEFAULT,
   LISTING_CONDITION_OPTIONS,
@@ -17,6 +18,7 @@ import {
   deleteListingPhoto,
   fetchItemSpecificsSample,
   fetchListingDraft,
+  fetchSellerPolicies,
   publishListing,
   uploadListingPhoto,
   upsertListingDraft,
@@ -84,6 +86,21 @@ function nearestShippingPolicy(targetUsd: number, options: readonly string[]): s
 export default function ListingTab({ item, onChanged }: Props) {
   const shopId = item.account === "soulcamera" || item.account === "soulmenjapan" ? item.account : null;
 
+  // 2026-09-27追加(ユーザー指示): 「写真」の右に「画像保管フォルダを開く」ボタン。
+  // InspectionTab.tsxの同名機能と同じopenfolder://ハンドラ方式(各PCにインストール済み)。
+  const imageFolderDriveFolder = item.item_drive_folders?.[0];
+  const imageFolderLocalPath = imageFolderDriveFolder
+    ? computeDriveLocalPath(
+        imageFolderDriveFolder.current_stage,
+        imageFolderDriveFolder.model_folder_name,
+        imageFolderDriveFolder.item_folder_name,
+      )
+    : null;
+  function handleOpenImageFolder() {
+    if (!imageFolderLocalPath) return;
+    window.open(windowsPathToOpenFolderUrl(imageFolderLocalPath), "_blank", "noopener,noreferrer");
+  }
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -104,6 +121,11 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [itemPrice, setItemPrice] = useState("");
   const [paymentPolicy, setPaymentPolicy] = useState<string>(LISTING_PAYMENT_POLICY_DEFAULT);
   const [shippingPolicy, setShippingPolicy] = useState<string>(LISTING_SHIPPING_POLICY_DEFAULT);
+  // 2026-09-27追加(ユーザー指摘): ハードコードしたShipping policy一覧が実際のアカウント登録数(38件)と
+  // 一致していなかったため、eBay Account APIからライブ取得する。取得できるまでは静的な既定値を暫定表示。
+  const [paymentPolicyOptions, setPaymentPolicyOptions] = useState<string[]>([...LISTING_PAYMENT_POLICY_OPTIONS]);
+  const [shippingPolicyOptions, setShippingPolicyOptions] = useState<string[]>([...LISTING_SHIPPING_POLICY_OPTIONS]);
+  const [policyOptionsError, setPolicyOptionsError] = useState<string | null>(null);
 
   const [sampleBusy, setSampleBusy] = useState(false);
   const [sampleMessage, setSampleMessage] = useState<string | null>(null);
@@ -123,7 +145,7 @@ export default function ListingTab({ item, onChanged }: Props) {
 
   function handleApplyProfitCalc(priceUsd: number, shippingUsd: number) {
     setItemPrice(priceUsd.toFixed(2));
-    setShippingPolicy(nearestShippingPolicy(shippingUsd, LISTING_SHIPPING_POLICY_OPTIONS));
+    setShippingPolicy(nearestShippingPolicy(shippingUsd, shippingPolicyOptions));
     setProfitModalOpen(false);
   }
 
@@ -160,6 +182,31 @@ export default function ListingTab({ item, onChanged }: Props) {
       cancelled = true;
     };
   }, [item.id, item.item_title, item.management_no]);
+
+  // 2026-09-27追加(ユーザー指摘): Payment/Shipping policyの選択肢をeBay Account APIからライブ取得する。
+  useEffect(() => {
+    if (!shopId) return;
+    let cancelled = false;
+    setPolicyOptionsError(null);
+    fetchSellerPolicies(shopId)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.paymentPolicies.length > 0) setPaymentPolicyOptions(result.paymentPolicies.map((p) => p.name));
+        if (result.shippingPolicies.length > 0) setShippingPolicyOptions(result.shippingPolicies.map((p) => p.name));
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPolicyOptionsError(
+            err instanceof Error
+              ? `Payment/Shipping policy一覧の取得に失敗したため、暫定の一覧を表示しています: ${err.message}`
+              : "Payment/Shipping policy一覧の取得に失敗しました",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shopId]);
 
   async function persistPhotos(next: ListingPhoto[]) {
     setPhotos(next);
@@ -316,9 +363,20 @@ export default function ListingTab({ item, onChanged }: Props) {
 
       {/* 1. 写真ドロップエリア */}
       <section>
-        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-          写真({photos.length}/{LISTING_PHOTOS_MAX_COUNT})
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>
+            写真({photos.length}/{LISTING_PHOTOS_MAX_COUNT})
+          </p>
+          <button
+            type="button"
+            onClick={handleOpenImageFolder}
+            disabled={!imageFolderLocalPath}
+            title={imageFolderLocalPath ?? "画像保管フォルダの場所が特定できません"}
+            style={{ width: "fit-content" }}
+          >
+            画像保管フォルダを開く
+          </button>
+        </div>
         <div
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes("Files")) e.preventDefault();
@@ -578,7 +636,7 @@ export default function ListingTab({ item, onChanged }: Props) {
               onChange={(e) => setPaymentPolicy(e.target.value)}
               style={{ display: "block", marginTop: 4 }}
             >
-              {LISTING_PAYMENT_POLICY_OPTIONS.map((opt) => (
+              {paymentPolicyOptions.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>
@@ -592,13 +650,14 @@ export default function ListingTab({ item, onChanged }: Props) {
               onChange={(e) => setShippingPolicy(e.target.value)}
               style={{ display: "block", marginTop: 4 }}
             >
-              {LISTING_SHIPPING_POLICY_OPTIONS.map((opt) => (
+              {shippingPolicyOptions.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
                 </option>
               ))}
             </select>
           </label>
+          {policyOptionsError && <p style={{ fontSize: 11, color: "var(--danger-text)" }}>{policyOptionsError}</p>}
         </div>
       </section>
 
