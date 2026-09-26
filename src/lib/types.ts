@@ -235,3 +235,89 @@ export interface ItemListFilters {
   createdAtFrom?: string;
   createdAtTo?: string;
 }
+
+/**
+ * 「出品」タブ(2026-09-27追加)の下書きデータ。1商品(items.id)につき1行(item_idがPK)。
+ * 検品タブの「生成データ保存」ボタン(item_title/soulcamera_item_info/description_html/
+ * seller_note_textの4項目のみ)と、出品タブ自体の保存(残り全項目)の両方から書き込まれる。
+ */
+export interface ListingPhoto {
+  /** Supabase Storage(listing-photosバケット)上のパス。削除・並べ替え時のキーとして使う。 */
+  path: string;
+  /** 公開URL(eBayのPictureURLにそのまま渡せる)。 */
+  url: string;
+}
+
+export interface ItemListingDraft {
+  item_id: string;
+  item_title: string | null;
+  custom_label: string | null;
+  soulcamera_item_info: string | null;
+  description_html: string | null;
+  seller_note_text: string | null;
+  ebay_category: string | null;
+  store_category: string | null;
+  item_specifics_text: string | null;
+  item_condition: string | null;
+  condition_description: string | null;
+  item_price: string | null;
+  payment_policy: string | null;
+  shipping_policy: string | null;
+  photos: ListingPhoto[];
+  published_item_id: string | null;
+  published_at: string | null;
+}
+
+/** 出品タブ「ITEM CATEGORY」プルダウンの選択肢(ユーザー指示の4種)。値は表示ラベルと同一。
+ *  実際のeBay CategoryIDへの対応はEDGE FUNCTION側(listing-publish)のLISTING_CATEGORY_IDSと対応。 */
+export const LISTING_EBAY_CATEGORY_OPTIONS = ["Film Cameras", "Digital Cameras", "Lenses", "Other Cameras & Photo"] as const;
+export const LISTING_EBAY_CATEGORY_DEFAULT = "Film Cameras";
+
+/** 出品タブ「Store category」プルダウンの選択肢(ユーザー指示の8種、ストアの実際のカテゴリ名と一致)。 */
+export const LISTING_STORE_CATEGORY_OPTIONS = [
+  "Camera accessories",
+  "Digital SLR camera",
+  "Digital compact camera",
+  "Film SLR camera",
+  "Film compact camera",
+  "Lens",
+  "Mirrorless camera",
+  "Other",
+] as const;
+export const LISTING_STORE_CATEGORY_DEFAULT = "Film compact camera";
+
+/** 出品タブ「Item condition」プルダウンの選択肢(eBay標準ConditionIDに対応、ユーザー指示の4種)。 */
+export const LISTING_CONDITION_OPTIONS = ["New", "Open box", "Used", "For parts or not working"] as const;
+export const LISTING_CONDITION_DEFAULT = "Used";
+
+/** 出品タブ「PRICING Payment policy」プルダウンの選択肢(2026-09-27、実アカウントのSellerProfilesから収集)。 */
+export const LISTING_PAYMENT_POLICY_OPTIONS = [
+  "Managed Payments(Immediate Payment On)",
+  "Managed Payments(Immediate Payment Off)",
+] as const;
+export const LISTING_PAYMENT_POLICY_DEFAULT = "Managed Payments(Immediate Payment On)";
+
+/** 出品タブ「SHIPPING Shipping policy」プルダウンの選択肢(2026-09-27、実アカウントのSellerProfilesから収集。
+ *  送料額(ドル建て)ごとに分かれた実運用プロファイル名。商品の重量・サイズに応じて都度選ぶ想定なので
+ *  「これが正解」というデフォルトは無く、よく使われているものを暫定デフォルトにしている)。 */
+export const LISTING_SHIPPING_POLICY_OPTIONS = [
+  "EXP_$0020",
+  "EXP_$0023",
+  "EXP_$0024",
+  "EXP_$0028",
+  "EXP_$0029",
+  "EXP_$0030",
+  "EXP_$0031",
+  "EXP_$0032",
+  "EXP_$0033",
+  "EXP_$0034",
+  "EXP_$0035",
+  "EXP_$0036",
+  "EXP_$0037",
+  "EXP_$0038",
+  "EXP_$0039",
+  "EXP_$0044",
+  "EXP_$0046",
+  "EXP_$0059",
+] as const;
+export const LISTING_SHIPPING_POLICY_DEFAULT = "EXP_$0035";

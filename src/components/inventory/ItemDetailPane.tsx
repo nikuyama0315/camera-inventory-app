@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import BasicInfoTab from "./tabs/BasicInfoTab";
 import PurchaseTab from "./tabs/PurchaseTab";
 import InspectionTab from "./tabs/InspectionTab";
+import ListingTab from "./tabs/ListingTab";
 import SalesTab from "./tabs/SalesTab";
 import { fetchItemDetail, deleteItem } from "../../lib/api/items";
 import type { ItemDetail } from "../../lib/types";
@@ -19,14 +20,14 @@ interface Props {
   onItemDeleted?: () => void;
 }
 
-type TabKey = "basic" | "purchase" | "inspection" | "sales";
+type TabKey = "basic" | "purchase" | "inspection" | "listing" | "sales";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "基本情報" },
   { key: "purchase", label: "仕入" },
   { key: "inspection", label: "検品" },
+  { key: "listing", label: "出品" },
   { key: "sales", label: "販売" },
-  // Phase3/4で「写真・出品/履歴」タブを追加する
 ];
 
 export default function ItemDetailPane({
@@ -266,6 +267,8 @@ export default function ItemDetailPane({
           scrollToDescriptionTrigger={descriptionScrollTrigger}
         />
       )}
+
+      {activeTab === "listing" && detail && <ListingTab item={detail} onChanged={handleAfterChange} />}
 
       {activeTab === "sales" && detail && <SalesTab item={detail} onChanged={handleAfterChange} />}
     </div>

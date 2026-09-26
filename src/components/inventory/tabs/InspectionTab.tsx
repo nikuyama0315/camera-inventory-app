@@ -20,6 +20,7 @@ import {
 import { triggerDriveFolderMove } from "../../../lib/api/driveFolderMove";
 import { generateDescriptionHtml, generateSellerNoteText, generateSoulcameraItemInfo } from "../../../lib/descriptionGenerator";
 import { computeDriveLocalPath, windowsPathToOpenFolderUrl } from "../../../lib/constants";
+import { saveGeneratedListingData } from "../../../lib/api/listingDraft";
 
 /** 2026-09-25追加: コピーボタン用のアイコン(コードブロックのコピーボタンと同じ、
  *  2枚の四角が重なったデザイン)。絵文字ではなくSVGで統一する。 */
@@ -202,6 +203,30 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
     setSellerNoteText(generateSellerNoteText(detail, values));
     setItemTitleText(detail.item_title ?? "");
     setSoulcameraItemInfo(generateSoulcameraItemInfo(detail));
+  }
+
+  // 2026-09-27追加(ユーザー指示): 「生成データ保存」ボタン用。ITEM TITLE・Soulcamera Item Info・
+  // Description HTML・Seller noteテキストの4項目をitem_listing_draftsへ保存し、新設の「出品」タブ側で
+  // オートフィル表示できるようにする(出品タブ自体の他項目には触れない)。
+  const [savingGeneratedData, setSavingGeneratedData] = useState(false);
+  const [saveGeneratedDataMessage, setSaveGeneratedDataMessage] = useState<string | null>(null);
+
+  async function handleSaveGeneratedData() {
+    setSavingGeneratedData(true);
+    setSaveGeneratedDataMessage(null);
+    try {
+      await saveGeneratedListingData(detail.id, {
+        item_title: itemTitleText,
+        soulcamera_item_info: soulcameraItemInfo,
+        description_html: descriptionHtml,
+        seller_note_text: sellerNoteText,
+      });
+      setSaveGeneratedDataMessage("保存しました");
+    } catch (err) {
+      setSaveGeneratedDataMessage(err instanceof Error ? `保存に失敗しました: ${err.message}` : "保存に失敗しました");
+    } finally {
+      setSavingGeneratedData(false);
+    }
   }
 
   /** 2026-09-26追加: 「画像保管フォルダを開く」ボタン用。BasicInfoTab.tsxの同名機能と同じ
@@ -819,6 +844,17 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
             <button onClick={handleGenerateDescription} style={{ width: "fit-content" }}>
               Description生成
             </button>
+            <button
+              type="button"
+              onClick={handleSaveGeneratedData}
+              disabled={savingGeneratedData || !(itemTitleText || soulcameraItemInfo || descriptionHtml || sellerNoteText)}
+              style={{ width: "fit-content" }}
+            >
+              {savingGeneratedData ? "保存中..." : "生成データ保存"}
+            </button>
+            {saveGeneratedDataMessage && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{saveGeneratedDataMessage}</span>
+            )}
             <button
               type="button"
               onClick={handleOpenImageFolder}
