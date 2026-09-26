@@ -27,6 +27,30 @@ interface Props {
   onChanged: () => void;
 }
 
+/** 2026-09-27追加(ユーザー指示): Item Specificsを1つの大きなテキストボックスではなく、
+ *  項目ごとに個別のテキストボックスで表示・編集する。DB側(item_specifics_text列)は従来通り
+ *  「Name: Value」1行1項目のテキストのまま保存するため、読み込み/保存時にパース・組み立てを行う。 */
+interface SpecificPair {
+  name: string;
+  value: string;
+}
+
+function parseSpecificsText(text: string): SpecificPair[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf(":");
+      if (idx === -1) return { name: line, value: "" };
+      return { name: line.slice(0, idx).trim(), value: line.slice(idx + 1).trim() };
+    });
+}
+
+function serializeSpecificsPairs(pairs: SpecificPair[]): string {
+  return pairs.map((p) => `${p.name}: ${p.value}`).join("\n");
+}
+
 /** 2026-09-27追加: 「出品」タブ(検品と販売の間)。出品用データを作成し、Supabase Storageへ写真を
  *  保存、最終的に「出品する」ボタンからeBay Trading API AddFixedPriceItemで実際にライブ出品する。
  *  写真アップロード先はユーザー指示によりSupabase Storage(listing-photosバケット、公開)。
@@ -46,7 +70,8 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [customLabel, setCustomLabel] = useState("");
   const [ebayCategory, setEbayCategory] = useState<string>(LISTING_EBAY_CATEGORY_DEFAULT);
   const [storeCategory, setStoreCategory] = useState<string>(LISTING_STORE_CATEGORY_DEFAULT);
-  const [itemSpecificsText, setItemSpecificsText] = useState("");
+  const [itemSpecificsPairs, setItemSpecificsPairs] = useState<SpecificPair[]>([]);
+  const [specificsSearchQuery, setSpecificsSearchQuery] = useState("");
   const [itemCondition, setItemCondition] = useState<string>(LISTING_CONDITION_DEFAULT);
   const [conditionDescription, setConditionDescription] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("");
@@ -73,10 +98,10 @@ export default function ListingTab({ item, onChanged }: Props) {
       .then((draft) => {
         if (cancelled) return;
         setItemTitle(draft?.item_title || item.item_title || "");
-        setCustomLabel(draft?.custom_label || item.management_no || "");
+        setCustomLabel(draft?.custom_label || draft?.soulcamera_item_info || "");
         setEbayCategory(draft?.ebay_category || LISTING_EBAY_CATEGORY_DEFAULT);
         setStoreCategory(draft?.store_category || LISTING_STORE_CATEGORY_DEFAULT);
-        setItemSpecificsText(draft?.item_specifics_text || "");
+        setItemSpecificsPairs(parseSpecificsText(draft?.item_specifics_text || ""));
         setItemCondition(draft?.item_condition || LISTING_CONDITION_DEFAULT);
         setConditionDescription(draft?.condition_description || draft?.seller_note_text || "");
         setDescriptionHtml(draft?.description_html || "");
@@ -162,16 +187,16 @@ export default function ListingTab({ item, onChanged }: Props) {
       setSampleMessage("この商品にはeBayアカウント(soulcamera/soulmenjapan)が設定されていません");
       return;
     }
-    const query = itemSpecificsText.trim();
+    const query = specificsSearchQuery.trim();
     if (!query) {
-      setSampleMessage("検索したい機種名などをテキストボックスに入力してから押してください");
+      setSampleMessage("検索したい機種名などを検索キーワード欄に入力してから押してください");
       return;
     }
     setSampleBusy(true);
     setSampleMessage(null);
     try {
       const result = await fetchItemSpecificsSample(query, shopId);
-      setItemSpecificsText(result.itemSpecificsText);
+      setItemSpecificsPairs(parseSpecificsText(result.itemSpecificsText));
       if (result.itemPrice) setItemPrice(result.itemPrice);
       setSampleMessage(
         `取得しました(参照元: ${result.sourceItemTitle ?? result.sourceItemId}${
@@ -201,7 +226,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         custom_label: customLabel,
         ebay_category: ebayCategory,
         store_category: storeCategory,
-        item_specifics_text: itemSpecificsText,
+        item_specifics_text: serializeSpecificsPairs(itemSpecificsPairs),
         item_condition: itemCondition,
         condition_description: conditionDescription,
         description_html: descriptionHtml,
@@ -401,20 +426,41 @@ export default function ListingTab({ item, onChanged }: Props) {
       {/* 4. Item specifics エリア */}
       <section>
         <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Item specifics</p>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <textarea
-            value={itemSpecificsText}
-            onChange={(e) => setItemSpecificsText(e.target.value)}
-            placeholder="機種名などを入力して「サンプルデータ取得」を押すと、直近の販売済みデータからItem Specificsを取得してここに表示します(Name: Value の1行1項目形式)"
-            rows={10}
-            cols={30}
-            style={{ width: "30ch", flexShrink: 0, fontFamily: "monospace", fontSize: 12 }}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+          <input
+            type="text"
+            value={specificsSearchQuery}
+            onChange={(e) => setSpecificsSearchQuery(e.target.value)}
+            placeholder="機種名などを入力(例: Canon AE-1)"
+            style={{ width: "30ch" }}
           />
           <button type="button" onClick={() => void handleFetchSample()} disabled={sampleBusy} style={{ width: "fit-content", flexShrink: 0 }}>
             {sampleBusy ? "取得中..." : "サンプルデータ取得"}
           </button>
         </div>
-        {sampleMessage && <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>{sampleMessage}</p>}
+        {sampleMessage && <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>{sampleMessage}</p>}
+        {itemSpecificsPairs.length === 0 ? (
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            「サンプルデータ取得」を押すと、直近の販売済みデータからItem Specificsを項目ごとに取得して表示します。
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {itemSpecificsPairs.map((pair, index) => (
+              <label key={`${pair.name}-${index}`} style={{ fontSize: 11, color: "var(--text-secondary)", width: 200 }}>
+                {pair.name}
+                <input
+                  type="text"
+                  value={pair.value}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setItemSpecificsPairs((prev) => prev.map((p, i) => (i === index ? { ...p, value } : p)));
+                  }}
+                  style={{ display: "block", width: "100%", marginTop: 2, boxSizing: "border-box", fontSize: 12 }}
+                />
+              </label>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 5. CONDITION エリア */}
