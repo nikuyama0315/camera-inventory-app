@@ -21,6 +21,7 @@ import {
   uploadListingPhoto,
   upsertListingDraft,
 } from "../../../lib/api/listingDraft";
+import ProfitCalcModal from "./ProfitCalcModal";
 
 interface Props {
   item: ItemDetail;
@@ -49,6 +50,31 @@ function parseSpecificsText(text: string): SpecificPair[] {
 
 function serializeSpecificsPairs(pairs: SpecificPair[]): string {
   return pairs.map((p) => `${p.name}: ${p.value}`).join("\n");
+}
+
+/** Shipping policy名("EXP_$0035"等)からドル数値(35)を取り出す。取れなければnull。 */
+function shippingPolicyToUsd(name: string): number | null {
+  const m = name.match(/\$0*(\d+)/);
+  if (!m) return null;
+  const v = Number(m[1]);
+  return Number.isFinite(v) ? v : null;
+}
+
+/** 2026-09-27追加(ユーザー指示): 利益簡易計算モーダルの「反映」で返ってきたドル金額に
+ *  数値が一致する(無ければ最も近い)Shipping policyを選ぶ。 */
+function nearestShippingPolicy(targetUsd: number, options: readonly string[]): string {
+  let best = options[0];
+  let bestDiff = Infinity;
+  for (const opt of options) {
+    const v = shippingPolicyToUsd(opt);
+    if (v == null) continue;
+    const diff = Math.abs(v - targetUsd);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = opt;
+    }
+  }
+  return best;
 }
 
 /** 2026-09-27追加: 「出品」タブ(検品と販売の間)。出品用データを作成し、Supabase Storageへ写真を
@@ -89,6 +115,17 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [publishResult, setPublishResult] = useState<{ success: boolean; ebayItemId?: string; error?: string } | null>(
     null,
   );
+
+  // 2026-09-27追加(ユーザー指示): 「利益簡易計算」ボタン用。仕入高(円)はitem.purchases[0]から、
+  // 開いた時点のItem price(USD)・Shipping policyのドル数値をそれぞれ初期値として渡す。
+  const [profitModalOpen, setProfitModalOpen] = useState(false);
+  const purchasePriceJpy = item.purchases?.[0]?.purchase_price ?? 0;
+
+  function handleApplyProfitCalc(priceUsd: number, shippingUsd: number) {
+    setItemPrice(priceUsd.toFixed(2));
+    setShippingPolicy(nearestShippingPolicy(shippingUsd, LISTING_SHIPPING_POLICY_OPTIONS));
+    setProfitModalOpen(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -522,12 +559,17 @@ export default function ListingTab({ item, onChanged }: Props) {
           </label>
           <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
             Item price (USD)
-            <input
-              type="text"
-              value={itemPrice}
-              onChange={(e) => setItemPrice(e.target.value)}
-              style={{ display: "block", width: 200, marginTop: 4 }}
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+              <input
+                type="text"
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+                style={{ width: 200 }}
+              />
+              <button type="button" onClick={() => setProfitModalOpen(true)} style={{ width: "fit-content" }}>
+                利益簡易計算
+              </button>
+            </div>
           </label>
           <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
             Payment policy
@@ -583,6 +625,16 @@ export default function ListingTab({ item, onChanged }: Props) {
             : `出品に失敗しました: ${publishResult.error}`}
         </p>
       )}
+
+      <ProfitCalcModal
+        open={profitModalOpen}
+        title={itemTitle || item.item_title || item.management_no}
+        initialPriceUsd={Number(itemPrice) || 0}
+        initialShippingUsd={shippingPolicyToUsd(shippingPolicy) ?? 0}
+        initialCostJpy={purchasePriceJpy}
+        onClose={() => setProfitModalOpen(false)}
+        onApply={handleApplyProfitCalc}
+      />
     </div>
   );
 }
