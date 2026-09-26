@@ -328,6 +328,26 @@ export default function ListingTab({ item, onChanged }: Props) {
     }
   }
 
+  /** 2026-09-27追加(ユーザー指示): 「保存」の右の「クリア」ボタン。画面上の入力項目を空/既定値に
+   *  戻すだけで、DBへの保存は行わない(誤クリア時に「保存」を押し直さなければ元データは失われない)。
+   *  写真は個別の削除ボタンがあるため対象外。 */
+  function handleClear() {
+    if (!window.confirm("入力内容をクリアします。よろしいですか?(「保存」を押すまでは保存済みデータは残ります)")) return;
+    setItemTitle("");
+    setCustomLabel("");
+    setEbayCategory(LISTING_EBAY_CATEGORY_DEFAULT);
+    setStoreCategory(LISTING_STORE_CATEGORY_DEFAULT);
+    setItemSpecificsPairs([]);
+    setSpecificsSearchQuery("");
+    setItemCondition(LISTING_CONDITION_DEFAULT);
+    setConditionDescription("");
+    setDescriptionHtml("");
+    setItemPrice("");
+    setPaymentPolicy(LISTING_PAYMENT_POLICY_DEFAULT);
+    setShippingPolicy(LISTING_SHIPPING_POLICY_DEFAULT);
+    setSaveMessage(null);
+  }
+
   async function handlePublish() {
     if (!shopId) {
       setPublishResult({ success: false, error: "この商品にはeBayアカウント(soulcamera/soulmenjapan)が設定されていません" });
@@ -664,6 +684,9 @@ export default function ListingTab({ item, onChanged }: Props) {
       <section style={{ display: "flex", alignItems: "center", gap: 12, borderTop: "0.5px solid var(--border)", paddingTop: 16 }}>
         <button type="button" onClick={() => void handleSave()} disabled={saveBusy}>
           {saveBusy ? "保存中..." : "保存"}
+        </button>
+        <button type="button" onClick={handleClear}>
+          クリア
         </button>
         <button type="button" onClick={() => void handlePublish()} disabled={publishBusy || !shopId}>
           {publishBusy ? "出品処理中..." : "出品する"}
