@@ -48,6 +48,11 @@ export default function ItemDetailPane({
     setActiveTab("inspection");
     setDescriptionScrollTrigger((v) => v + 1);
   }
+
+  /** 2026-09-27追加(ユーザー指示): 検品タブ「出品」ボタン用。出品タブへ切り替える。 */
+  function handleGoToListing() {
+    setActiveTab("listing");
+  }
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -265,6 +270,7 @@ export default function ItemDetailPane({
           detail={detail}
           onChanged={handleAfterChange}
           scrollToDescriptionTrigger={descriptionScrollTrigger}
+          onGoToListing={handleGoToListing}
         />
       )}
 

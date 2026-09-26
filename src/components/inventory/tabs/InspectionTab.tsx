@@ -48,6 +48,8 @@ interface Props {
   /** 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたときの、
    *  Description生成セクションへのスクロールトリガー。親(ItemDetailPane)が押すたびインクリメントする。 */
   scrollToDescriptionTrigger?: number;
+  /** 2026-09-27追加: 「出品」ボタン用。押すと生成データを保存した上で出品タブへ切り替える。 */
+  onGoToListing?: () => void;
 }
 
 interface FieldDef {
@@ -159,7 +161,7 @@ function buildInitialValues(detail: ItemDetail): FormValues {
   return values;
 }
 
-export default function InspectionTab({ detail, onChanged, scrollToDescriptionTrigger }: Props) {
+export default function InspectionTab({ detail, onChanged, scrollToDescriptionTrigger, onGoToListing }: Props) {
   const [values, setValues] = useState<FormValues>(() => buildInitialValues(detail));
   const [translating, setTranslating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -226,6 +228,26 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
       setSaveGeneratedDataMessage(err instanceof Error ? `保存に失敗しました: ${err.message}` : "保存に失敗しました");
     } finally {
       setSavingGeneratedData(false);
+    }
+  }
+
+  // 2026-09-27追加(ユーザー指示): 「出品」ボタン用。「生成データ保存」と同じ内容を保存した上で
+  // 出品タブへ切り替える(出品タブ自身のオートフィルは、切り替え時にこの保存済みデータから行われる)。
+  const [goingToListing, setGoingToListing] = useState(false);
+  async function handleGoToListing() {
+    setGoingToListing(true);
+    try {
+      await saveGeneratedListingData(detail.id, {
+        item_title: itemTitleText,
+        soulcamera_item_info: soulcameraItemInfo,
+        description_html: descriptionHtml,
+        seller_note_text: sellerNoteText,
+      });
+      onGoToListing?.();
+    } catch (err) {
+      setSaveGeneratedDataMessage(err instanceof Error ? `保存に失敗しました: ${err.message}` : "保存に失敗しました");
+    } finally {
+      setGoingToListing(false);
     }
   }
 
@@ -863,6 +885,14 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
               style={{ width: "fit-content" }}
             >
               画像保管フォルダを開く
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleGoToListing()}
+              disabled={goingToListing || !onGoToListing}
+              style={{ width: "fit-content" }}
+            >
+              {goingToListing ? "保存中..." : "出品"}
             </button>
           </div>
           {itemTitleText && (
