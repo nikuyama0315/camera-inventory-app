@@ -685,3 +685,49 @@ export async function runModelStockCheck(
   if (error) throw error;
   return data as ModelStockCheckResult;
 }
+
+
+/**
+ * 「直販PF-アプリ同期チェック」機能(2026-09-27追加)。his50s.com(Japan Retro Camera
+ * Wholesale)に公開中(status='published')の出品と、アプリ側の指定アカウントで
+ * ステータスが「検品済・出品待ち」または「出品中」のアイテムを、管理番号(=his50s側の
+ * external_id)で突合する。eBay側のチェック(runEbayListingCheck)とは完全に独立している。
+ */
+export interface His50sListingCheckMatchedRow {
+  managementNo: string;
+  title: string | null;
+  status: string;
+  his50sStockQuantity: number;
+  his50sUpdatedAt: string;
+}
+
+export interface His50sListingCheckAppOnlyRow {
+  managementNo: string;
+  title: string | null;
+  status: string;
+}
+
+export interface His50sListingCheckHis50sOnlyRow {
+  externalId: string;
+  stockQuantity: number;
+  updatedAt: string;
+}
+
+export interface His50sListingCheckResult {
+  shopId: "soulcamera" | "soulmenjapan";
+  totalHis50sPublished: number;
+  totalAppTarget: number;
+  matched: His50sListingCheckMatchedRow[];
+  appOnly: His50sListingCheckAppOnlyRow[];
+  his50sOnly: His50sListingCheckHis50sOnlyRow[];
+}
+
+export async function runHis50sListingCheck(
+  shopId: "soulcamera" | "soulmenjapan",
+): Promise<His50sListingCheckResult> {
+  const { data, error } = await supabase.functions.invoke("his50s-listing-check", {
+    body: { shopId },
+  });
+  if (error) throw error;
+  return data as His50sListingCheckResult;
+}

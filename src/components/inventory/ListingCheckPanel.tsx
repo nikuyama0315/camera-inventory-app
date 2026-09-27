@@ -2,9 +2,11 @@ import { useState } from "react";
 import {
   runEbayListingCheck,
   runModelStockCheck,
+  runHis50sListingCheck,
   type ListingCheckResult,
   type ListingCheckModelStockRow,
   type ModelStockCheckResult,
+  type His50sListingCheckResult,
 } from "../../lib/api/ebaySync";
 import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
 
@@ -196,6 +198,27 @@ export default function ListingCheckPanel() {
     }
   }
 
+  // 2026-09-27追加(ユーザー指示): his50s.com(Japan Retro Camera Wholesale)の公開中出品と、
+  // システム上「検品済・出品待ち」+「出品中」のアイテムを突合する「直販PF-アプリ同期チェック」。
+  // 上記のeBay側チェックとは完全に独立している。
+  const [his50sBusy, setHis50sBusy] = useState(false);
+  const [his50sErrorMessage, setHis50sErrorMessage] = useState<string | null>(null);
+  const [his50sResult, setHis50sResult] = useState<His50sListingCheckResult | null>(null);
+
+  async function handleRunHis50sCheck() {
+    setHis50sBusy(true);
+    setHis50sErrorMessage(null);
+    setHis50sResult(null);
+    try {
+      const r = await runHis50sListingCheck(shopId);
+      setHis50sResult(r);
+    } catch (err) {
+      setHis50sErrorMessage(err instanceof Error ? err.message : "チェックに失敗しました");
+    } finally {
+      setHis50sBusy(false);
+    }
+  }
+
   return (
     <div style={{ padding: "1.5rem", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>出品チェック</h3>
@@ -220,10 +243,13 @@ export default function ListingCheckPanel() {
           </select>
         </label>
         <button onClick={handleRun} disabled={busy}>
-          {busy ? "チェック中..." : "チェック実行"}
+          {busy ? "チェック中..." : "eBay-アプリ同期チェック"}
         </button>
         <button onClick={handleRunModelStockCheck} disabled={modelStockBusy}>
           {modelStockBusy ? "チェック中..." : "在庫あり・eBay出品なしチェック実行"}
+        </button>
+        <button onClick={handleRunHis50sCheck} disabled={his50sBusy}>
+          {his50sBusy ? "チェック中..." : "直販PF-アプリ同期チェック"}
         </button>
       </div>
 
@@ -232,6 +258,9 @@ export default function ListingCheckPanel() {
       )}
       {modelStockErrorMessage && (
         <p style={{ fontSize: 13, color: "var(--danger-text)", marginBottom: 12 }}>{modelStockErrorMessage}</p>
+      )}
+      {his50sErrorMessage && (
+        <p style={{ fontSize: 13, color: "var(--danger-text)", marginBottom: 12 }}>{his50sErrorMessage}</p>
       )}
 
       {result && (
@@ -376,6 +405,118 @@ export default function ListingCheckPanel() {
           </div>
         );
       })()}
+
+      {his50sResult && (
+        <div style={{ marginTop: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              marginBottom: 20,
+              padding: "10px 14px",
+              border: "0.5px solid var(--border)",
+              borderRadius: 8,
+              fontSize: 12,
+              color: "var(--text-secondary)",
+            }}
+          >
+            <span>his50s公開中: {his50sResult.totalHis50sPublished}件</span>
+            <span>
+              システム上「検品済・出品待ち」+「出品中」({EBAY_ACCOUNT_LABELS[his50sResult.shopId]}):{" "}
+              {his50sResult.totalAppTarget}件
+            </span>
+            <span>両方に存在: {his50sResult.matched.length}件</span>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              アプリのみ(his50s未掲載)({his50sResult.appOnly.length}件)
+            </p>
+            {his50sResult.appOnly.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                    <th style={{ padding: "4px" }}>管理番号</th>
+                    <th style={{ padding: "4px" }}>仕入品名</th>
+                    <th style={{ padding: "4px" }}>ステータス</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {his50sResult.appOnly.map((row) => (
+                    <tr key={row.managementNo} style={{ borderTop: "0.5px solid var(--border)" }}>
+                      <td style={{ padding: "4px" }}>{row.managementNo}</td>
+                      <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
+                      <td style={{ padding: "4px" }}>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              his50sのみ(システム上は対象ステータス外)({his50sResult.his50sOnly.length}件)
+            </p>
+            {his50sResult.his50sOnly.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                    <th style={{ padding: "4px" }}>管理番号(external_id)</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
+                    <th style={{ padding: "4px" }}>his50s更新日時</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {his50sResult.his50sOnly.map((row) => (
+                    <tr key={row.externalId} style={{ borderTop: "0.5px solid var(--border)" }}>
+                      <td style={{ padding: "4px" }}>{row.externalId}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.stockQuantity}</td>
+                      <td style={{ padding: "4px" }}>{row.updatedAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              両方に存在({his50sResult.matched.length}件)
+            </p>
+            {his50sResult.matched.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                    <th style={{ padding: "4px" }}>管理番号</th>
+                    <th style={{ padding: "4px" }}>仕入品名</th>
+                    <th style={{ padding: "4px" }}>ステータス</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
+                    <th style={{ padding: "4px" }}>his50s更新日時</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {his50sResult.matched.map((row) => (
+                    <tr key={row.managementNo} style={{ borderTop: "0.5px solid var(--border)" }}>
+                      <td style={{ padding: "4px" }}>{row.managementNo}</td>
+                      <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
+                      <td style={{ padding: "4px" }}>{row.status}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.his50sStockQuantity}</td>
+                      <td style={{ padding: "4px" }}>{row.his50sUpdatedAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
