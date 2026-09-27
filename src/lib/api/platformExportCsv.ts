@@ -22,25 +22,32 @@ export interface PlatformExportItem {
   platform_category: string | null;
   grade: string | null;
   accessories_included: string | null;
-  /** 検品「全体」の英訳。condition_descriptionの[Total]に使用。 */
-  overall_notes_en: string | null;
-  /** 検品「外観」の英訳。condition_descriptionの[Body]に使用。 */
-  appearance_notes_en: string | null;
-  /** 検品「ファインダー」の英訳。condition_descriptionの[Finder]に使用。 */
-  viewfinder_notes_en: string | null;
-  /** 検品「レンズ」の英訳。condition_descriptionの[Lens]に使用。 */
-  lens_notes_en: string | null;
-  /** 検品「その他」の英訳。condition_descriptionの[Functional]に使用。 */
-  other_notes_en: string | null;
+  /**
+   * 検品タブの状態チェック表(FUNCTIONAL_CHECK_ITEMS、"ok"|"ng"|"na"|null)。
+   * 2026-09-27変更(ユーザー指示): condition_descriptionはこの8項目のうち"ok"のものだけを
+   * 英語ラベルで連結する方式に変更した(旧: overall/appearance/viewfinder/lens/other_notes_enの
+   * [Total][Body][Finder][Lens][Functional]連結方式は廃止)。
+   */
+  check_shutter: string | null;
+  check_flash: string | null;
+  check_autofocus: string | null;
+  check_auto_exposure: string | null;
+  check_film_winding: string | null;
+  check_film_rewinding: string | null;
+  check_film_counter: string | null;
+  check_self_timer: string | null;
 }
 
 type RawInspectionRow = {
   inspected_at: string;
-  overall_notes_en: string | null;
-  appearance_notes_en: string | null;
-  viewfinder_notes_en: string | null;
-  lens_notes_en: string | null;
-  other_notes_en: string | null;
+  check_shutter: string | null;
+  check_flash: string | null;
+  check_autofocus: string | null;
+  check_auto_exposure: string | null;
+  check_film_winding: string | null;
+  check_film_rewinding: string | null;
+  check_film_counter: string | null;
+  check_self_timer: string | null;
 };
 
 type RawRow = {
@@ -84,7 +91,8 @@ export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> 
       .select(
         "id, management_no, brand, model, category, status, platform_category, grade, accessories_included, " +
           "purchases(purchase_date), sales(sale_date, sale_item_title), " +
-          "inspections(inspected_at, overall_notes_en, appearance_notes_en, viewfinder_notes_en, lens_notes_en, other_notes_en)",
+          "inspections(inspected_at, check_shutter, check_flash, check_autofocus, check_auto_exposure, " +
+          "check_film_winding, check_film_rewinding, check_film_counter, check_self_timer)",
       )
       .eq("account", "soulcamera")
       .in("status", ["inspected_awaiting_listing", "listed"])
@@ -108,11 +116,14 @@ export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> 
       ...item,
       purchase_date: purchase?.purchase_date ?? null,
       sale_item_title: latestSale?.sale_item_title ?? null,
-      overall_notes_en: latestInspection?.overall_notes_en ?? null,
-      appearance_notes_en: latestInspection?.appearance_notes_en ?? null,
-      viewfinder_notes_en: latestInspection?.viewfinder_notes_en ?? null,
-      lens_notes_en: latestInspection?.lens_notes_en ?? null,
-      other_notes_en: latestInspection?.other_notes_en ?? null,
+      check_shutter: latestInspection?.check_shutter ?? null,
+      check_flash: latestInspection?.check_flash ?? null,
+      check_autofocus: latestInspection?.check_autofocus ?? null,
+      check_auto_exposure: latestInspection?.check_auto_exposure ?? null,
+      check_film_winding: latestInspection?.check_film_winding ?? null,
+      check_film_rewinding: latestInspection?.check_film_rewinding ?? null,
+      check_film_counter: latestInspection?.check_film_counter ?? null,
+      check_self_timer: latestInspection?.check_self_timer ?? null,
     };
   });
 }
@@ -144,15 +155,26 @@ function csvEscape(value: string): string {
   return value;
 }
 
-/** [Total]/[Body]/[Finder]/[Lens]/[Functional] の順で検品英訳を連結する。値が無い項目は出力しない。 */
+/**
+ * 検品タブの状態チェック表(FUNCTIONAL_CHECK_ITEMSと同じ並び順)で"ok"がマークされている項目の
+ * 英語ラベルを", "(カンマ+スペース)で連結し、末尾に" Confirmed working."を付加する
+ * (2026-09-27変更、ユーザー指示)。1件もOKが無い場合は空文字を返す。
+ */
+const CONDITION_CHECK_ITEMS: { key: keyof PlatformExportItem; label: string }[] = [
+  { key: "check_shutter", label: "Shutter" },
+  { key: "check_flash", label: "Flash" },
+  { key: "check_autofocus", label: "Auto focus" },
+  { key: "check_auto_exposure", label: "Auto exposure" },
+  { key: "check_film_winding", label: "Film winding" },
+  { key: "check_film_rewinding", label: "Film rewinding" },
+  { key: "check_film_counter", label: "Film counter" },
+  { key: "check_self_timer", label: "Self timer" },
+];
+
 function buildConditionDescription(item: PlatformExportItem): string {
-  const parts: string[] = [];
-  if (item.overall_notes_en) parts.push(`[Total] ${item.overall_notes_en}`);
-  if (item.appearance_notes_en) parts.push(`[Body] ${item.appearance_notes_en}`);
-  if (item.viewfinder_notes_en) parts.push(`[Finder] ${item.viewfinder_notes_en}`);
-  if (item.lens_notes_en) parts.push(`[Lens] ${item.lens_notes_en}`);
-  if (item.other_notes_en) parts.push(`[Functional] ${item.other_notes_en}`);
-  return parts.join("\n");
+  const okLabels = CONDITION_CHECK_ITEMS.filter((c) => item[c.key] === "ok").map((c) => c.label);
+  if (okLabels.length === 0) return "";
+  return `[Tested functions] ${okLabels.join(", ")} Confirmed working.`;
 }
 
 /** 選択されたアイテムから「直販プラットフォーム登録用CSV」の文字列(ヘッダー行込み、改行はCRLF)を組み立てる。 */
@@ -161,7 +183,9 @@ export function buildDirectSalesCsv(items: PlatformExportItem[]): string {
   const lines = items.map((item) => {
     const row: Record<(typeof DIRECT_SALES_CSV_HEADERS)[number], string> = {
       external_id: item.management_no ?? "",
-      title: item.sale_item_title ?? "",
+      // 2026-09-27変更(ユーザー指示): titleは「ブランド 機種名 管理番号」をスペース区切りで連結する
+      // 方式に変更した(旧: 直近の売上のsale_item_title(eBay出品タイトル等)を使用)。
+      title: [item.brand, item.model, item.management_no].filter(Boolean).join(" "),
       category: item.platform_category ?? "",
       condition_description: buildConditionDescription(item),
       grade: item.grade ?? "",
