@@ -344,6 +344,22 @@ export default function ListingTab({ item, onChanged }: Props) {
     }
   }
 
+  // 2026-09-27追加(ユーザー指示): 更新出品(ReviseItem/Sold積み出品)モードから新規出品モードへ
+  // 切り替えるボタン用。既存ItemID関連の状態だけをクリアし、タイトル・価格・説明文・写真等の
+  // 入力済みデータはそのまま保持する(handleClear()と違い全消去はしない)。
+  function handleSwitchToNewListingMode() {
+    if (
+      !window.confirm(
+        "新規出品モードに切り替えます(既存ItemIDへの更新出品ではなく、新しいItemIDで出品する扱いになります)。よろしいですか?",
+      )
+    ) {
+      return;
+    }
+    setReviseTargetItemId(null);
+    setExistingItemIdInput("");
+    setExistingFetchMessage(null);
+  }
+
   function handleViewDescriptionInBrowser() {
     const blob = new Blob([descriptionHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -659,8 +675,15 @@ export default function ListingTab({ item, onChanged }: Props) {
           <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>{existingFetchMessage}</p>
         )}
         {reviseTargetItemId && (
-          <p style={{ fontSize: 12, color: "var(--highlight-text)", fontWeight: 700, marginBottom: 10 }}>
+          <p style={{ fontSize: 12, color: "var(--highlight-text)", fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
             更新出品(Sold積み出品)モード: ItemID {reviseTargetItemId} をReviseItemで更新します
+            <button
+              type="button"
+              onClick={handleSwitchToNewListingMode}
+              style={{ fontSize: 11, fontWeight: 400, padding: "2px 8px", flexShrink: 0 }}
+            >
+              新規出品モードに切り替え
+            </button>
           </p>
         )}
         {itemSpecificsPairs.length === 0 ? (
