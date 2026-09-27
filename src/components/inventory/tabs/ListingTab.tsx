@@ -422,6 +422,14 @@ export default function ListingTab({ item, onChanged }: Props) {
       setStatusUpdateWarning(null);
       const result = await publishListing(item.id, shopId);
       setPublishResult(result);
+      // 2026-09-27追加(ユーザー報告: 「更新出品する」を押しても何も起きないように見える):
+      // 結果テキストはボタン群の下に小さく表示されるだけで見逃しやすいため、window.confirm()と
+      // 同じ目立つモーダルでも必ず結果を知らせる(成功・失敗どちらも)。
+      window.alert(
+        result.success
+          ? `出品に成功しました。ItemID: ${result.ebayItemId}`
+          : `出品に失敗しました: ${result.error}`,
+      );
       if (result.success) {
         // 2026-09-27追加(ユーザー指示): 出品成功時、ステータスを「出品中」に変更する
         // (検品タブの既存フローと同じmark_item_listed RPC + Driveフォルダ移動を使う)。
@@ -436,7 +444,9 @@ export default function ListingTab({ item, onChanged }: Props) {
         onChanged();
       }
     } catch (err) {
-      setPublishResult({ success: false, error: err instanceof Error ? err.message : "出品に失敗しました" });
+      const message = err instanceof Error ? err.message : "出品に失敗しました";
+      setPublishResult({ success: false, error: message });
+      window.alert(`出品に失敗しました: ${message}`);
     } finally {
       setPublishBusy(false);
     }
