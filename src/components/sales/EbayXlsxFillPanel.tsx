@@ -63,32 +63,56 @@ function fmtDate(value: Date | null): string {
   return value.toISOString().slice(0, 10);
 }
 
-/** SKU(Custom Label)の先頭9文字(管理番号部分)を取り出す */
+/**
+ * SKU(Custom Label)は本来「管理番号 出品Start日(YYMMDD) 仕入値+補足」の空白区切り3トークン
+ * (例: "260521-12 260905 5900-V2R1790432587")。
+ *
+ * 【2026-09-28修正、ユーザー報告】従来は空白区切りを無視し、管理番号9文字+出品Start日6文字が
+ * 必ずその通りの文字数であることを前提に、17文字目以降を仕入値とみなす固定文字位置方式だった。
+ * このため、出品Start日部分が本来の6桁(YYMMDD)ではなく4桁(MMDD、年の入力漏れ)等の異常な
+ * SKUが1件でもあると、後続の仕入値の切り出し位置までずれてしまい、出品Start日とは無関係な
+ * はずの仕入値まで誤った値(実例: 本来9100円のところ0円)になる不具合があった。
+ * 各項目を空白区切りのトークンごとに独立して抽出するよう変更し、あるトークンの不備が他の
+ * トークンの抽出結果に影響しないようにした(不備のあるトークン自体は従来通り警告表示する)。
+ */
+function skuTokens(sku: string): string[] {
+  return sku.trim().split(/\s+/);
+}
+
+/** SKUの1トークン目(管理番号)を取り出す */
 function skuManagementNo(sku: string): string {
-  return sku.trim().slice(0, 9);
+  return skuTokens(sku)[0] ?? "";
 }
 
-/** SKUの18文字目から次のハイフンの直前までを取り出す(仕入値、円建て) */
-function skuPurchasePrice(sku: string): number | null {
-  const s = sku.trim();
-  if (s.length < 18) return null;
-  const hyphenIdx = s.indexOf("-", 17);
-  if (hyphenIdx === -1) return null;
-  const n = Number(s.slice(17, hyphenIdx));
-  return Number.isFinite(n) ? n : null;
-}
-
-/** SKU内のstartIndex(0始まり)から6桁のYYMMDDを取り出し、西暦2000+YYの日付として解釈する */
-function parseSkuDate(sku: string, startIndex0Based: number): Date | null {
-  const s = sku.trim();
-  if (s.length < startIndex0Based + 6) return null;
-  const digits = s.slice(startIndex0Based, startIndex0Based + 6);
+/** 6桁のYYMMDD文字列を西暦2000+YYの日付として解釈する。桁数不正・日付として不正ならnull。 */
+function parseYymmdd(digits: string): Date | null {
   if (!/^\d{6}$/.test(digits)) return null;
   const yy = Number(digits.slice(0, 2));
   const mm = Number(digits.slice(2, 4));
   const dd = Number(digits.slice(4, 6));
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
   return new Date(Date.UTC(2000 + yy, mm - 1, dd));
+}
+
+/** SKUの2トークン目(出品Start日、YYMMDD)を日付として取り出す */
+function skuListingStartDate(sku: string): Date | null {
+  const token = skuTokens(sku)[1];
+  return token ? parseYymmdd(token) : null;
+}
+
+/** SKUの1トークン目(管理番号)先頭6桁(仕入日、YYMMDD)を日付として取り出す */
+function skuPurchaseDate(sku: string): Date | null {
+  return parseYymmdd(skuManagementNo(sku).slice(0, 6));
+}
+
+/** SKUの3トークン目の先頭の数字部分(仕入値、円建て)を取り出す。例: "5900-V2R..." → 5900 */
+function skuPurchasePrice(sku: string): number | null {
+  const token = skuTokens(sku)[2];
+  if (!token) return null;
+  const match = token.match(/^(\d+)/);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -205,8 +229,8 @@ export default function EbayXlsxFillPanel() {
           plFeeUsd: lookup.adFeeUsd ?? null,
           purchasePriceJpy: sku ? skuPurchasePrice(sku) : null,
           courierShippingJpy: courierShippingByOrderNo.get(orderNo) ?? null,
-          listingStartDate: sku ? parseSkuDate(sku, 10) : null,
-          purchaseDate: sku ? parseSkuDate(sku, 0) : null,
+          listingStartDate: sku ? skuListingStartDate(sku) : null,
+          purchaseDate: sku ? skuPurchaseDate(sku) : null,
           buyerCountry: lookup.buyerCountry ?? null,
         });
 
@@ -262,11 +286,11 @@ export default function EbayXlsxFillPanel() {
           const courierShipping = courierShippingByOrderNo.get(orderNo);
           if (courierShipping != null) ws.getCell(`S${row}`).value = courierShipping;
 
-          const listingDate = parseSkuDate(sku, 10);
+          const listingDate = skuListingStartDate(sku);
           if (listingDate) ws.getCell(`AA${row}`).value = listingDate;
           else warnings.push("出品Start日(AA列)");
 
-          const purchaseDate = parseSkuDate(sku, 0);
+          const purchaseDate = skuPurchaseDate(sku);
           if (purchaseDate) ws.getCell(`AC${row}`).value = purchaseDate;
           else warnings.push("仕入日(AC列)");
         }
