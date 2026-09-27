@@ -696,6 +696,7 @@ export async function runModelStockCheck(
 export interface His50sListingCheckMatchedRow {
   managementNo: string;
   title: string | null;
+  itemTitle: string | null;
   status: string;
   his50sStockQuantity: number;
   his50sUpdatedAt: string;
@@ -704,6 +705,7 @@ export interface His50sListingCheckMatchedRow {
 export interface His50sListingCheckAppOnlyRow {
   managementNo: string;
   title: string | null;
+  itemTitle: string | null;
   status: string;
 }
 

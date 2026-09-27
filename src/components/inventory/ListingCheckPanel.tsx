@@ -439,7 +439,7 @@ export default function ListingCheckPanel() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>管理番号</th>
-                    <th style={{ padding: "4px" }}>仕入品名</th>
+                    <th style={{ padding: "4px" }}>仕入品名 / Item Title</th>
                     <th style={{ padding: "4px" }}>ステータス</th>
                   </tr>
                 </thead>
@@ -447,7 +447,10 @@ export default function ListingCheckPanel() {
                   {his50sResult.appOnly.map((row) => (
                     <tr key={row.managementNo} style={{ borderTop: "0.5px solid var(--border)" }}>
                       <td style={{ padding: "4px" }}>{row.managementNo}</td>
-                      <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
+                      <td style={{ padding: "4px" }}>
+                        <div>{row.title ?? "-"}</div>
+                        <div style={{ color: "var(--text-muted)" }}>{row.itemTitle ?? "-"}</div>
+                      </td>
                       <td style={{ padding: "4px" }}>{row.status}</td>
                     </tr>
                   ))}
@@ -495,7 +498,7 @@ export default function ListingCheckPanel() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>管理番号</th>
-                    <th style={{ padding: "4px" }}>仕入品名</th>
+                    <th style={{ padding: "4px" }}>仕入品名 / Item Title</th>
                     <th style={{ padding: "4px" }}>ステータス</th>
                     <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
                     <th style={{ padding: "4px" }}>his50s更新日時</th>
@@ -505,7 +508,10 @@ export default function ListingCheckPanel() {
                   {his50sResult.matched.map((row) => (
                     <tr key={row.managementNo} style={{ borderTop: "0.5px solid var(--border)" }}>
                       <td style={{ padding: "4px" }}>{row.managementNo}</td>
-                      <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
+                      <td style={{ padding: "4px" }}>
+                        <div>{row.title ?? "-"}</div>
+                        <div style={{ color: "var(--text-muted)" }}>{row.itemTitle ?? "-"}</div>
+                      </td>
                       <td style={{ padding: "4px" }}>{row.status}</td>
                       <td style={{ padding: "4px", textAlign: "right" }}>{row.his50sStockQuantity}</td>
                       <td style={{ padding: "4px" }}>{row.his50sUpdatedAt}</td>
