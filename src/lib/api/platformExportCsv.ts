@@ -184,8 +184,8 @@ function buildConditionDescription(item: PlatformExportItem): string {
   const okLabels = CONDITION_CHECK_ITEMS.filter((c) => item[c.key] === "ok").map((c) => c.label);
   const lines: string[] = [];
   if (okLabels.length > 0) lines.push(`[Tested functions] ${okLabels.join(", ")} Confirmed working.`);
-  if (item.lens_notes_en) lines.push(item.lens_notes_en);
-  if (item.viewfinder_notes_en) lines.push(item.viewfinder_notes_en);
+  if (item.lens_notes_en) lines.push(`[Lens] ${item.lens_notes_en}`);
+  if (item.viewfinder_notes_en) lines.push(`[Finder] ${item.viewfinder_notes_en}`);
   return lines.join("\n");
 }
 
