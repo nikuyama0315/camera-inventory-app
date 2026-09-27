@@ -36,6 +36,10 @@ export interface PlatformExportItem {
   check_film_rewinding: string | null;
   check_film_counter: string | null;
   check_self_timer: string | null;
+  /** 検品「レンズ」の英訳。condition_descriptionの2行目に使用(2026-09-27追加)。 */
+  lens_notes_en: string | null;
+  /** 検品「ファインダー」の英訳。condition_descriptionの3行目に使用(2026-09-27追加)。 */
+  viewfinder_notes_en: string | null;
 }
 
 type RawInspectionRow = {
@@ -48,6 +52,8 @@ type RawInspectionRow = {
   check_film_rewinding: string | null;
   check_film_counter: string | null;
   check_self_timer: string | null;
+  lens_notes_en: string | null;
+  viewfinder_notes_en: string | null;
 };
 
 type RawRow = {
@@ -92,7 +98,8 @@ export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> 
         "id, management_no, brand, model, category, status, platform_category, grade, accessories_included, " +
           "purchases(purchase_date), sales(sale_date, sale_item_title), " +
           "inspections(inspected_at, check_shutter, check_flash, check_autofocus, check_auto_exposure, " +
-          "check_film_winding, check_film_rewinding, check_film_counter, check_self_timer)",
+          "check_film_winding, check_film_rewinding, check_film_counter, check_self_timer, " +
+          "lens_notes_en, viewfinder_notes_en)",
       )
       .eq("account", "soulcamera")
       .in("status", ["inspected_awaiting_listing", "listed"])
@@ -124,6 +131,8 @@ export async function fetchPlatformExportItems(): Promise<PlatformExportItem[]> 
       check_film_rewinding: latestInspection?.check_film_rewinding ?? null,
       check_film_counter: latestInspection?.check_film_counter ?? null,
       check_self_timer: latestInspection?.check_self_timer ?? null,
+      lens_notes_en: latestInspection?.lens_notes_en ?? null,
+      viewfinder_notes_en: latestInspection?.viewfinder_notes_en ?? null,
     };
   });
 }
@@ -173,8 +182,11 @@ const CONDITION_CHECK_ITEMS: { key: keyof PlatformExportItem; label: string }[] 
 
 function buildConditionDescription(item: PlatformExportItem): string {
   const okLabels = CONDITION_CHECK_ITEMS.filter((c) => item[c.key] === "ok").map((c) => c.label);
-  if (okLabels.length === 0) return "";
-  return `[Tested functions] ${okLabels.join(", ")} Confirmed working.`;
+  const lines: string[] = [];
+  if (okLabels.length > 0) lines.push(`[Tested functions] ${okLabels.join(", ")} Confirmed working.`);
+  if (item.lens_notes_en) lines.push(item.lens_notes_en);
+  if (item.viewfinder_notes_en) lines.push(item.viewfinder_notes_en);
+  return lines.join("\n");
 }
 
 /** 選択されたアイテムから「直販プラットフォーム登録用CSV」の文字列(ヘッダー行込み、改行はCRLF)を組み立てる。 */
