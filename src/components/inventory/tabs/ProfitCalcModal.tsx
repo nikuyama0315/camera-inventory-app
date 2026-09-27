@@ -118,7 +118,8 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
   const [rate, setRate] = useState(DEFAULTS.rate);
   const [rateNote, setRateNote] = useState("為替レートを取得中です…");
 
-  const [ddpMarkup, setDdpMarkup] = useState(initialShippingUsd);
+  // 2026-09-28変更(ユーザー指示): DDP上乗せ分＋送料徴取額は整数のみ扱う(小数点以下不要)。
+  const [ddpMarkup, setDdpMarkup] = useState(Math.round(initialShippingUsd));
   const [tariff, setTariff] = useState(DEFAULTS.tariff);
   const [clearance, setClearance] = useState(DEFAULTS.clearance);
   const [ptRateDdp, setPtRateDdp] = useState(DEFAULTS.ptRateDdp);
@@ -138,7 +139,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
     setPromo(DEFAULTS.promo);
     setActualCost(initialCostJpy || DEFAULTS.actualCost);
     setActualShip(DEFAULTS.actualShip);
-    setDdpMarkup(initialShippingUsd);
+    setDdpMarkup(Math.round(initialShippingUsd));
     setTariff(DEFAULTS.tariff);
     setClearance(DEFAULTS.clearance);
     setPtRateDdp(DEFAULTS.ptRateDdp);
@@ -323,7 +324,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div style={pinkFieldStyle}>
                 <label style={fieldLabelStyle}>DDP上乗せ分＋送料徴取額(USD)</label>
-                <input type="number" step="0.01" value={ddpMarkup} onChange={(e) => setDdpMarkup(Number(e.target.value))} style={fieldInputStyle} />
+                <input type="number" step="1" value={ddpMarkup} onChange={(e) => setDdpMarkup(Math.round(Number(e.target.value)))} style={fieldInputStyle} />
               </div>
               <div style={pinkFieldStyle}>
                 <label style={fieldLabelStyle}>関税率(%)</label>
