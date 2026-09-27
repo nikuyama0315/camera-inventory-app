@@ -13,6 +13,12 @@ interface Filters {
   category: string;
   /** "not_sold" はステータスが"sold"(販売済み)以外の全件を対象とする特殊な絞り込み条件。 */
   status: ItemStatus | "not_sold" | "";
+  /**
+   * 2026-09-27追加(ユーザー指示): ステータス条件をもう1つ追加し、statusとstatus2の両方に値が
+   * 設定されている場合は「いずれかに一致(OR)」で絞り込む(例: 「検品済・出品待ち」または「出品中」)。
+   * この「ステータス」条件全体は、カテゴリ・仕入日等の他の絞り込み条件とはAND(かつ)で組み合わされる。
+   */
+  status2: ItemStatus | "not_sold" | "";
   purchaseDateFrom: string;
   purchaseDateTo: string;
 }
@@ -22,6 +28,7 @@ const EMPTY_FILTERS: Filters = {
   brandModel: "",
   category: "",
   status: "",
+  status2: "",
   purchaseDateFrom: "",
   purchaseDateTo: "",
 };
@@ -79,10 +86,14 @@ export default function DirectSalesCsvPanel() {
         if (!brandModel.includes(brandModelQuery)) return false;
       }
       if (filters.category && item.category !== filters.category) return false;
-      if (filters.status === "not_sold") {
-        if (item.status === "sold") return false;
-      } else if (filters.status && item.status !== filters.status) {
-        return false;
+      const statusConditions = [filters.status, filters.status2].filter(
+        (v): v is ItemStatus | "not_sold" => v !== "",
+      );
+      if (statusConditions.length > 0) {
+        const matchesAny = statusConditions.some((v) =>
+          v === "not_sold" ? item.status !== "sold" : item.status === v,
+        );
+        if (!matchesAny) return false;
       }
       if (filters.purchaseDateFrom && (!item.purchase_date || item.purchase_date < filters.purchaseDateFrom)) {
         return false;
@@ -186,19 +197,34 @@ export default function DirectSalesCsvPanel() {
           </select>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ステータス</label>
-          <select
-            value={filters.status}
-            onChange={(e) => updateFilter("status", e.target.value as ItemStatus | "not_sold" | "")}
-          >
-            <option value="">すべて</option>
-            <option value="not_sold">販売済み以外</option>
-            {STATUS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>ステータス(いずれかに一致)</label>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <select
+              value={filters.status}
+              onChange={(e) => updateFilter("status", e.target.value as ItemStatus | "not_sold" | "")}
+            >
+              <option value="">すべて</option>
+              <option value="not_sold">販売済み以外</option>
+              {STATUS_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>または</span>
+            <select
+              value={filters.status2}
+              onChange={(e) => updateFilter("status2", e.target.value as ItemStatus | "not_sold" | "")}
+            >
+              <option value="">(指定なし)</option>
+              <option value="not_sold">販売済み以外</option>
+              {STATUS_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>仕入日</label>
