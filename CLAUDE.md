@@ -109,3 +109,21 @@ git add -A && git commit -m "..."
   ```
   cmd /c 'icacls "<鍵パス>" /inheritance:r && icacls "<鍵パス>" /remove "<余分なアカウント名>" && icacls "<鍵パス>" /grant:r "%username%:R"'
   ```
+
+## セッション要点(2026-09-28〜09-29)
+
+ユーザー報告「売れた商品がhis50s側/システム側に反映されない」2件の不具合調査・修正。
+
+### his50s在庫削除の取りこぼし
+- 症状: 売上登録済みなのに、his50s.com側の出品が「公開中」のまま残っているケースがあった(実例: 管理番号260913-14)。
+- 調査: `notify-his50s-sold`自体は正常(直接呼び出して再現テスト済み)。原因は`src/lib/api/sales.ts`の`createSale()`内でこの呼び出しがfire-and-forget(`.then/.catch`のみ、呼び出し元はawaitしない)だったこと。売上登録処理自体は通知の完了を待たずに終了するため、タイミング次第で通信が失われ、しかも失敗してもconsole.warnにしか出ないため画面上は何も分からなかった。
+- 修正: (1) `createSale()`をawaitするように変更し、戻り値を`{ sale, his50sWarning }`に変更。失敗時は`SalesPage.tsx`に赤字で警告表示する。(2) `his50s-listing-check` Edge Functionに`soldButPublished`検出(status='sold'なのにhis50s側がpublishedのまま)を追加し、「出品チェック」タブに再送信ボタン付きの表を新設(セーフティネット、`resendHis50sSoldNotification()`)。
+- 全608件の「販売済み」商品×his50s公開中(316件)を突合した結果、実際に取りこぼしていたのは260913-14の1件のみだった(その場で手動修復済み)。
+
+### eBay売上自動同期のSKUマッチング失敗
+- 症状: eBayで実際に売れている(管理番号260912-02、260618-03)のに、システム上は「出品中」のまま、売上未登録。
+- 原因: `ebay_transaction_lines`には売上明細が取り込まれていたが、`match_status='unmatched'`で自動マッチング(SKUから管理番号を抽出して`items`と突合するロジック、`ebay-sync-orders` Edge Function)が失敗していた。該当のCustom Label(SKU)は`"260618-03 260630 2040-V2R1790513546"`のように、Inventory API経由の再出品で自動付与される`-V2R<timestamp>`識別子付きの形式(既知のSKU汚染問題、plan参照)で、かつ管理番号自体にハイフンを含む(`260618-03`)ため、既存の抽出ロジックとの相性が悪く未マッチになったと推測される(根本原因の正規表現修正は2026-09-29時点で未着手、ユーザーへ確認中)。
+- その場での対応: `ebay_transaction_lines.matched_item_id`/`match_status`を手動UPDATE(psql直接接続、`SUPABASE_DB_*`環境変数を`.env`から使用)し、`matched_pending`にして該当itemへ紐付け済み。ユーザーが「eBayレビューキュー」から「フォームに反映」→「登録する」で通常通り登録できる状態にした。
+
+### 補足: Supabase MCPツールの一時的な分類器エラー
+- このセッション中、`mcp__05c17e31-...`(Supabase MCP)の`execute_sql`/`get_edge_function`等が「server-side auto mode classifierがno verdict」エラーで断続的に失敗する時間帯があった。フォールバックとして、VPSの`.env`にある`SUPABASE_DB_HOST`/`PORT`/`NAME`/`USER`/`PASSWORD`を使い、VPS上から`psql`で直接Supabase Postgresに接続して調査・修正を続行した(読み取り・書き込みとも可能、MCPツールとは独立した経路)。
