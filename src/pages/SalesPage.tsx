@@ -113,6 +113,9 @@ export default function SalesPage() {
   const [candidates, setCandidates] = useState<ItemForSale[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // 2026-09-28追加(ユーザー報告: his50s側在庫が消えない不具合対応): createSale()がawaitして
+  // 返すhis50s通知の警告を表示する(売上登録自体は成功しているため、formErrorとは別で表示)。
+  const [his50sWarning, setHis50sWarning] = useState<string | null>(null);
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
   const formSectionRef = useRef<HTMLDivElement>(null);
   /** 売上一覧テーブルの折りたたみ表示(2026-09-04追加、直販プラットフォーム登録用CSV作成の一覧折りたたみと同じパターン)。 */
@@ -526,6 +529,7 @@ export default function SalesPage() {
 
   async function handleSubmit() {
     setFormError(null);
+    setHis50sWarning(null);
     if (!form.selectedItem) {
       setFormError("管理番号で商品を検索して選択してください");
       return;
@@ -569,7 +573,7 @@ export default function SalesPage() {
         }
         setEditingSaleId(null);
       } else {
-        await createSale(
+        const { his50sWarning: newHis50sWarning } = await createSale(
           {
             item_id: form.selectedItem.id,
             sale_date: form.sale_date,
@@ -590,6 +594,7 @@ export default function SalesPage() {
           },
           form.selectedItem.purchase_price,
         );
+        setHis50sWarning(newHis50sWarning);
         if (pendingEbayLineId) {
           try {
             await markEbayTransactionLineRegistered(pendingEbayLineId);
@@ -1530,6 +1535,9 @@ export default function SalesPage() {
         </div>
 
         {formError && <p style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 8 }}>{formError}</p>}
+        {his50sWarning && (
+          <p style={{ color: "var(--danger-text)", fontSize: 13, marginBottom: 8 }}>{his50sWarning}</p>
+        )}
         <button onClick={handleSubmit} disabled={saving} style={{ width: "100%" }}>
           {saving ? (editingSaleId ? "更新中..." : "登録中...") : editingSaleId ? "更新する" : "登録する"}
         </button>

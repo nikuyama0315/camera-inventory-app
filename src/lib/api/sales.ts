@@ -210,7 +210,10 @@ export async function fetchItemForSaleById(itemId: string): Promise<ItemForSale 
 }
 
 /** 仕入高は登録時点のスナップショットとして保存する(後日仕入高を編集しても過去の粗利は変わらない) */
-export async function createSale(input: CreateSaleInput, purchasePriceSnapshot: number): Promise<Sale> {
+export async function createSale(
+  input: CreateSaleInput,
+  purchasePriceSnapshot: number,
+): Promise<{ sale: Sale; his50sWarning: string | null }> {
   const { data, error } = await supabase
     .from("sales")
     .insert({
@@ -248,6 +251,7 @@ export async function createSale(input: CreateSaleInput, purchasePriceSnapshot: 
   // 登録済みの売上レコードを失敗扱いにして再登録(=売上の二重登録)を誘発しないよう、エラーは
   // console.warnに留め、createSale自体は成功として扱う(triggerDriveFolderMove自体が元々持つ
   // 「ベストエフォート・エラーを外に投げない」方針と揃えた)。
+  let his50sWarning: string | null = null;
   try {
     const { data: updatedItem, error: statusError } = await supabase
       .from("items")
@@ -262,28 +266,37 @@ export async function createSale(input: CreateSaleInput, purchasePriceSnapshot: 
     // 「売れた」をAPI通知し先方の在庫を減らす(保留中の見積があれば自動declineされる)。他プラット
     // フォーム(eBay/メルカリ等)経由の売上も含め、当アプリで販売済みになった時点で必ず呼ぶ。
     // his50sに出品していない商品がほとんどのため、not_listed応答は正常系(エラーではない)。
+    //
+    // 2026-09-28変更(ユーザー報告: his50s側の在庫が消えない不具合): 以前はfire-and-forget
+    // (.then/.catchのみ、呼び出し元はawaitしない)だったため、ブラウザタブをすぐ閉じる等の
+    // タイミング次第で通信が完了せず、しかも失敗が画面に一切表示されないという問題があった。
+    // await するように変更し、失敗した場合はhis50sWarningとして呼び出し元へ返す
+    // (売上登録・ステータス更新自体は既に完了しているため、ここが失敗してもcreateSale全体は
+    // 成功として扱う。not_listed応答は正常系なので警告にしない)。
     if (updatedItem?.management_no) {
-      supabase.functions
-        .invoke("notify-his50s-sold", {
+      try {
+        const { data: notifyData, error: notifyError } = await supabase.functions.invoke("notify-his50s-sold", {
           body: { managementNo: updatedItem.management_no, saleId: data.id },
-        })
-        .then(({ error: notifyError }) => {
-          if (notifyError) {
-            // eslint-disable-next-line no-console
-            console.warn("his50sへの「売れた」通知に失敗しました(売上自体は登録済みです):", notifyError);
-          }
-        })
-        .catch((notifyErr) => {
-          // eslint-disable-next-line no-console
-          console.warn("his50sへの「売れた」通知に失敗しました(売上自体は登録済みです):", notifyErr);
         });
+        if (notifyError) {
+          his50sWarning = `his50sへの「売れた」通知に失敗しました: ${notifyError.message ?? notifyError}`;
+        } else if (notifyData?.status && notifyData.status !== "notified" && notifyData.status !== "not_listed") {
+          his50sWarning = `his50sへの「売れた」通知が想定外の結果になりました: ${JSON.stringify(notifyData)}`;
+        }
+      } catch (notifyErr) {
+        his50sWarning = `his50sへの「売れた」通知に失敗しました: ${notifyErr instanceof Error ? notifyErr.message : String(notifyErr)}`;
+      }
+      if (his50sWarning) {
+        // eslint-disable-next-line no-console
+        console.warn(his50sWarning);
+      }
     }
   } catch (statusErr) {
     // eslint-disable-next-line no-console
     console.warn("売上登録後の商品ステータス自動更新に失敗しました(売上自体は登録済みです):", statusErr);
   }
 
-  return data as Sale;
+  return { sale: data as Sale, his50sWarning };
 }
 
 export async function deleteSale(id: string): Promise<void> {
@@ -538,3 +551,28 @@ export async function fetchShippingCostByOrderNos(orderNos: string[]): Promise<M
   return result;
 }
 
+
+/**
+ * his50s.com(Japan Retro Camera Wholesale)への「売れた」通知を手動で再送信する(2026-09-28追加)。
+ * 「出品チェック」タブの「直販PF-アプリ同期チェック」で検出された取りこぼし(status='sold'なのに
+ * his50s側がpublishedのまま)の再送信ボタンから呼ばれる。createSale()内の自動呼び出しと同じ
+ * Edge Function(notify-his50s-sold)を使う。
+ */
+export async function resendHis50sSoldNotification(
+  managementNo: string,
+  saleId: string,
+): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke("notify-his50s-sold", {
+    body: { managementNo, saleId },
+  });
+  if (error) {
+    return { success: false, message: error.message ?? String(error) };
+  }
+  if (data?.status === "notified") {
+    return { success: true, message: `再送信しました(his50s在庫を減算): ${managementNo}` };
+  }
+  if (data?.status === "not_listed") {
+    return { success: false, message: `his50s側に該当する出品が見つかりませんでした: ${managementNo}` };
+  }
+  return { success: false, message: `想定外の応答でした: ${JSON.stringify(data)}` };
+}

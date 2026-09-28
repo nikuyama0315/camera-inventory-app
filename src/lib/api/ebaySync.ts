@@ -715,6 +715,20 @@ export interface His50sListingCheckHis50sOnlyRow {
   updatedAt: string;
 }
 
+/**
+ * status='sold'なのにhis50s側では依然publishedのまま(通知の取りこぼし)の行(2026-09-28追加、
+ * ユーザー報告「売れた商品をhis50sの出品から消す処理が動いていない」の調査対応)。
+ */
+export interface His50sListingCheckSoldButPublishedRow {
+  itemId: string;
+  managementNo: string;
+  title: string | null;
+  /** notify-his50s-sold再送信用。売上レコードが見つからない場合はnull(再送信不可)。 */
+  saleId: string | null;
+  his50sStockQuantity: number;
+  his50sUpdatedAt: string;
+}
+
 export interface His50sListingCheckResult {
   shopId: "soulcamera" | "soulmenjapan";
   totalHis50sPublished: number;
@@ -722,6 +736,7 @@ export interface His50sListingCheckResult {
   matched: His50sListingCheckMatchedRow[];
   appOnly: His50sListingCheckAppOnlyRow[];
   his50sOnly: His50sListingCheckHis50sOnlyRow[];
+  soldButPublished: His50sListingCheckSoldButPublishedRow[];
 }
 
 export async function runHis50sListingCheck(

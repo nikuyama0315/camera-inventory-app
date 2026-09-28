@@ -8,6 +8,7 @@ import {
   type ModelStockCheckResult,
   type His50sListingCheckResult,
 } from "../../lib/api/ebaySync";
+import { resendHis50sSoldNotification } from "../../lib/api/sales";
 import { EBAY_ACCOUNT_LABELS, EBAY_SYNC_SHOP_IDS } from "../../lib/types";
 
 // 2026-09-25追加(ユーザー指示): メモ欄の「保存」ボタン用。localStorageに保存し、
@@ -219,6 +220,33 @@ export default function ListingCheckPanel() {
     }
   }
 
+  // 2026-09-28追加(ユーザー報告「売れた商品をhis50sの出品から消す処理が動いていない」への対応):
+  // soldButPublished行の「再送信」ボタン用。行ごとにbusy状態とメッセージを持つ。
+  const [resendBusyItemId, setResendBusyItemId] = useState<string | null>(null);
+  const [resendMessages, setResendMessages] = useState<Record<string, string>>({});
+
+  async function handleResendHis50sSold(itemId: string, managementNo: string, saleId: string) {
+    setResendBusyItemId(itemId);
+    setResendMessages((prev) => ({ ...prev, [itemId]: "" }));
+    try {
+      const result = await resendHis50sSoldNotification(managementNo, saleId);
+      setResendMessages((prev) => ({ ...prev, [itemId]: result.message }));
+      if (result.success) {
+        // 再送信に成功したら一覧から消えるよう、その場でsoldButPublishedから除外する。
+        setHis50sResult((prev) =>
+          prev ? { ...prev, soldButPublished: prev.soldButPublished.filter((r) => r.itemId !== itemId) } : prev,
+        );
+      }
+    } catch (err) {
+      setResendMessages((prev) => ({
+        ...prev,
+        [itemId]: err instanceof Error ? err.message : "再送信に失敗しました",
+      }));
+    } finally {
+      setResendBusyItemId(null);
+    }
+  }
+
   return (
     <div style={{ padding: "1.5rem", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>出品チェック</h3>
@@ -426,6 +454,59 @@ export default function ListingCheckPanel() {
               {his50sResult.totalAppTarget}件
             </span>
             <span>両方に存在: {his50sResult.matched.length}件</span>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: "var(--danger-text)" }}>
+              売却済みなのにhis50sで公開中のまま(通知の取りこぼし)({his50sResult.soldButPublished.length}件)
+            </p>
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 0, marginBottom: 8 }}>
+              売上登録時のhis50sへの自動通知が何らかの理由で失敗/未完了だったアイテムです。「再送信」を押すとその場でhis50s側の在庫を減らします。
+            </p>
+            {his50sResult.soldButPublished.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--text-muted)" }}>該当なし</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                    <th style={{ padding: "4px" }}>管理番号</th>
+                    <th style={{ padding: "4px" }}>仕入品名</th>
+                    <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
+                    <th style={{ padding: "4px" }}>his50s更新日時</th>
+                    <th style={{ padding: "4px" }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {his50sResult.soldButPublished.map((row) => (
+                    <tr key={row.itemId} style={{ borderTop: "0.5px solid var(--border)" }}>
+                      <td style={{ padding: "4px" }}>{row.managementNo}</td>
+                      <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
+                      <td style={{ padding: "4px", textAlign: "right" }}>{row.his50sStockQuantity}</td>
+                      <td style={{ padding: "4px" }}>{row.his50sUpdatedAt}</td>
+                      <td style={{ padding: "4px" }}>
+                        {row.saleId ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleResendHis50sSold(row.itemId, row.managementNo, row.saleId as string)}
+                            disabled={resendBusyItemId === row.itemId}
+                            style={{ fontSize: 11, padding: "2px 8px" }}
+                          >
+                            {resendBusyItemId === row.itemId ? "送信中..." : "再送信"}
+                          </button>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>売上レコード不明</span>
+                        )}
+                        {resendMessages[row.itemId] && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                            {resendMessages[row.itemId]}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div style={{ marginBottom: 24 }}>
