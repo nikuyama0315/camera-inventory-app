@@ -34,6 +34,7 @@ git add -A && git commit -m "..."
 - `claude/ebay-sales-sync-proposal.md` — eBay売上自動同期の設計・実装経緯
 - `claude/report-import-proposal.md` — CSV/PDFレポート取込機能の設計・実装経緯
 - `claude/profit-calculator-ttm-rate.md` — `/opt/ebay-automation`側の為替レート自動取得機能
+- `claude/send-offer-and-return-loss-2026-09-28.md` — `/opt/ebay-automation`側「Send Offer」機能・「リターン損益計算」画面の設計・実装経緯
 - `claude/forgot-password-spec.md` — 古い仕様メモ(2026-09-08にebay-automation方式(共有ユーザー名/パスワード+リカバリーコード)へ全面刷新済み。`src/pages/LoginPage.tsx`+`src/pages/AccountSecurityPage.tsx`+`src/lib/api/auth.ts`+Edge Functions `app-login`/`app-change-password`/`app-recovery-code-reissue`/`app-forgot-password`参照。Supabase Authの`ResetPasswordPage.tsx`は廃止・削除済み)
 
 ## セッション要点(2026-09-15〜09-16)

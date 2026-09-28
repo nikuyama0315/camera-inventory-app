@@ -331,7 +331,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
                 <input type="number" step="0.01" value={tariff} onChange={(e) => setTariff(Number(e.target.value))} style={fieldInputStyle} />
               </div>
               <div style={{ ...pinkFieldStyle, gridColumn: "span 2" }}>
-                <label style={fieldLabelStyle}>通関方法（Clearance Processing）</label>
+                <label style={fieldLabelStyle}>発送方法（Clearance Processing）</label>
                 <select value={clearance} onChange={(e) => setClearance(e.target.value)} style={fieldInputStyle}>
                   {CLEARANCE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
