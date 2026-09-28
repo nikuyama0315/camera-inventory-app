@@ -18,6 +18,7 @@ import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow 
 import { establishMarketingSession } from "./lib/api/auth";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import { checkTodoDueAlertsAndNotify, fetchOverdueTodoCount } from "./lib/api/todos";
+import { fetchSendOfferPendingCount } from "./lib/api/sendOffers";
 import logo from "./assets/logo.png";
 
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "eventLog" | "ledgerImport";
@@ -82,6 +83,8 @@ export default function App() {
   const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
   const [overdueTodoCount, setOverdueTodoCount] = useState(0);
   const [overdueTodoDismissed, setOverdueTodoDismissed] = useState(false);
+  const [sendOfferPendingCount, setSendOfferPendingCount] = useState(0);
+  const [sendOfferAlertDismissed, setSendOfferAlertDismissed] = useState(false);
   // ?view=account-security でこの画面を直接開けるようにする(2026-09-11追加、
   // マーケティング側「ログイン情報再設定」リンクからの誘導先。ユーザー指示「販売管理の
   // ほうと同じにすべき」により、マーケティング固有の自己サービス型パスワード変更画面を
@@ -166,6 +169,13 @@ export default function App() {
     checkTodoDueAlertsAndNotify().catch(() => {
       /* メール送信設定が未完了の場合は静かに失敗させる */
     });
+    // eBay Negotiation APIで検知したSend Offer対象商品(マーケティング側のcronが
+    // 30分おきに更新)の件数を取得し、バナー表示する(2026-09-28追加、在庫アラート等と同じ方式)。
+    fetchSendOfferPendingCount()
+      .then(setSendOfferPendingCount)
+      .catch(() => {
+        /* バナー表示のための取得失敗は致命的でないため無視 */
+      });
   }, [session]);
 
   if (!checked) {
@@ -386,6 +396,32 @@ export default function App() {
           </button>
           <button
             onClick={() => setOverdueTodoDismissed(true)}
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
+          >
+            隠す
+          </button>
+        </div>
+      )}
+
+      {sendOfferPendingCount > 0 && !sendOfferAlertDismissed && (
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "var(--danger-bg)",
+            borderBottom: "0.5px solid var(--danger-text)",
+            fontSize: 12,
+            color: "var(--danger-text)",
+          }}
+        >
+          {sendOfferPendingCount}件のSend Offer対象商品があります
+          <a
+            href="/marketing/send-offers"
+            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8, color: "var(--danger-text)" }}
+          >
+            確認する
+          </a>
+          <button
+            onClick={() => setSendOfferAlertDismissed(true)}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
           >
             隠す
