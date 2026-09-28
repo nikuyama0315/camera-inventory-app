@@ -341,7 +341,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
                 </select>
               </div>
               <div style={pinkFieldStyle}>
-                <label style={fieldLabelStyle}>還付・仕入控除率</label>
+                <label style={fieldLabelStyle}>仕入控除率</label>
                 <select value={ptRateDdp} onChange={(e) => setPtRateDdp(Number(e.target.value))} style={fieldInputStyle}>
                   <option value={8}>8%</option>
                   <option value={10}>10%</option>
@@ -394,7 +394,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
                 />
               </div>
               <div style={pinkFieldStyle}>
-                <label style={fieldLabelStyle}>還付・仕入控除率</label>
+                <label style={fieldLabelStyle}>仕入控除率</label>
                 <select value={ptRateNonDdp} onChange={(e) => setPtRateNonDdp(Number(e.target.value))} style={fieldInputStyle}>
                   <option value={8}>8%</option>
                   <option value={10}>10%</option>
