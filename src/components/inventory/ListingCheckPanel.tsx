@@ -581,7 +581,7 @@ export default function ListingCheckPanel() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>管理番号</th>
-                    <th style={{ padding: "4px" }}>仕入品名 / his50s TITLE</th>
+                    <th style={{ padding: "4px" }}>仕入品名 / Item Title / his50s TITLE</th>
                     <th style={{ padding: "4px" }}>ステータス</th>
                     <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
                     <th style={{ padding: "4px" }}>his50s更新日時</th>
@@ -593,6 +593,7 @@ export default function ListingCheckPanel() {
                       <td style={{ padding: "4px" }}>{row.managementNo}</td>
                       <td style={{ padding: "4px" }}>
                         <div>{row.title ?? "-"}</div>
+                        <div style={{ color: "var(--text-muted)" }}>{row.itemTitle ?? "-"}</div>
                         <div style={{ color: "var(--text-muted)" }}>{row.his50sTitle ?? "-"}</div>
                       </td>
                       <td style={{ padding: "4px" }}>{row.status}</td>
