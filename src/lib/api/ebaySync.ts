@@ -697,6 +697,7 @@ export interface His50sListingCheckMatchedRow {
   managementNo: string;
   title: string | null;
   itemTitle: string | null;
+  his50sTitle: string | null;
   status: string;
   his50sStockQuantity: number;
   his50sUpdatedAt: string;
@@ -711,6 +712,7 @@ export interface His50sListingCheckAppOnlyRow {
 
 export interface His50sListingCheckHis50sOnlyRow {
   externalId: string;
+  title: string | null;
   stockQuantity: number;
   updatedAt: string;
 }
