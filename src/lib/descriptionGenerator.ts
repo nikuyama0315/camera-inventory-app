@@ -36,55 +36,60 @@ $$GRADETABLE$$
 
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Appearance</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 20px; font-size: 14px; line-height: 1.8;">
-    <li>$$EXTERIOR$$, consistent with our $$CONDITION1$$ ($$GRADEPERCENT$$) grade: $$GRADETEXT$$.</li>
-    <li>$$ELECTRICITY$$.</li>
+    <li>$$EXTERIOR$$, consistent with our $$CONDITION1$$ ($$GRADEPERCENT$$) grade: $$GRADETEXT$$</li>
+    <li>$$ELECTRICITY$$</li>
     <li>Please refer to all listing photos for a full visual assessment of the actual item.</li>
   </ul>
 
+  <div style="display:flex;gap:20px;align-items:flex-start;margin:0px 0px 24px;flex-wrap:wrap;">
+  <div style="flex:1;min-width:220px;">
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Functional Check</font></h3>
-  <table style="border-collapse:collapse;color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; font-size: 14px; line-height: 1.9;">
-    <tr><td style="width:20px;padding:0;">$$OKNG1$$</td><td style="width:110px;padding:0;">Shutter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK1$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG2$$</td><td style="width:110px;padding:0;">Flash</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK2$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG3$$</td><td style="width:110px;padding:0;">Auto focus</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK3$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG4$$</td><td style="width:110px;padding:0;">Auto exposure</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK4$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG5$$</td><td style="width:110px;padding:0;">Film winding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK5$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:110px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:110px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
-    <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:110px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
+  <table style="border-collapse:collapse;color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px; font-size: 14px; line-height: 1.9;">
+    <tr><td style="width:20px;padding:0;">$$OKNG1$$</td><td style="width:100px;padding:0;">Shutter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK1$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG2$$</td><td style="width:100px;padding:0;">Flash</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK2$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG3$$</td><td style="width:100px;padding:0;">Auto focus</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK3$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG4$$</td><td style="width:100px;padding:0;">Auto exposure</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK4$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG5$$</td><td style="width:100px;padding:0;">Film winding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK5$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG6$$</td><td style="width:100px;padding:0;">Film rewinding</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK6$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG7$$</td><td style="width:100px;padding:0;">Film counter</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK7$$</strong></td></tr>
+    <tr><td style="width:20px;padding:0;">$$OKNG8$$</td><td style="width:100px;padding:0;">Self timer</td><td style="padding:0;">&mdash;&nbsp;<strong>$$WORK8$$</strong></td></tr>
 $$FUNCTIONALNOTES$$  </table>
-
+  </div>
+  <div style="flex:1;min-width:220px;">
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Optics Inspection</font></h3>
   <div style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; overflow-x: auto; margin: 0px 0px $$OPTICSBOTTOMMARGIN$$px;">
-    <table style="border-collapse:collapse;min-width:460px;width:65%;font-size:13px;">
-      <caption style="caption-side:top;text-align:left;font-size:14px;line-height:1.75;color:#6e7378;padding-bottom:6px;">$$OPTICALTEXT$$</caption>
+    <table style="border-collapse:collapse;width:100%;font-size:11px;">
+      <caption style="caption-side:top;text-align:left;font-size:13px;line-height:1.6;color:#6e7378;padding-bottom:6px;">$$OPTICALTEXT$$</caption>
       <thead>
       <tr>
-        <th scope="col" style="border:1px solid #d9dcdd;padding:8px 10px;background:#f4f5f4;font-weight:bold;text-align:left;">Part</th>
-        <th scope="col" style="border:1px solid #d9dcdd;padding:8px 10px;background:#f4f5f4;font-weight:bold;text-align:left;">Fungus</th>
-        <th scope="col" style="border:1px solid #d9dcdd;padding:8px 10px;background:#f4f5f4;font-weight:bold;text-align:left;">Haze</th>
-        <th scope="col" style="border:1px solid #d9dcdd;padding:8px 10px;background:#f4f5f4;font-weight:bold;text-align:left;">Scratches / Marks</th>
-        <th scope="col" style="border:1px solid #d9dcdd;padding:8px 10px;background:#f4f5f4;font-weight:bold;text-align:left;">Dust</th>
+        <th scope="col" style="border:1px solid #d9dcdd;padding:5px 6px;background:#f4f5f4;font-weight:bold;text-align:left;">Part</th>
+        <th scope="col" style="border:1px solid #d9dcdd;padding:5px 6px;background:#f4f5f4;font-weight:bold;text-align:left;">Fungus</th>
+        <th scope="col" style="border:1px solid #d9dcdd;padding:5px 6px;background:#f4f5f4;font-weight:bold;text-align:left;">Haze</th>
+        <th scope="col" style="border:1px solid #d9dcdd;padding:5px 6px;background:#f4f5f4;font-weight:bold;text-align:left;">Scratches / Marks</th>
+        <th scope="col" style="border:1px solid #d9dcdd;padding:5px 6px;background:#f4f5f4;font-weight:bold;text-align:left;">Dust</th>
       </tr>
       </thead>
       <tbody>
       <tr>
-        <th scope="row" style="border:1px solid #d9dcdd;padding:8px 10px;font-weight:bold;text-align:left;">Lens</th>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$LFUNGUS$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$LHAZE$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$LMARK$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$LDUST$$</td>
+        <th scope="row" style="border:1px solid #d9dcdd;padding:5px 6px;font-weight:bold;text-align:left;">Lens</th>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$LFUNGUS$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$LHAZE$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$LMARK$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$LDUST$$</td>
       </tr>
       <tr>
-        <th scope="row" style="border:1px solid #d9dcdd;padding:8px 10px;font-weight:bold;text-align:left;">Finder</th>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$FFUNGUS$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$FHAZE$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$FMARK$$</td>
-        <td style="border:1px solid #d9dcdd;padding:8px 10px;color:#3f6b4f;">$$FDUST$$</td>
+        <th scope="row" style="border:1px solid #d9dcdd;padding:5px 6px;font-weight:bold;text-align:left;">Finder</th>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$FFUNGUS$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$FHAZE$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$FMARK$$</td>
+        <td style="border:1px solid #d9dcdd;padding:5px 6px;color:#3f6b4f;">$$FDUST$$</td>
       </tr>
       </tbody>
     </table>
   </div>
 $$OPTICALCHECKNOTES$$
+  </div>
+  </div>
   <h3 style="color: rgb(168, 103, 43); font-family: &quot;Courier New&quot;, Courier, monospace; margin: 0px 0px 10px; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgb(217, 220, 221); padding-bottom: 6px; font-weight: normal;"><font size="4">■ Included Accessories</font></h3>
   <ul style="color: rgb(58, 63, 68); font-family: Arial, Helvetica, sans-serif; margin: 0px 0px 24px; padding-left: 20px; font-size: 14px; line-height: 1.8;">
     $$INCLUDESLI$$<li>As shown in the listing photos (see photo gallery for exact contents).</li>

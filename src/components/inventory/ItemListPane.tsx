@@ -2,6 +2,7 @@ import type { ItemListFilters, ItemStatus } from "../../lib/types";
 import { EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS, ITEM_STATUS_LABELS } from "../../lib/types";
 import { SOURCE_TYPE_OPTIONS } from "../../lib/constants";
 import type { ItemSortOption, ItemWithPurchase } from "../../lib/api/items";
+import { exportItemsToXlsx } from "../../lib/api/itemsExport";
 
 interface Props {
   // 2026-09-24変更: 状態ランク・状態チェック表下の自由記述を一覧に表示するため、
@@ -243,7 +244,10 @@ export default function ItemListPane({
             value={filters.sellerName ?? ""}
             onChange={(e) => onFiltersChange({ ...filters, sellerName: e.target.value || undefined })}
           />
-          <button onClick={onStartNewItem}>+ 新規登録</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onStartNewItem} style={{ flex: 1 }}>+ 新規登録</button>
+            <button onClick={() => exportItemsToXlsx(items, "詳細編集")} style={{ flex: 1 }}>絞込条件でファイル作成</button>
+          </div>
         </div>
       </div>
 

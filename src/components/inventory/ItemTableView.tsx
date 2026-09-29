@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { EBAY_ACCOUNT_LABELS, EBAY_ACCOUNT_OPTIONS, ITEM_STATUS_LABELS, type ItemStatus } from "../../lib/types";
 import { deleteItem, updateItemBasicInfo, updateItemStatus, type ItemWithPurchase } from "../../lib/api/items";
 import { computeDriveLocalPath, SOURCE_TYPE_OPTIONS, windowsPathToOpenFolderUrl } from "../../lib/constants";
+import { exportItemsToXlsx } from "../../lib/api/itemsExport";
 
 interface Props {
   items: ItemWithPurchase[];
@@ -535,6 +536,9 @@ export default function ItemTableView({ items, loading, errorMessage, onSelectIt
             絞り込みをクリア
           </button>
         )}
+        <button onClick={() => exportItemsToXlsx(sortedItems, "一覧表示")} style={{ fontSize: 12, padding: "4px 10px" }}>
+          絞込条件でファイル作成
+        </button>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           {filteredItems.length}件 / 全{items.length}件
         </span>
