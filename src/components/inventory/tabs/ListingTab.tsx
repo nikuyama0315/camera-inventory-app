@@ -331,6 +331,14 @@ export default function ListingTab({ item, onChanged }: Props) {
       setExistingFetchMessage("既存のeBay ItemIDを入力してから押してください");
       return;
     }
+    // ユーザー報告(2026-09-30): 注文番号(Order No.、xx-xxxxx-xxxxx形式)を誤って
+    // ItemID欄に入力すると、eBay GetItemが分かりにくいエラーを返していたため事前に検知する。
+    if (!/^\d+$/.test(targetId)) {
+      setExistingFetchMessage(
+        `入力された「${targetId}」はeBayのItemID(数字のみ)の形式ではありません。注文番号(Order No.)ではなく、出品のItemIDを入力してください。`,
+      );
+      return;
+    }
     setExistingFetchBusy(true);
     setExistingFetchMessage(null);
     setItemSpecificsPairs([]); // 再取得時は前回取得分をいったんクリアしてから表示し直す(ユーザー指示)
