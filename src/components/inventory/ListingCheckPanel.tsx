@@ -470,6 +470,7 @@ export default function ListingCheckPanel() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                     <th style={{ padding: "4px" }}>管理番号</th>
+                    <th style={{ padding: "4px" }}>TITLE</th>
                     <th style={{ padding: "4px" }}>仕入品名</th>
                     <th style={{ padding: "4px", textAlign: "right" }}>his50s在庫数</th>
                     <th style={{ padding: "4px" }}>his50s更新日時</th>
@@ -480,6 +481,7 @@ export default function ListingCheckPanel() {
                   {his50sResult.soldButPublished.map((row) => (
                     <tr key={row.itemId} style={{ borderTop: "0.5px solid var(--border)" }}>
                       <td style={{ padding: "4px" }}>{row.managementNo}</td>
+                      <td style={{ padding: "4px" }}>{row.his50sTitle ?? "-"}</td>
                       <td style={{ padding: "4px" }}>{row.title ?? "-"}</td>
                       <td style={{ padding: "4px", textAlign: "right" }}>{row.his50sStockQuantity}</td>
                       <td style={{ padding: "4px" }}>{row.his50sUpdatedAt}</td>

@@ -725,6 +725,8 @@ export interface His50sListingCheckSoldButPublishedRow {
   itemId: string;
   managementNo: string;
   title: string | null;
+  /** his50s側の出品TITLE(2026-09-30追加)。 */
+  his50sTitle: string | null;
   /** notify-his50s-sold再送信用。売上レコードが見つからない場合はnull(再送信不可)。 */
   saleId: string | null;
   his50sStockQuantity: number;
