@@ -244,3 +244,19 @@ export async function checkStockAlertsAndNotify(): Promise<{ notified: string[] 
   if (error) throw error;
   return data as { notified: string[] };
 }
+
+/** 在庫アラート画面の「購入メモ」欄(2026-09-30追加、ユーザー要望)。単一行(id="default")の
+ *  自由記述メモを取得する。 */
+export async function fetchPurchaseMemo(): Promise<string> {
+  const { data, error } = await supabase.from("purchase_memo").select("memo_text").eq("id", "default").maybeSingle();
+  if (error) throw error;
+  return data?.memo_text ?? "";
+}
+
+/** 購入メモを保存する。 */
+export async function savePurchaseMemo(memoText: string): Promise<void> {
+  const { error } = await supabase
+    .from("purchase_memo")
+    .upsert({ id: "default", memo_text: memoText, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}

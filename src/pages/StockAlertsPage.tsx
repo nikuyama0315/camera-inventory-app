@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import {
   checkStockAlertsAndNotify,
   fetchModelStockOverview,
+  fetchPurchaseMemo,
+  savePurchaseMemo,
   syncDriveStockCounts,
   deleteStockThreshold,
   renameModelFolder,
@@ -52,6 +54,12 @@ export default function StockAlertsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
+  // 購入メモ(2026-09-30追加、ユーザー要望)。単一の自由記述欄で、各行の「メモ」ボタンで
+  // 機種名フォルダ名を差し込める。
+  const [purchaseMemo, setPurchaseMemo] = useState("");
+  const [savingMemo, setSavingMemo] = useState(false);
+  const [memoMessage, setMemoMessage] = useState<string | null>(null);
+
   async function reload() {
     setLoading(true);
     setErrorMessage(null);
@@ -99,7 +107,28 @@ export default function StockAlertsPage() {
 
   useEffect(() => {
     void reload();
+    fetchPurchaseMemo()
+      .then(setPurchaseMemo)
+      .catch((err) => setErrorMessage(err instanceof Error ? err.message : "購入メモの取得に失敗しました"));
   }, []);
+
+  async function handleSaveMemo() {
+    setSavingMemo(true);
+    setMemoMessage(null);
+    try {
+      await savePurchaseMemo(purchaseMemo);
+      setMemoMessage("保存しました");
+    } catch (err) {
+      setMemoMessage(err instanceof Error ? err.message : "購入メモの保存に失敗しました");
+    } finally {
+      setSavingMemo(false);
+    }
+  }
+
+  function handleFillMemo(modelFolderName: string) {
+    setPurchaseMemo(modelFolderName);
+    setMemoMessage(null);
+  }
 
   function updateEditValue(modelFolderName: string, value: string) {
     setEditValues((prev) => ({ ...prev, [modelFolderName]: value }));
@@ -386,6 +415,20 @@ export default function StockAlertsPage() {
           {syncingDrive ? "取得中..." : "Google Driveから最新の在庫数を取得"}
         </button>
         {syncMessage && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{syncMessage}</span>}
+        <textarea
+          value={purchaseMemo}
+          onChange={(e) => {
+            setPurchaseMemo(e.target.value);
+            setMemoMessage(null);
+          }}
+          placeholder="購入メモ"
+          rows={2}
+          style={{ width: 320, fontSize: 13, resize: "vertical" }}
+        />
+        <button onClick={() => void handleSaveMemo()} disabled={savingMemo}>
+          {savingMemo ? "保存中..." : "保存"}
+        </button>
+        {memoMessage && <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{memoMessage}</span>}
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
@@ -568,6 +611,12 @@ export default function StockAlertsPage() {
                     </div>
                   </td>
                   <td style={{ padding: "8px 4px", textAlign: "right" }}>
+                    <button
+                      onClick={() => handleFillMemo(r.model_folder_name)}
+                      style={{ fontSize: 12, padding: "3px 10px", marginRight: 6 }}
+                    >
+                      メモ
+                    </button>
                     <button
                       onClick={() => void handleDeleteModel(r.model_folder_name)}
                       disabled={deletingModel === r.model_folder_name}
