@@ -129,3 +129,37 @@ git add -A && git commit -m "..."
 
 ### 補足: Supabase MCPツールの一時的な分類器エラー
 - このセッション中、`mcp__05c17e31-...`(Supabase MCP)の`execute_sql`/`get_edge_function`等が「server-side auto mode classifierがno verdict」エラーで断続的に失敗する時間帯があった。フォールバックとして、VPSの`.env`にある`SUPABASE_DB_HOST`/`PORT`/`NAME`/`USER`/`PASSWORD`を使い、VPS上から`psql`で直接Supabase Postgresに接続して調査・修正を続行した(読み取り・書き込みとも可能、MCPツールとは独立した経路)。
+
+## セッション要点(2026-09-30〜10-01)
+
+`/opt/ebay-automation`への機能追加・不具合修正を中心に実施(いずれもユーザーから直接名指しで依頼された例外対応)。camera-inventory-app本体への変更は無し。
+
+### ebay-automation: Send Offer関連のダッシュボード改修
+- ダッシュボード(v2)の各行、承認/却下ボタンの下に、その商品がSend Offer送信から96時間以内(`send_offer_eligible_items.offer_sent_at`基準)なら赤字で「Send Offer is valid」を表示。
+- 一括承認(Best Match順位による一括承認・経過日数による一括承認)それぞれに「Send Offerから96時間以内のアイテムは除外する」チェックボックスを追加(`queue_bulk_approve_by_rank`/`queue_bulk_approve_by_elapsed_days`、対象IDを`target_id=not.in.(...)`でPATCHフィルタに追加)。
+- レイアウト調整: フォントサイズ11px→13px、「Sold除外」「Send Offer除外」の2つのチェックボックスを縦並びに、一括承認フォームを「数量入力欄(1行目)」+「チェックボックス2行+一括承認ボタン(2行目、横並び)」の2段構成に整理。
+
+### 「仕入額0円」の粗利計算バグ(ebay-automation): 調査の顛末と最終修正
+- ユーザー報告(ItemID 287617356131、Soulcamera Item Info「260531-04 260930 0」)を受け、`_parse_original_purchase_cost()`(`webapp/app.py`)を調査。
+- **当初の誤った修正(撤回済み)**: 「仕入額0円は実運用上あり得ず、データ未登録のプレースホルダーのはず」と誤って判断し、パース結果が0のとき空文字列(データ無し扱い)を返すよう変更してしまった。ユーザーから「仕入額が本当に0円ということはあり得ます」(無料入手品・景品等)と指摘を受け、この変更は撤回。0は文字通り0円として利益計算に使う(=原価を差し引かない)のが正しい挙動。
+- **真の原因**: 当該商品はダッシュボードの「Soulcamera Item Info: ...」表示自体は`ebay_sell_similar_queue.sku`列(Item/SKU欄)の値を表示しているが、仕入額の抽出には別列`soulcamera_item_info`(GetItemのItem Specifics由来、未設定の出品も多い)を使っており、この商品はItem Specifics側が空だったため仕入額が一切抽出できていなかった(0円ではなく「データ無し」の状態)。
+- **最終修正**: 新設の`_cost_source_value(soulcamera_item_info, sku)`フィルタで、Item Specifics(`soulcamera_item_info`)を最優先、無ければCustom Label(`sku`)にフォールバックする方式に変更。ただしV2(Inventory API)再出品による機械的な識別子(`-V2R`サフィックス付きSKU)は仕入額の出典として信頼できないため対象外とする(`get_soulcamera_item_info()`の既存ロジックと同じ理由)。対象: `dashboard_v2.html`・`listing_info_update.html`の計4箇所の`data-cost`属性。
+
+### ebay-automation: 自動スキャン時刻変更時のリセット機能
+- 症状: 設定画面(`/settings`)の自動再スキャン時刻(`scan_schedule_jst`)を当日中に変更しても、変更前の時刻で既にその日1回実行済みだと、`scripts/scheduled_scan.py`の「1日1回」ガード(`.scheduler_state.json`の`last_run_date`、日付単位でしか見ていない)により新しい時刻でもスキップされてしまっていた(実例: 16:00→20:00に変更したが20:00には実行されなかった)。
+- 修正: `settings_save()`で保存前後の`scan_schedule_jst`を比較し、変更があった場合のみ`.scheduler_state.json`を削除(`_reset_scheduler_last_run_date()`)して本日分をやり直せるようにした。同じ時刻のまま再保存した場合はリセットしない(重複実行防止)。
+
+### ebay-automation: 「終了品バックアップ」機能、Inventory API版(v2)への実装漏れを修正
+- 症状: EndItemで旧出品を終了した後、新規出品の公開(publishOffer)が失敗したアイテムなのに「終了品バックアップ」一覧で「バックアップなし」と表示されていた。
+- 原因: 2026-09-30に追加したバックアップ機能(EndItem直前に出品データ・画像を保存、失敗時はEndItem自体を中止)は`sell_similar.py`の`do_action()`(Trading API/AddFixedPriceItem版)にのみ実装されており、`sell_similar_v2.py`の`do_action_v2()`(Inventory API版、出品情報更新機能で使われる方)には呼び出しが漏れていた。
+- 修正: `do_action_v2()`に`shop_id`引数を追加し、EndItem直前に`ss.backup_listing_before_end()`を呼び、失敗時はEndItem自体を中止するよう`do_action()`と同じ合意事項を適用。publishOffer失敗時・成功時の`update_backup_relist_result()`呼び出しも追加。呼び出し元3箇所(`run_v2`/`run_execute_approved_v2`/bulk-dry-run-report相当)に`shop_id`を渡すよう修正。この関数は常にサブプロセスとして起動されるため、webapp再起動不要(次回実行から反映)。
+
+### ebay-automation: 「終了品バックアップ」一覧を直近1回の実行ジョブ分のみに限定
+- 従来は`ebay_sell_similar_history`(shop_id・target_idの組でUPSERT、全期間の最新結果が累積)を無制限(直近300件)に一覧表示していたが、ユーザー要望により直近1回の実行ジョブの対象分のみに変更。
+- 実装: `webapp/jobs.db`(SQLite、「実行ジョブ一覧」と同じデータ源)から、実際に出品の終了・作成を伴うジョブ(mode が`scan`/`dry_run`/`bulk_dry_run_report`で始まらないもの)を直近1件特定する`_latest_relisting_job()`を追加し、そのジョブの`started_at`〜`finished_at`の範囲で`ebay_sell_similar_history.action_at`を絞り込む(`ebay_sell_similar_history`自体にはどのジョブで記録されたかを示す列が無いための代替策)。画面上部に対象ジョブ(mode・開始〜終了時刻)を表示。
+
+### 補足: eBay Seller Hub「Inactive」タブに終了出品が出ない件(Web検索で調査)
+- ユーザー質問「アプリでEnd Listingした場合、なぜSeller HubのInactiveで見れないのか」についてWeb検索で調査。eBay Community上で広く報告されている既知の現象で、eBay公式も"ALERT17029"として終了・新規出品・再出品したアイテムがSeller Hubの想定セクションに正しく反映されない問題を調査中と報告されている。APIで終了した場合に限った仕様ではなく、UI上で手動終了した場合でも同様の報告が多数あり、eBay全体の同期処理の遅延・不具合による「limbo状態」(ActiveでもEnded/Unsold/Inactiveでもない一時的な未分類状態)が原因と見られる。だからこそ「終了品バックアップ」機能がSeller Hub側の表示に頼れない場合の実質的なセーフティネットとして機能する。
+
+### Windows側SSH鍵の正確なパス(訂正)
+- `vps_key_openssh.key`は本セッションのプロジェクトフォルダ(`C:\Users\straw\projects\camera-inventory-app`)内には無く、実際には`C:\Users\straw\vps_key_openssh.key`に配置されている。ユーザーがプロジェクトフォルダから相対パスでssh実行し「Identity file not accessible」で失敗する事例が発生したため、デプロイコマンドを案内する際は必ずフルパス(`C:\Users\straw\vps_key_openssh.key`)を使うこと。
