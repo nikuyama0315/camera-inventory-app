@@ -298,6 +298,7 @@ export default function ListingTab({ item, onChanged }: Props) {
     }
     setSampleBusy(true);
     setSampleMessage(null);
+    setItemSpecificsPairs([]); // 再取得時は前回取得分をいったんクリアしてから表示し直す(ユーザー指示)
     try {
       const result = await fetchItemSpecificsSample(query, shopId);
       setItemSpecificsPairs(parseSpecificsText(result.itemSpecificsText));
@@ -332,6 +333,7 @@ export default function ListingTab({ item, onChanged }: Props) {
     }
     setExistingFetchBusy(true);
     setExistingFetchMessage(null);
+    setItemSpecificsPairs([]); // 再取得時は前回取得分をいったんクリアしてから表示し直す(ユーザー指示)
     try {
       const result = await fetchItemSpecificsByExistingItem(targetId, shopId);
       setItemSpecificsPairs(parseSpecificsText(result.itemSpecificsText));
