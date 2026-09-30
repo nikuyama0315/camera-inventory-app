@@ -478,7 +478,7 @@ export default function StockAlertsPage() {
           </thead>
           <tbody>
             {displayRows.map((r, rowIndex) => {
-              const zebraBackground = rowIndex % 2 === 1 ? "var(--surface-1)" : undefined;
+              const zebraBackground = rowIndex % 2 === 1 ? "#e9ebee" : undefined;
               const editValue = editValues[r.model_folder_name] ?? String(r.threshold);
               const isDirty = editValue !== String(r.threshold);
               const isSaving = savingModel === r.model_folder_name;
