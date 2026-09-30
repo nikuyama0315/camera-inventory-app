@@ -126,7 +126,10 @@ export default function StockAlertsPage() {
   }
 
   function handleFillMemo(modelFolderName: string) {
-    setPurchaseMemo(modelFolderName);
+    setPurchaseMemo((prev) => {
+      const trimmed = prev.replace(/\n+$/, "");
+      return trimmed ? trimmed + "\n" + modelFolderName : modelFolderName;
+    });
     setMemoMessage(null);
   }
 
