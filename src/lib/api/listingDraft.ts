@@ -65,6 +65,27 @@ export async function deleteListingPhoto(path: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Edge Functionが非2xxを返した際、supabase-jsは`error`をFunctionsHttpErrorとして返すが、
+ * こちらが返したJSONボディ(`{error: "日本語メッセージ"}`)は自動では読み込まれない
+ * (`error.context`が未パースのResponseのまま渡ってくる)。ここでボディを読み取り、
+ * 無ければ汎用メッセージにフォールバックする(src/lib/api/auth.tsと同じパターン)。
+ */
+async function extractEdgeFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (body && typeof body === "object" && "error" in body && body.error) {
+        return String((body as { error: unknown }).error);
+      }
+    } catch {
+      /* ボディがJSONでない場合はフォールバックする */
+    }
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 export interface ItemSpecificsSampleResult {
   itemSpecificsText: string;
   itemPrice: string | null;
@@ -82,7 +103,7 @@ export async function fetchItemSpecificsSample(
   const { data, error } = await supabase.functions.invoke("listing-item-specifics-lookup", {
     body: { query, shopId },
   });
-  if (error) throw error;
+  if (error) throw new Error(await extractEdgeFunctionErrorMessage(error, "サンプルデータの取得に失敗しました"));
   if (!data || typeof data !== "object" || "error" in data) {
     throw new Error((data as { error?: string })?.error ?? "サンプルデータの取得に失敗しました");
   }
@@ -98,7 +119,7 @@ export async function fetchItemSpecificsByExistingItem(
   const { data, error } = await supabase.functions.invoke("listing-item-specifics-lookup", {
     body: { itemId: existingItemId, shopId },
   });
-  if (error) throw error;
+  if (error) throw new Error(await extractEdgeFunctionErrorMessage(error, "既存出品データの取得に失敗しました"));
   if (!data || typeof data !== "object" || "error" in data) {
     throw new Error((data as { error?: string })?.error ?? "既存出品データの取得に失敗しました");
   }
