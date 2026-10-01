@@ -37,6 +37,11 @@ const ALL_FIELDS: FieldDef[] = [
   { key: "ship_to", label: "Ship to", type: "text" },
 ];
 
+// 長い機種名で表全体が画面からはみ出さないよう、表示時の最大幅を制限する列(2026-10-02追加)。
+const DISPLAY_MAX_WIDTH: Partial<Record<keyof ShippingRateReferenceInput, number>> = {
+  model: 130,
+};
+
 const BLANK_INPUT: ShippingRateReferenceInput = {
   brand: "",
   model: "",
@@ -107,7 +112,7 @@ function EditableCell({
       type="text"
       value={value === null || value === undefined ? "" : String(value)}
       onChange={(e) => onChange(e.target.value)}
-      style={{ width: field.key === "brand" || field.key === "model" ? 110 : 150, fontSize: 12, padding: "2px 4px" }}
+      style={{ width: field.key === "model" ? 110 : field.key === "brand" ? 90 : 150, fontSize: 12, padding: "2px 4px" }}
     />
   );
 }
@@ -439,7 +444,18 @@ export default function ShippingRateLookupPanel() {
                           ) : f.type === "number" ? (
                             (row[f.key] as number | null) ?? "-"
                           ) : (
-                            (row[f.key] as string | null) || "-"
+                            <span
+                              title={(row[f.key] as string | null) || undefined}
+                              style={{
+                                display: "inline-block",
+                                maxWidth: DISPLAY_MAX_WIDTH[f.key],
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                verticalAlign: "bottom",
+                              }}
+                            >
+                              {(row[f.key] as string | null) || "-"}
+                            </span>
                           )}
                         </td>
                       ))}
