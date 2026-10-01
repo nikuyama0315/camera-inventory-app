@@ -42,6 +42,11 @@ const DISPLAY_MAX_WIDTH: Partial<Record<keyof ShippingRateReferenceInput, number
   model: 78,
 };
 
+// 早見表プルダウンの幅も機種名だけ狭める(2026-10-02追加)。
+const CHAIN_SELECT_WIDTH: Partial<Record<keyof ShippingRateReferenceInput, number>> = {
+  model: 72,
+};
+
 const BLANK_INPUT: ShippingRateReferenceInput = {
   brand: "",
   model: "",
@@ -279,7 +284,7 @@ export default function ShippingRateLookupPanel() {
                   <select
                     value={sel}
                     onChange={(e) => handleSelectChange(index, e.target.value)}
-                    style={{ fontSize: 12, padding: "4px 6px", minWidth: 120 }}
+                    style={{ fontSize: 12, padding: "4px 6px", width: CHAIN_SELECT_WIDTH[field.key] ?? 120 }}
                   >
                     <option value="">(指定なし)</option>
                     {options.map((opt) => (
