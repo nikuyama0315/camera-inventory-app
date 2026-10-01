@@ -159,9 +159,10 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const purchasePriceJpy = item.purchases?.[0]?.purchase_price ?? 0;
 
-  function handleApplyProfitCalc(priceUsd: number, shippingUsd: number) {
+  function handleApplyProfitCalc(priceUsd: number, shippingUsd: number, promoRate: number) {
     setItemPrice(priceUsd.toFixed(2));
     setShippingPolicy(nearestShippingPolicy(shippingUsd, shippingPolicyOptions));
+    setPromotedGeneralRate(promoRate.toFixed(2));
     setProfitModalOpen(false);
   }
 
@@ -898,6 +899,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         initialPriceUsd={Number(itemPrice) || 0}
         initialShippingUsd={shippingPolicyToUsd(shippingPolicy) ?? 0}
         initialCostJpy={purchasePriceJpy}
+        initialPromoRate={Number(promotedGeneralRate) || 0}
         onClose={() => setProfitModalOpen(false)}
         onApply={handleApplyProfitCalc}
       />

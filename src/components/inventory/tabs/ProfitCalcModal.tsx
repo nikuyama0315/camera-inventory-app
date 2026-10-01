@@ -7,8 +7,9 @@ interface Props {
   initialPriceUsd: number;
   initialShippingUsd: number;
   initialCostJpy: number;
+  initialPromoRate: number;
   onClose: () => void;
-  onApply: (priceUsd: number, shippingUsd: number) => void;
+  onApply: (priceUsd: number, shippingUsd: number, promoRate: number) => void;
 }
 
 /**
@@ -16,9 +17,14 @@ interface Props {
  * /opt/ebay-automation の marketing/v2(dashboard_v2.html「利益簡易計算」モーダル、
  * webapp/templates/dashboard_v2.html 653-995行目)の入力項目・計算式をそのまま移植している。
  * DDP(関税込み)・Non-DDP(関税別payment)の2パターンを同時に算出して両方表示する。
- * 「変更値を元画面に反映する」を押すと、商品本体価格・DDP上乗せ分＋送料徴取額を
- * onApply(priceUsd, shippingUsd) で呼び出し元(出品タブ)へ返す(実際の反映先へのマッピングは
- * 呼び出し元が行う)。
+ * 「変更値を元画面に反映する」を押すと、商品本体価格・DDP上乗せ分＋送料徴取額・
+ * Promo Listing（General広告料率）を onApply(priceUsd, shippingUsd, promoRate) で
+ * 呼び出し元(出品タブ)へ返す(実際の反映先へのマッピングは呼び出し元が行う)。
+ * ⚠️ 2026-10-01追加(御社報告: モーダルから戻ったときPromoted Listing Generalの値が
+ * セットされていない): 従来はpromoがDEFAULTS.promo(0)固定で初期化され、Applyでも
+ * 一切呼び出し元へ返されていなかった(出品タブのPromote listing「General」欄と
+ * 完全に無関係だった)。initialPromoRateで開いた時点の値を引き継ぎ、Apply時にも
+ * 返すようにした。
  */
 
 const DEFAULTS = {
@@ -106,13 +112,13 @@ const tileStyle: React.CSSProperties = {
 };
 const accentTileStyle: React.CSSProperties = { ...tileStyle, background: "var(--surface-2)", fontWeight: 700 };
 
-export default function ProfitCalcModal({ open, title, initialPriceUsd, initialShippingUsd, initialCostJpy, onClose, onApply }: Props) {
+export default function ProfitCalcModal({ open, title, initialPriceUsd, initialShippingUsd, initialCostJpy, initialPromoRate, onClose, onApply }: Props) {
   const [price, setPrice] = useState(initialPriceUsd);
   const [ebayFee, setEbayFee] = useState(DEFAULTS.ebayFee);
   const [vat, setVat] = useState(DEFAULTS.vat);
   const [payoneer, setPayoneer] = useState(DEFAULTS.payoneer);
   const [intlFee, setIntlFee] = useState(DEFAULTS.intlFee);
-  const [promo, setPromo] = useState(DEFAULTS.promo);
+  const [promo, setPromo] = useState(initialPromoRate || DEFAULTS.promo);
   const [actualCost, setActualCost] = useState(initialCostJpy || DEFAULTS.actualCost);
   const [actualShip, setActualShip] = useState(DEFAULTS.actualShip);
   const [rate, setRate] = useState(DEFAULTS.rate);
@@ -136,7 +142,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
     setVat(DEFAULTS.vat);
     setPayoneer(DEFAULTS.payoneer);
     setIntlFee(DEFAULTS.intlFee);
-    setPromo(DEFAULTS.promo);
+    setPromo(initialPromoRate || DEFAULTS.promo);
     setActualCost(initialCostJpy || DEFAULTS.actualCost);
     setActualShip(DEFAULTS.actualShip);
     setDdpMarkup(Math.round(initialShippingUsd));
@@ -177,7 +183,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
     return () => {
       cancelled = true;
     };
-  }, [open, initialPriceUsd, initialShippingUsd, initialCostJpy]);
+  }, [open, initialPriceUsd, initialShippingUsd, initialCostJpy, initialPromoRate]);
 
   if (!open) return null;
 
@@ -230,7 +236,7 @@ export default function ProfitCalcModal({ open, title, initialPriceUsd, initialS
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
           <h2 style={{ margin: 0, fontSize: 15 }}>利益簡易計算: {title}</h2>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button type="button" onClick={() => onApply(price, ddpMarkup)} style={{ padding: "4px 10px" }}>
+            <button type="button" onClick={() => onApply(price, ddpMarkup, promo)} style={{ padding: "4px 10px" }}>
               変更値を元画面に反映する
             </button>
             <button type="button" onClick={onClose} style={{ padding: "4px 10px" }}>
