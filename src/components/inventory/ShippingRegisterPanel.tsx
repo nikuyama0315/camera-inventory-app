@@ -4,6 +4,7 @@ import {
   registerElogiShipping,
   type ShippingImportResult,
 } from "../../lib/api/cpassShipping";
+import ShippingRateLookupPanel from "./ShippingRateLookupPanel";
 
 const STATUS_LABELS: Record<ShippingImportResult["status"], string> = {
   success: "登録しました",
@@ -69,6 +70,7 @@ export default function ShippingRegisterPanel() {
 
   return (
     <div style={{ padding: "1.5rem", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+      <ShippingRateLookupPanel />
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>送料登録</h3>
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面の内容をコピーして下のテキストボックスに貼り付け、

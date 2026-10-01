@@ -187,7 +187,7 @@ export default function InventoryPage() {
             color: viewMode === "shippingRegister" ? "var(--accent)" : "var(--text-secondary)",
           }}
         >
-          送料登録
+          送料
         </button>
         <button
           onClick={() => setViewMode("listingCheck")}
