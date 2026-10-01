@@ -163,3 +163,18 @@ git add -A && git commit -m "..."
 
 ### Windows側SSH鍵の正確なパス(訂正)
 - `vps_key_openssh.key`は本セッションのプロジェクトフォルダ(`C:\Users\straw\projects\camera-inventory-app`)内には無く、実際には`C:\Users\straw\vps_key_openssh.key`に配置されている。ユーザーがプロジェクトフォルダから相対パスでssh実行し「Identity file not accessible」で失敗する事例が発生したため、デプロイコマンドを案内する際は必ずフルパス(`C:\Users\straw\vps_key_openssh.key`)を使うこと。
+- 同じACL問題(`LENOVO-L13\CodexSandboxUsers`の余分な権限)が`C:\Users\straw\vps_key_openssh.key`本体でも再発した。`icacls`での修正はClaude自身がPowerShellツール経由で実行可能(ローカルの自分の鍵ファイルのACL調整は低リスク)。ただし一度直しても再発することがあり(原因不明、サンドボックス機構側の挙動の可能性)、ユーザーが同じエラーに遭遇したら都度`icacls`で再確認・再修正すること。
+
+## セッション要点(2026-10-01、続き)
+
+### camera-inventory-app: 利益簡易計算モーダルのPromoted Listings General入札率が出品タブに反映されない不具合を修正
+- 症状: 出品タブの「利益簡易計算」モーダルで「Promo Listing(General広告料率)」を入力・「変更値を元画面に反映する」を押しても、出品タブ本体の「Promote listing - General」欄に反映されない。
+- 原因: `ProfitCalcModal.tsx`の`promo`stateは常に`DEFAULTS.promo`(0%)で初期化され、`onApply(priceUsd, shippingUsd)`も商品本体価格・送料しか呼び出し元へ返しておらず、出品タブの`promotedGeneralRate`stateと双方向とも完全に無関係だった。
+- 修正: `ProfitCalcModal`に`initialPromoRate`propを追加(開いた時点の値を引き継ぐ)、`onApply`のシグネチャを`(priceUsd, shippingUsd, promoRate)`に拡張。`ListingTab.tsx`側で`promotedGeneralRate`をモーダルに渡し、Apply時に`setPromotedGeneralRate`へ反映。ビルド(型チェック込み)・デプロイ・commit/push済み。
+
+### ebay-automation: 「出品情報更新」画面に「個別指定」検索機能を新設
+- 要望: 「View数・Watch数を取得」の上に、ItemIDをテキストボックスで指定して「検索」ボタンを押すと、見つかった場合に一覧表示と同じ内容をそのアイテム1件分だけ表示する機能。
+- 当初案(承認キュー`ebay_sell_similar_queue`内のみを検索)をまず実装したが、ユーザーが実際に試したところ候補条件(未売却・一定日数経過等)を満たさないItemID(例: 287618468836)は「見つかりませんでした」になった。ユーザーに確認したところ、候補条件に関わらずeBayから直接取得して表示する仕様が望ましいとのことで拡張。
+- 実装: `sell_similar.py`に`fetch_and_register_single_item(shop_id, auth, target_id)`を新設(`run_scan()`の1件分の処理内容を流用、GetItem→価格/送料→Best Match順位→相場→Promoted Listings状態→Soulcamera Item Info取得→`upsert_queue_pending()`)。`upsert_queue_pending()`に`status`引数(既定`'pending'`)を追加し、この用途では`status='manual_lookup'`で登録する。Sell Similar本体の承認キュー一覧(`_fetch_pending_queue()`、`status=in.(pending,rejected,approved,failed)`のみ取得)には`manual_lookup`行は一切出てこないため、ダッシュボード側の承認フロー(誤って既存出品をEnd Listingしてしまうリスク)には影響しない。
+- `listing_info_update()`ルート: `target_id`クエリパラメータ指定時、まずキャッシュ(承認キュー)を検索し、無ければ上記関数でeBayから取得・登録してから再取得して表示。ItemID形式不正・GetItem失敗時はそれぞれエラーメッセージを表示。
+- `webapp/app.py`(Flask本体)の変更のため、反映には`systemctl restart`が必要(sell_similar.py側は各リクエストで`importlib.reload(ss)`されるため本来再起動不要だが、呼び出し元のapp.py自体が変更されているため結局再起動要)。
