@@ -215,7 +215,16 @@ export default function ShippingRateLookupPanel() {
     return result;
   }, [rows, selections]);
 
-  const finalMatches = chainState.length > 0 ? chainState[chainState.length - 1].filteredRows : rows;
+  // ⚠️ 2026-10-02追加(御社要望): 該当N件リストは支払額(amount_paid_jpy)の昇順で表示する。
+  // 未登録(null)の行は末尾に回す。
+  const finalMatches = [...(chainState.length > 0 ? chainState[chainState.length - 1].filteredRows : rows)].sort(
+    (a, b) => {
+      if (a.amount_paid_jpy === null && b.amount_paid_jpy === null) return 0;
+      if (a.amount_paid_jpy === null) return 1;
+      if (b.amount_paid_jpy === null) return -1;
+      return a.amount_paid_jpy - b.amount_paid_jpy;
+    },
+  );
   const selectedCount = CHAIN_FIELDS.filter((f) => selections[f.key as string]).length;
 
   // ⚠️ 2026-10-02追加(御社要望): ブランド・機種名の2つだけ選んだ時点で、寸法1〜3・
@@ -413,10 +422,10 @@ export default function ShippingRateLookupPanel() {
                       {" "}
                       — 支払額(K列):{" "}
                       <strong style={{ fontSize: 16 }}>{formatYen(finalMatches[0].amount_paid_jpy)}</strong>
-                      {(finalMatches[0].incoterms || finalMatches[0].shipping_service) && (
+                      {(finalMatches[0].incoterms || finalMatches[0].shipping_service || finalMatches[0].package_type) && (
                         <span style={{ marginLeft: 4 }}>
                           (
-                          {[finalMatches[0].shipping_service, finalMatches[0].incoterms]
+                          {[finalMatches[0].shipping_service, finalMatches[0].package_type, finalMatches[0].incoterms]
                             .filter(Boolean)
                             .join(" / ")}
                           )
@@ -438,6 +447,7 @@ export default function ShippingRateLookupPanel() {
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>支払額(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Shipping Service</th>
+                        <th style={{ textAlign: "left", padding: "2px 8px" }}>Package Type</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Incoterms</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>配送先国</th>
                       </tr>
@@ -448,6 +458,7 @@ export default function ShippingRateLookupPanel() {
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.amount_paid_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.duty_vat_other_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{r.shipping_service || "-"}</td>
+                          <td style={{ padding: "2px 8px" }}>{r.package_type || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.incoterms || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.destination_country ?? "-"}</td>
                         </tr>
