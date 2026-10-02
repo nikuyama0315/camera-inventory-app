@@ -96,10 +96,15 @@ function EditableCell({
   field,
   value,
   onChange,
+  datalistId,
 }: {
   field: FieldDef;
   value: string | number | null;
   onChange: (v: string | number | null) => void;
+  // ⚠️ 2026-10-02追加(御社要望): 新規行追加時にテキスト列をプルダウン(候補)から
+  // 選べるようにする。<datalist>は親側で1回だけレンダリングし、ここではlist属性で
+  // 参照するだけ(行ごとにdatalistを複製してid重複になるのを避けるため)。
+  datalistId?: string;
 }) {
   if (field.type === "number") {
     return (
@@ -115,6 +120,7 @@ function EditableCell({
   return (
     <input
       type="text"
+      list={datalistId}
       value={value === null || value === undefined ? "" : String(value)}
       onChange={(e) => onChange(e.target.value)}
       style={{ width: field.key === "model" ? 66 : field.key === "brand" ? 90 : 150, fontSize: 12, padding: "2px 4px" }}
@@ -172,22 +178,37 @@ export default function ShippingRateLookupPanel() {
     setSelections({});
   }
 
-  // 各プルダウンの選択肢・現在までの絞り込み結果を計算
+  // 各プルダウンの選択肢・現在までの絞り込み結果を計算。
+  // ⚠️ 2026-10-02追加(御社要望): 絞り込み条件(ブランド・機種名等のテキスト列)は
+  // 大文字・小文字を区別しない。元データ(CPaSS実績)が"Canon"/"CANON"のように
+  // 表記ゆれしているため、区別すると同じ商品が別の選択肢として重複表示されたり、
+  // 選んだ表記と実データの表記が食い違って絞り込めなかったりする不具合があった。
+  // 選択肢は小文字キーで重複排除し(表示は最初に見つかった表記を使う)、絞り込みの
+  // 一致判定も大文字・小文字を無視して比較する(数値列は対象外)。
   const chainState = useMemo(() => {
     const result: { options: string[]; filteredRows: ShippingRateReferenceRow[] }[] = [];
     let current = rows;
     for (let i = 0; i < CHAIN_FIELDS.length; i++) {
       const field = CHAIN_FIELDS[i];
-      const optionSet = new Set<string>();
+      const isText = field.type === "text";
+      const optionMap = new Map<string, string>();
       for (const r of current) {
         const v = normalizeValue(field, r[field.key]);
-        if (v) optionSet.add(v);
+        if (!v) continue;
+        const dedupeKey = isText ? v.toLowerCase() : v;
+        if (!optionMap.has(dedupeKey)) optionMap.set(dedupeKey, v);
       }
-      const options = Array.from(optionSet).sort((a, b) =>
+      const options = Array.from(optionMap.values()).sort((a, b) =>
         field.type === "number" ? Number(a) - Number(b) : a.localeCompare(b),
       );
       const sel = selections[field.key as string] ?? "";
-      const filteredRows = sel ? current.filter((r) => normalizeValue(field, r[field.key]) === sel) : current;
+      const selKey = isText ? sel.toLowerCase() : sel;
+      const filteredRows = sel
+        ? current.filter((r) => {
+            const v = normalizeValue(field, r[field.key]);
+            return isText ? v.toLowerCase() === selKey : v === sel;
+          })
+        : current;
       result.push({ options, filteredRows });
       current = filteredRows;
     }
@@ -197,6 +218,29 @@ export default function ShippingRateLookupPanel() {
   const finalMatches = chainState.length > 0 ? chainState[chainState.length - 1].filteredRows : rows;
   const selectedCount = CHAIN_FIELDS.filter((f) => selections[f.key as string]).length;
 
+  // ⚠️ 2026-10-02追加(御社要望): ブランド・機種名の2つだけ選んだ時点で、寸法1〜3・
+  // 重量を「該当N件」の結果より上に表示する(Shipping Service等を選ばなくても
+  // 荷姿の目安が分かるように)。brand・modelの2段階まで絞り込んだ時点のchainState
+  // (index 1)を使う。同じブランド・機種名でも寸法/重量の組み合わせが複数ある場合は
+  // 重複排除してすべて列挙する。
+  const brandModelSelected = Boolean(selections["brand"] && selections["model"]);
+  const brandModelRows = brandModelSelected ? (chainState[1]?.filteredRows ?? []) : [];
+  const dimensionWeightCombos: { d1: number | null; d2: number | null; d3: number | null; w: number | null }[] = [];
+  if (brandModelSelected) {
+    const seen = new Set<string>();
+    for (const r of brandModelRows) {
+      const key = `${r.dimension_1_cm}|${r.dimension_2_cm}|${r.dimension_3_cm}|${r.chargeable_weight_kg}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dimensionWeightCombos.push({
+        d1: r.dimension_1_cm,
+        d2: r.dimension_2_cm,
+        d3: r.dimension_3_cm,
+        w: r.chargeable_weight_kg,
+      });
+    }
+  }
+
   const filteredTableRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return rows;
@@ -204,6 +248,30 @@ export default function ShippingRateLookupPanel() {
       (r) => r.brand.toLowerCase().includes(term) || r.model.toLowerCase().includes(term),
     );
   }, [rows, search]);
+
+  // ⚠️ 2026-10-02追加(御社要望): 新規行追加・編集時、テキスト列は既存データの値を
+  // プルダウン(<datalist>、自由入力も可能)で候補表示する。大文字・小文字は区別せず
+  // 重複排除する(早見表の絞り込みと同じ方針)。
+  const fieldCandidates = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const f of ALL_FIELDS) {
+      if (f.type !== "text") continue;
+      const seen = new Map<string, string>();
+      for (const r of rows) {
+        const v = normalizeValue(f, r[f.key]);
+        if (!v) continue;
+        const dedupeKey = v.toLowerCase();
+        if (!seen.has(dedupeKey)) seen.set(dedupeKey, v);
+      }
+      map.set(String(f.key), Array.from(seen.values()).sort((a, b) => a.localeCompare(b)));
+    }
+    return map;
+  }, [rows]);
+
+  function datalistIdFor(key: keyof ShippingRateReferenceInput): string | undefined {
+    const candidates = fieldCandidates.get(String(key));
+    return candidates && candidates.length > 0 ? `shipping-rate-dl-${String(key)}` : undefined;
+  }
 
   function startEdit(row: ShippingRateReferenceRow) {
     setEditingId(row.id);
@@ -304,6 +372,21 @@ export default function ShippingRateLookupPanel() {
               リセット
             </button>
           </div>
+
+          {brandModelSelected && (
+            <div style={{ marginBottom: 8, fontSize: 13 }}>
+              寸法1×2×3(cm) / 重量(kg):{" "}
+              {dimensionWeightCombos.length === 0 ? (
+                <span style={{ color: "var(--text-muted)" }}>-</span>
+              ) : (
+                dimensionWeightCombos.map((c, i) => (
+                  <span key={i} style={{ marginRight: 16 }}>
+                    {c.d1 ?? "-"}×{c.d2 ?? "-"}×{c.d3 ?? "-"} / {c.w ?? "-"}kg
+                  </span>
+                ))
+              )}
+            </div>
+          )}
 
           <div
             style={{
@@ -407,6 +490,18 @@ export default function ShippingRateLookupPanel() {
             )}
           </div>
 
+          {ALL_FIELDS.filter((f) => f.type === "text").map((f) => {
+            const candidates = fieldCandidates.get(String(f.key)) ?? [];
+            if (candidates.length === 0) return null;
+            return (
+              <datalist key={String(f.key)} id={`shipping-rate-dl-${String(f.key)}`}>
+                {candidates.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            );
+          })}
+
           <div style={{ maxHeight: 420, overflow: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
             <table style={{ fontSize: 12, borderCollapse: "collapse", width: "max-content" }}>
               <thead style={{ position: "sticky", top: 0, background: "var(--surface-1)", zIndex: 1 }}>
@@ -428,6 +523,7 @@ export default function ShippingRateLookupPanel() {
                           field={f}
                           value={newDraft[f.key] as string | number | null}
                           onChange={(v) => setNewDraft((prev) => ({ ...prev, [f.key]: v }))}
+                          datalistId={datalistIdFor(f.key)}
                         />
                       </td>
                     ))}
@@ -445,6 +541,7 @@ export default function ShippingRateLookupPanel() {
                               field={f}
                               value={editDraft[f.key] as string | number | null}
                               onChange={(v) => setEditDraft((prev) => ({ ...prev, [f.key]: v }))}
+                              datalistId={datalistIdFor(f.key)}
                             />
                           ) : f.type === "number" ? (
                             (row[f.key] as number | null) ?? "-"
