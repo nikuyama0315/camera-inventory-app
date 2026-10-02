@@ -409,6 +409,9 @@ export default function ShippingRateLookupPanel() {
                       {" "}
                       — 支払額(K列):{" "}
                       <strong style={{ fontSize: 16 }}>{formatYen(finalMatches[0].amount_paid_jpy)}</strong>
+                      {finalMatches[0].incoterms && (
+                        <span style={{ marginLeft: 4 }}>({finalMatches[0].incoterms})</span>
+                      )}
                       {finalMatches[0].duty_vat_other_jpy ? (
                         <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
                           (うち関税VAT等: {formatYen(finalMatches[0].duty_vat_other_jpy)})
@@ -423,6 +426,7 @@ export default function ShippingRateLookupPanel() {
                       <tr>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>支払額(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
+                        <th style={{ textAlign: "left", padding: "2px 8px" }}>Incoterms</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>配送先国</th>
                       </tr>
                     </thead>
@@ -431,6 +435,7 @@ export default function ShippingRateLookupPanel() {
                         <tr key={r.id}>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.amount_paid_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.duty_vat_other_jpy)}</td>
+                          <td style={{ padding: "2px 8px" }}>{r.incoterms || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.destination_country ?? "-"}</td>
                         </tr>
                       ))}
