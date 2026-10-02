@@ -27,6 +27,7 @@ import {
   upsertListingDraft,
 } from "../../../lib/api/listingDraft";
 import ProfitCalcModal from "./ProfitCalcModal";
+import { generateSoulcameraItemInfo } from "../../../lib/descriptionGenerator";
 
 interface Props {
   item: ItemDetail;
@@ -114,6 +115,9 @@ export default function ListingTab({ item, onChanged }: Props) {
 
   const [itemTitle, setItemTitle] = useState("");
   const [customLabel, setCustomLabel] = useState("");
+  // 2026-10-03追加(ユーザー指示): Item Specificsに「Soulcamera Item Info」が無い場合の追加ボタン用。
+  // 検品タブの「生成データ保存」で下書きに保存済みの値(Custom labelの既定値と同じもの)。
+  const [savedSoulcameraItemInfo, setSavedSoulcameraItemInfo] = useState("");
   const [ebayCategory, setEbayCategory] = useState<string>(LISTING_EBAY_CATEGORY_DEFAULT);
   const [storeCategory, setStoreCategory] = useState<string>(LISTING_STORE_CATEGORY_DEFAULT);
   const [itemSpecificsPairs, setItemSpecificsPairs] = useState<SpecificPair[]>([]);
@@ -159,6 +163,20 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const purchasePriceJpy = item.purchases?.[0]?.purchase_price ?? 0;
 
+  // 2026-10-03追加(ユーザー指示): 表示中のItem Specificsに「Soulcamera Item Info」が無い場合、
+  // その項目を追加する。値は下書き保存済みの値を優先し、無ければ「管理番号 今日の日付 仕入高」で生成。
+  const hasSoulcameraSpecific = itemSpecificsPairs.some(
+    (p) => p.name.trim().toLowerCase() === "soulcamera item info",
+  );
+  const soulcameraItemInfoToAdd = savedSoulcameraItemInfo || generateSoulcameraItemInfo(item);
+
+  function handleAddSoulcameraItemInfo() {
+    setItemSpecificsPairs((prev) => {
+      if (prev.some((p) => p.name.trim().toLowerCase() === "soulcamera item info")) return prev;
+      return [...prev, { name: "Soulcamera Item Info", value: soulcameraItemInfoToAdd }];
+    });
+  }
+
   function handleApplyProfitCalc(priceUsd: number, shippingUsd: number, promoRate: number) {
     setItemPrice(priceUsd.toFixed(2));
     setShippingPolicy(nearestShippingPolicy(shippingUsd, shippingPolicyOptions));
@@ -175,6 +193,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         if (cancelled) return;
         setItemTitle(draft?.item_title || item.item_title || "");
         setCustomLabel(draft?.custom_label || draft?.soulcamera_item_info || "");
+        setSavedSoulcameraItemInfo(draft?.soulcamera_item_info || "");
         setEbayCategory(draft?.ebay_category || LISTING_EBAY_CATEGORY_DEFAULT);
         setStoreCategory(draft?.store_category || LISTING_STORE_CATEGORY_DEFAULT);
         setItemSpecificsPairs(parseSpecificsText(draft?.item_specifics_text || ""));
@@ -717,6 +736,23 @@ export default function ListingTab({ item, onChanged }: Props) {
                 />
               </label>
             ))}
+          </div>
+        )}
+        {!hasSoulcameraSpecific && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "var(--danger-text)", fontWeight: 600 }}>
+              「Soulcamera Item Info」が未設定です
+            </span>
+            <button
+              type="button"
+              onClick={handleAddSoulcameraItemInfo}
+              style={{ width: "fit-content", flexShrink: 0, fontSize: 12, padding: "2px 10px" }}
+            >
+              Soulcamera Item Infoを追加
+            </button>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              追加される値: {soulcameraItemInfoToAdd}
+            </span>
           </div>
         )}
       </section>
