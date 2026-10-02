@@ -375,13 +375,17 @@ export default function ShippingRateLookupPanel() {
 
           {brandModelSelected && (
             <div style={{ marginBottom: 8, fontSize: 13 }}>
-              寸法1×2×3(cm) / 重量(kg):{" "}
+              <strong>寸法1×2×3(cm) / 重量(kg):</strong>{" "}
               {dimensionWeightCombos.length === 0 ? (
                 <span style={{ color: "var(--text-muted)" }}>-</span>
               ) : (
                 dimensionWeightCombos.map((c, i) => (
                   <span key={i} style={{ marginRight: 16 }}>
-                    {c.d1 ?? "-"}×{c.d2 ?? "-"}×{c.d3 ?? "-"} / {c.w ?? "-"}kg
+                    <span style={{ color: "var(--accent)" }}>
+                      {c.d1 ?? "-"}×{c.d2 ?? "-"}×{c.d3 ?? "-"}
+                    </span>
+                    {" / "}
+                    <span style={{ color: "var(--danger-text)" }}>{c.w ?? "-"}kg</span>
                   </span>
                 ))
               )}
