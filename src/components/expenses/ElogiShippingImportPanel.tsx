@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ShippingReconcileSection from "./ShippingReconcileSection";
 import { parseCsv } from "../../lib/api/expenseBackupRestore";
 import {
   buildElogiRawRows,
@@ -194,6 +195,8 @@ export default function ElogiShippingImportPanel({ onDataChanged }: ElogiShippin
           </button>
 
           {error && <p style={{ fontSize: 12, color: "var(--danger-text)", marginBottom: 10 }}>{error}</p>}
+
+          <ShippingReconcileSection source="elogi" file={file} />
 
           {summary && (
             <div

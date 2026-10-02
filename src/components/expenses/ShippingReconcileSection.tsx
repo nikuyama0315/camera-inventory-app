@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchSalesForReconcile,
   overwriteShippingWithBilled,
@@ -40,23 +40,27 @@ function signedYen(n: number): string {
   return `${n > 0 ? "+" : n < 0 ? "-" : ""}¥${Math.abs(n).toLocaleString()}`;
 }
 
+interface ShippingReconcileSectionProps {
+  source: ReconcileSource;
+  /** 親パネル(CPaSS請求明細取込・eLogi送料CSV取込)で選択中の請求明細ファイル。選択された時点で自動的に照合する */
+  file: File | null;
+}
+
 /**
- * 「送料支払額の請求明細との照合」パネル(送料タブ、2026-10-03新規・ユーザー指示)。
- * CPaSS請求明細(.xlsx/.csv、追跡番号で突合)・eLogi発送済一覧CSV(eBayオーダー番号で突合)を
- * 取り込んだ時点で自動的に照合し、登録済みの送料支払額(sales.shipping_cost_paid)との相違一覧を表示する。
+ * 「送料支払額との照合」セクション(2026-10-03新規・ユーザー指示)。レポート取込タブの
+ * 「eLogi送料CSV取込」「CPaSS請求明細取込」の各パネル内に埋め込まれ、親パネルで選択された請求明細
+ * ファイルを取り込んだ(選択した)時点で自動的に照合し、登録済みの送料支払額(sales.shipping_cost_paid)との
+ * 相違一覧を表示する。CPaSSは請求明細(.xlsx/.csv)を追跡番号で、eLogiは発送済一覧CSVをeBayオーダー番号で突合する。
  * 相違行にチェックを付けて「請求額で上書き」を押すと、請求額を正として登録額を更新する。
  * 初期状態でチェックが付くのは「請求のほうが多い」行のみ(「登録のほうが多い」行は関税・VAT等を含む
  * 可能性があるため、利用者が明示的にチェックした場合のみ上書きする)。
+ * このセクションは親パネルの経費取込(ドライラン・取込実行)とは独立しており、経費データには影響しない。
  */
-export default function ShippingReconcilePanel() {
-  const cpassInputRef = useRef<HTMLInputElement>(null);
-  const elogiInputRef = useRef<HTMLInputElement>(null);
-
+export default function ShippingReconcileSection({ source, file }: ShippingReconcileSectionProps) {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [report, setReport] = useState<ReconcileReport | null>(null);
   const [records, setRecords] = useState<BilledRecord[]>([]);
-  const [fileName, setFileName] = useState("");
   const [periodText, setPeriodText] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | ReconcileCategory>("all");
@@ -68,38 +72,45 @@ export default function ShippingReconcilePanel() {
     setFilter("all");
   }
 
-  async function handleFile(source: ReconcileSource, e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setBusy(true);
+  // ファイルが選択(変更)された時点で自動的に照合する
+  useEffect(() => {
+    setReport(null);
     setErrorMessage(null);
     setOverwriteMessage(null);
-    setReport(null);
-    try {
-      let parsed: BilledRecord[];
-      let period: string | null = null;
-      if (source === "cpass") {
-        const r = await parseCpassInvoiceFile(file);
-        parsed = r.records;
-        if (r.periodFrom && r.periodTo) period = `請求期間 ${r.periodFrom} 〜 ${r.periodTo}`;
-      } else {
-        parsed = parseElogiBilledRecords(decodeCsvBytes(await file.arrayBuffer()));
+    setPeriodText(null);
+    if (!file) return;
+
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      try {
+        let parsed: BilledRecord[];
+        let period: string | null = null;
+        if (source === "cpass") {
+          const r = await parseCpassInvoiceFile(file);
+          parsed = r.records;
+          if (r.periodFrom && r.periodTo) period = `請求期間 ${r.periodFrom} 〜 ${r.periodTo}`;
+        } else {
+          parsed = parseElogiBilledRecords(decodeCsvBytes(await file.arrayBuffer()));
+        }
+        if (parsed.length === 0) {
+          throw new Error("照合できるデータが見つかりませんでした。ファイルの内容をご確認ください");
+        }
+        const sales = await fetchSalesForReconcile();
+        if (cancelled) return;
+        setRecords(parsed);
+        setPeriodText(period);
+        applyReport(reconcile(source, parsed, sales));
+      } catch (err) {
+        if (!cancelled) setErrorMessage(err instanceof Error ? err.message : "照合に失敗しました");
+      } finally {
+        if (!cancelled) setBusy(false);
       }
-      if (parsed.length === 0) {
-        throw new Error("照合できるデータが見つかりませんでした。ファイルの内容をご確認ください");
-      }
-      const sales = await fetchSalesForReconcile();
-      setRecords(parsed);
-      setFileName(`${SOURCE_LABELS[source]}: ${file.name}`);
-      setPeriodText(period);
-      applyReport(reconcile(source, parsed, sales));
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "取り込みに失敗しました");
-    } finally {
-      setBusy(false);
-    }
-  }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [file, source]);
 
   const visibleRows = useMemo(
     () => (report ? report.rows.filter((r) => filter === "all" || r.category === filter) : []),
@@ -169,49 +180,24 @@ export default function ShippingReconcilePanel() {
     }
   }
 
-  return (
-    <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--border)" }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>請求明細との照合(送料支払額)</h3>
-      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
-        運送会社の請求明細を取り込むと、その場で登録済みの送料支払額と照合し、相違の一覧を表示します。
-        CPaSSは請求明細(.xlsx/.csv)を追跡番号で、eLogiは発送済一覧CSVをeBayオーダー番号で突合します。
-        相違する行は、チェックして「請求額で上書き」を押すと、請求額を正として登録額を更新します。
-        初期状態でチェックが付くのは「請求のほうが多い」行のみです。
-      </p>
+  if (!file) return null;
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <input
-          ref={cpassInputRef}
-          type="file"
-          accept=".xlsx,.csv"
-          onChange={(e) => void handleFile("cpass", e)}
-          style={{ display: "none" }}
-        />
-        <input
-          ref={elogiInputRef}
-          type="file"
-          accept=".csv"
-          onChange={(e) => void handleFile("elogi", e)}
-          style={{ display: "none" }}
-        />
-        <button onClick={() => cpassInputRef.current?.click()} disabled={busy} style={{ fontSize: 12, padding: "4px 12px" }}>
-          CPaSS請求明細を取り込んで照合(.xlsx/.csv)
-        </button>
-        <button onClick={() => elogiInputRef.current?.click()} disabled={busy} style={{ fontSize: 12, padding: "4px 12px" }}>
-          eLogi発送済一覧CSVを取り込んで照合
-        </button>
-        {busy && <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>処理中...</span>}
-      </div>
+  return (
+    <div style={{ marginBottom: 12, padding: "10px 12px", border: "0.5px solid var(--border)", borderRadius: 8 }}>
+      <p style={{ fontSize: 13, fontWeight: 700, margin: "0 0 4px" }}>送料支払額との照合</p>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
+        選択したファイルを、登録済みの送料支払額(売上)と{source === "cpass" ? "追跡番号" : "eBayオーダー番号"}で自動的に照合します。
+        相違する行は、チェックして「請求額で上書き」を押すと、請求額を正として登録額を更新します
+        (初期状態でチェックが付くのは「請求のほうが多い」行のみ。経費の取込とは独立しており、取込実行には影響しません)。
+        {busy && <span style={{ marginLeft: 8 }}>照合中...</span>}
+      </p>
 
       {errorMessage && <p style={{ color: "var(--danger-text)", fontSize: 13, marginTop: 8 }}>{errorMessage}</p>}
       {overwriteMessage && <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 8 }}>{overwriteMessage}</p>}
 
       {report && (
         <div style={{ marginTop: 12 }}>
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 6px" }}>
-            {fileName}
-            {periodText ? `(${periodText})` : ""}
-          </p>
+          {periodText && <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 6px" }}>{periodText}</p>}
           <p style={{ fontSize: 13, margin: "0 0 8px" }}>
             請求{report.recordCount}件のうち、金額も一致 <strong>{report.equalCount}</strong>件 / 相違{" "}
             <strong>{report.rows.length}</strong>件(請求のほうが多い {counts.under} / 登録のほうが多い {counts.over} /
