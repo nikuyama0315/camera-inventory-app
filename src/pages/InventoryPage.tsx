@@ -29,7 +29,11 @@ interface InventoryPageProps {
 // 「一覧表示」モードでは、売上・粗利タブと同様の全幅テーブルで絞り込み結果を確認できる。
 export default function InventoryPage({ initialFilters, onInitialFiltersConsumed }: InventoryPageProps = {}) {
   const [items, setItems] = useState<ItemWithPurchase[]>([]);
-  const [filters, setFilters] = useState<ItemListFilters>({});
+  // 2026-10-02修正: initialFiltersが指定されている場合、マウント時点から適用した状態で
+  // 初期化する(useEffectで後から適用すると、マウント直後に走るフィルタ無しの取得と
+  // フィルタ適用後の取得が非同期で競合し、フィルタ無しの結果が後から返って上書きしてしまう
+  // レースコンディションがあったため)。
+  const [filters, setFilters] = useState<ItemListFilters>(() => initialFilters ?? {});
   const [sort, setSort] = useState<ItemSortOption>("created_desc");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);

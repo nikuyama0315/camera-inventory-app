@@ -364,6 +364,7 @@ export default function StockAlertsPage({ onNavigateToInventoryWithFilter }: Sto
         onViewInInventory={() => onNavigateToInventoryWithFilter?.({ status: "awaiting_arrival" })}
       />
 
+      <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>在庫アラート</h3>
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 4 }}>
         在庫数は、Google Driveの「@撮影済み・出品待ち」フォルダ配下にある機種名フォルダの中に、実際にいくつフォルダ(商品ごとの個別フォルダ)があるかをGoogle Drive APIで数えた実数です。下の「Google Driveから最新の在庫数を取得」ボタンで再取得できます。
       </p>
