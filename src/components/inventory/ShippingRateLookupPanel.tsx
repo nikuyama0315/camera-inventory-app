@@ -432,6 +432,11 @@ export default function ShippingRateLookupPanel() {
                       <span style={{ marginLeft: 8, color: "var(--text-muted)" }}>
                         実質送料(円): {formatYen(netShippingYen(finalMatches[0].amount_paid_jpy, finalMatches[0].duty_vat_other_jpy))}
                       </span>
+                      {finalMatches[0].duty_vat_other_jpy ? (
+                        <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
+                          (うち関税VAT等: {formatYen(finalMatches[0].duty_vat_other_jpy)})
+                        </span>
+                      ) : null}
                       <span style={{ marginLeft: 8, color: "var(--text-muted)" }}>
                         寸法1×2×3(cm): {finalMatches[0].dimension_1_cm ?? "-"}×{finalMatches[0].dimension_2_cm ?? "-"}×
                         {finalMatches[0].dimension_3_cm ?? "-"} / 重量(kg): {finalMatches[0].chargeable_weight_kg ?? "-"}
@@ -445,11 +450,6 @@ export default function ShippingRateLookupPanel() {
                           )
                         </span>
                       )}
-                      {finalMatches[0].duty_vat_other_jpy ? (
-                        <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
-                          (うち関税VAT等: {formatYen(finalMatches[0].duty_vat_other_jpy)})
-                        </span>
-                      ) : null}
                     </>
                   )}
                 </div>
@@ -460,9 +460,9 @@ export default function ShippingRateLookupPanel() {
                       <tr>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>支払額(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>実質送料(円)</th>
+                        <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>寸法1×2×3(cm)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>重量(kg)</th>
-                        <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Shipping Service</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Package Type</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Incoterms</th>
@@ -474,11 +474,11 @@ export default function ShippingRateLookupPanel() {
                         <tr key={r.id}>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.amount_paid_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{formatYen(netShippingYen(r.amount_paid_jpy, r.duty_vat_other_jpy))}</td>
+                          <td style={{ padding: "2px 8px" }}>{formatYen(r.duty_vat_other_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>
                             {r.dimension_1_cm ?? "-"}×{r.dimension_2_cm ?? "-"}×{r.dimension_3_cm ?? "-"}
                           </td>
                           <td style={{ padding: "2px 8px" }}>{r.chargeable_weight_kg ?? "-"}</td>
-                          <td style={{ padding: "2px 8px" }}>{formatYen(r.duty_vat_other_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{r.shipping_service || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.package_type || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.incoterms || "-"}</td>
