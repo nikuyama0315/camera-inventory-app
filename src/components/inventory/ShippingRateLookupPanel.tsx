@@ -340,6 +340,13 @@ export default function ShippingRateLookupPanel() {
     return `¥${v.toLocaleString()}`;
   }
 
+  // ⚠️ 2026-10-02追加(御社要望): 実質送料(円) = 支払額 - 関税VAT等。
+  // 支払額が未登録ならnull(表示は"-")、関税VAT等が未登録なら0として扱う。
+  function netShippingYen(amountPaidJpy: number | null, dutyVatJpy: number | null): number | null {
+    if (amountPaidJpy === null || amountPaidJpy === undefined) return null;
+    return amountPaidJpy - (dutyVatJpy ?? 0);
+  }
+
   return (
     <div style={{ marginBottom: 32, paddingBottom: 24, borderBottom: "1px solid var(--border)" }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>送料設定早見表</h3>
@@ -422,6 +429,9 @@ export default function ShippingRateLookupPanel() {
                       {" "}
                       — 支払額(K列):{" "}
                       <strong style={{ fontSize: 16 }}>{formatYen(finalMatches[0].amount_paid_jpy)}</strong>
+                      <span style={{ marginLeft: 8, color: "var(--text-muted)" }}>
+                        実質送料(円): {formatYen(netShippingYen(finalMatches[0].amount_paid_jpy, finalMatches[0].duty_vat_other_jpy))}
+                      </span>
                       {(finalMatches[0].incoterms || finalMatches[0].shipping_service || finalMatches[0].package_type) && (
                         <span style={{ marginLeft: 4 }}>
                           (
@@ -445,6 +455,7 @@ export default function ShippingRateLookupPanel() {
                     <thead style={{ position: "sticky", top: 0, background: "var(--surface-2)" }}>
                       <tr>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>支払額(円)</th>
+                        <th style={{ textAlign: "left", padding: "2px 8px" }}>実質送料(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Shipping Service</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>Package Type</th>
@@ -456,6 +467,7 @@ export default function ShippingRateLookupPanel() {
                       {finalMatches.map((r) => (
                         <tr key={r.id}>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.amount_paid_jpy)}</td>
+                          <td style={{ padding: "2px 8px" }}>{formatYen(netShippingYen(r.amount_paid_jpy, r.duty_vat_other_jpy))}</td>
                           <td style={{ padding: "2px 8px" }}>{formatYen(r.duty_vat_other_jpy)}</td>
                           <td style={{ padding: "2px 8px" }}>{r.shipping_service || "-"}</td>
                           <td style={{ padding: "2px 8px" }}>{r.package_type || "-"}</td>
