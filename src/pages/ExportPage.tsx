@@ -10,6 +10,7 @@ import {
 import { fetchMonthlyExchangeRates, upsertMonthlyExchangeRate } from "../lib/api/exchangeRates";
 import { fetchLatestMufgTtm } from "../lib/api/mufgRate";
 import DirectSalesCsvPanel from "../components/csvExport/DirectSalesCsvPanel";
+import EbayXlsxFillPanel from "../components/sales/EbayXlsxFillPanel";
 import FreeeTemplatePanel from "../components/csvExport/FreeeTemplatePanel";
 
 /** "YYYY-MM" を delta ヶ月分シフトした "YYYY-MM" を返す(delta=-1で前月)。 */
@@ -162,7 +163,12 @@ export default function ExportPage() {
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "1.5rem", paddingBottom: "3rem", boxSizing: "border-box" }}>
-      <DirectSalesCsvPanel />
+      {/* 2026-10-03(ユーザー指示): 「利益管理票更新用データの作成」を売上画面からこの画面へ移動し、
+          「直販プラットフォーム登録用CSV作成」と2段横並びにする(左: 利益管理票、右: 直販PF CSV) */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+        <EbayXlsxFillPanel />
+        <DirectSalesCsvPanel />
+      </div>
 
       <hr style={{ margin: "8px 0 24px", border: "none", borderTop: "1px solid var(--border)" }} />
 

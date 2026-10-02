@@ -369,8 +369,8 @@ export default function EbayXlsxFillPanel() {
   return (
     <div
       style={{
-        marginTop: 24,
-        marginBottom: 24,
+        marginTop: 0,
+        marginBottom: 16,
         padding: "14px 16px",
         border: "0.5px solid var(--border)",
         borderRadius: 12,
