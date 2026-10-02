@@ -19,7 +19,10 @@ cp -r dist/* /var/www/camera-inventory/
 md5sum dist/assets/index-*.js /var/www/camera-inventory/assets/index-*.js  # 一致確認
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/  # 200確認(ポート8080必須)
 git add -A && git commit -m "..."
+git push origin master   # GitHubリモート: github-camera-inventory:nikuyama0315/camera-inventory-app.git
 ```
+
+**2026-09-20よりユーザーの指示で、コミット・GitHubへのpushまで含めて毎回Claudeが実行する運用に変更。** ただし`/var/www/camera-inventory/`へのコピー(本番反映)は環境側の自動モード分類器が「Production Deploy」として一律ブロックするため、Claudeからは実行不可。ビルドまで済ませた上でユーザーに手元のSSH(鍵: ローカルWindows機の`vps_key_openssh.key`、ユーザー`ubuntu`、ホスト`133.18.147.130`)からデプロイコマンドを実行してもらい、200確認後にClaudeがcommit・pushする、という分担で進めること。
 
 ## 重要な注意点
 
@@ -178,3 +181,84 @@ git add -A && git commit -m "..."
 - 実装: `sell_similar.py`に`fetch_and_register_single_item(shop_id, auth, target_id)`を新設(`run_scan()`の1件分の処理内容を流用、GetItem→価格/送料→Best Match順位→相場→Promoted Listings状態→Soulcamera Item Info取得→`upsert_queue_pending()`)。`upsert_queue_pending()`に`status`引数(既定`'pending'`)を追加し、この用途では`status='manual_lookup'`で登録する。Sell Similar本体の承認キュー一覧(`_fetch_pending_queue()`、`status=in.(pending,rejected,approved,failed)`のみ取得)には`manual_lookup`行は一切出てこないため、ダッシュボード側の承認フロー(誤って既存出品をEnd Listingしてしまうリスク)には影響しない。
 - `listing_info_update()`ルート: `target_id`クエリパラメータ指定時、まずキャッシュ(承認キュー)を検索し、無ければ上記関数でeBayから取得・登録してから再取得して表示。ItemID形式不正・GetItem失敗時はそれぞれエラーメッセージを表示。
 - `webapp/app.py`(Flask本体)の変更のため、反映には`systemctl restart`が必要(sell_similar.py側は各リクエストで`importlib.reload(ss)`されるため本来再起動不要だが、呼び出し元のapp.py自体が変更されているため結局再起動要)。
+
+## セッション要点(2026-10-01〜10-02、続き)
+
+### camera-inventory-app: 「送料設定早見表」機能を新設
+- 「送料登録」タブを「送料」に改名。タブ内の送料登録UI(CPaSS/eLogi取込)の**上**に新セクション「送料設定早見表」を追加。
+- ユーザー提供のエクセル(CPaSS実績242行、列: ブランド・機種名・Shipping Service・Service Type・Incoterms・Package Type・寸法1〜3・重量・支払額(JPY)・関税VAT等・配送先国・Ship to)をSupabaseの新規テーブル`shipping_rate_reference`に全件登録(RLSは他テーブルと同じ「authenticated users full access」パターン)。
+- ブランド→機種名→…→重量まで10項目を順にプルダウンで絞り込み、支払額(K列)にたどり着く「早見表」UIと、同データを画面上で行ごとに追加・編集・削除できる「データの追加・編集」(折りたたみ)UIの両方を実装(`ShippingRateLookupPanel.tsx`/`shippingRateReference.ts`)。追加・編集インタフェースは、早見表機能実装後にユーザーから改めて要望されたもの。
+- ユーザー要望で列幅を複数回調整: 機種名列は表示側max-width(ellipsis+ホバーで全文)・編集入力欄幅・早見表プルダウン幅すべてを段階的に縮小(最終的に初期値の60%)。長い機種名でテーブル全体が画面からはみ出す問題への対応。
+
+### camera-inventory-app: 「入荷アラート」機能を新設
+- メニュー名「在庫アラート」→「入荷・在庫アラート」に変更。既存の在庫アラート表示の上に「入荷アラート」セクションを新設(`ArrivalAlertPanel.tsx`)。
+- ステータス「入荷待ち」(`awaiting_arrival`)で、アイテム登録日(`items.created_at`)からn日以上経過している商品を、アカウント・管理番号・仕入品名(`items.title`)・仕入先/出品者名(`purchases.source_name`)・購入元URL(「購入サイトでみる」ボタン、`purchases.source_url`)・仕入高(`purchases.purchase_price`)・経過日数で一覧表示。該当件数がある場合は赤枠バナーで警告。
+- n日のしきい値はテキストボックス+「設定」ボタンで変更可能(初期値5、新規テーブル`arrival_alert_settings`の単一行に保存、`purchase_memo`と同じ単一行upsertパターン)。
+- 「仕入・在庫・販売画面で見る」ボタンで、詳細編集タブをステータス=入荷待ちで絞り込んだ状態に遷移する機能を新設。**このアプリにはReact Routerが入っておらず**、タブ切替は`App.tsx`のローカルstateのみで行っているため、ページ間でのプリセットフィルタの受け渡しは前例が無かった。`App.tsx`に`pendingInventoryFilters` stateを新設し、`StockAlertsPage`→`App.tsx`→`InventoryPage`(新規props `initialFilters`/`onInitialFiltersConsumed`)という形で親経由で受け渡す設計にした。
+- **修正済みの不具合**: 上記遷移直後、`filters` stateを`useEffect`内で事後的に`setFilters(initialFilters)`していたため、マウント直後に走る「フィルタ無し(全件)」の初回取得と、フィルタ適用後の取得が非同期で競合し、全件取得のレスポンスが後から返ってきて絞り込み結果を上書きしてしまうレースコンディションがあった(画面上は絞り込みドロップダウンは「入荷待ち」のままなのに一覧は全件表示、という不具合として現れた)。`useState`のlazy initializerで`initialFilters`をマウント時点から直接適用するよう修正して解消。
+- 「在庫アラート」セクション自体にも見出し(`<h3>在庫アラート</h3>`)を追加(入荷アラートと2セクション構成になったため)。
+
+### ebay-automation: Send Offer関連の機能追加・不具合修正(ユーザーから直接名指しで依頼された例外対応)
+- ダッシュボードの「Send Offer is valid」表示の下に、送信から96時間後の期限までの残り時間を「残り H:MM:SS」形式で1秒ごとに更新表示するカウントダウンを追加(`send_offer_deadline_iso`をサーバー側で計算しテンプレートに渡し、クライアント側JSの`setInterval`で表示を更新)。
+- **「終了品バックアップ」の警告は誤検知ではなく正確だった事案**: ユーザーから「ItemID 287612025268は終了済みだが新規出品の公開に失敗(400 Bad Request)」という警告について「新規出品できているのでは?」と質問を受け調査。実際には該当オファー(`287893100011`)は`UNPUBLISHED`のまま一度も公開されておらず、約23時間出品ゼロの状態だった(その後、別の後発の再出品サイクルで別のオファー経由で復旧)。eBayが返した実際のエラー本文は、例外の`str(e)`(400のステータス行のみ)しかログに残しておらず、`do_action_v2()`内で`e.response.text`を取得していなかったため、根本原因(どのAspect不足で400になったか等)は事後的に特定不能だった。
+- **Send Offerの重大な価格計算バグを発見・修正**: ユーザーが実際にオファー送信に失敗した際のエラー「Price must be at least 5.0% less than your Buy It Now price.」を報告。調査の結果、割引後価格の計算(`webapp/app.py`の`send_offer_send()`)が`round()`(最近接丸め)を使っていたため、価格の端数次第で「5%以上値引き」という閾値をわずかに超えて切り上がってしまうケースが、$20.00〜$1000.00の全価格帯で検証した結果**約46%の確率**で発生していたと判明(コイントスに近い確率で、商品の現在価格の端数次第で毎回起こり得るバグだった)。`Decimal`+`ROUND_DOWN`(必ず切り捨て)に変更し、98,000通りの価格で検証して失敗ゼロを確認。`send_offers.html`側のJSプレビュー(`soRenderPrice()`/`soComputeEstimate()`)も同じロジック(`Math.floor(v*100+1e-7)/100`)に統一し、画面表示と実際の送信価格が常に一致するよう修正。副次的に、失敗時のフラッシュメッセージに対象商品名を含めるよう改善(複数カード表示時にどの商品の失敗か分かるように)。
+
+## セッション要点(2026-10-02〜10-03)
+
+### インフラ: `biz.soulmen.net`をHTTPS化(Caddy + Let's Encrypt無料証明書)
+- 経緯: `133.18.147.130`(KAGOYA VPS)にドメイン`biz.soulmen.net`を設定済み(DNS解決済み)。plain HTTPの`:8080`アクセスを、無料証明書付きのHTTPSにしたいという依頼。
+- 構成: `Caddy(:443、TLS終端) → 127.0.0.1:8080(既存nginx、camera-inventory-app+/marketing/、無変更)`。ufwに`443/tcp`を追加、Caddyはaptで導入(Ubuntu 24.04標準の2.6.2)。
+- **port 80はnginxの`default_server`(無関係の別サイト、`server_name _`)が既に使用中のため、Caddyにはport 80を一切触らせない設計にした**。`/etc/caddy/Caddyfile`:
+  ```
+  {
+      email shopmaster@soulmen.net
+      auto_https disable_redirects
+  }
+  biz.soulmen.net {
+      tls {
+          issuer acme {
+              disable_http_challenge
+          }
+      }
+      reverse_proxy 127.0.0.1:8080
+  }
+  ```
+  `disable_http_challenge`でHTTP-01(port 80必須)を無効にしてTLS-ALPN-01(port 443のみで完結)に絞り、`auto_https disable_redirects`でCaddyが自動でport 80の待受(HTTP→HTTPSリダイレクト)を作るのも止めている。どちらか片方だけだと`bind: address already in use`でCaddyが起動に失敗する(デフォルトのCaddyfileでも実際にそうなった)。元のCaddyfileは`Caddyfile.bak-default-20261002`。証明書の更新はCaddyが自動で行う(cron等は不要)。ログは`journalctl -u caddy`。
+- **アクセス方法**: `https://biz.soulmen.net`(ポート番号なし)。`biz.soulmen.net:8080`のように`:8080`を付けると、Chromeが`https://`を自動補完して8080(TLS非対応のplain HTTP)へTLS接続を試み、`ERR_SSL_PROTOCOL_ERROR`になる。ブックマークは`:8080`を外すこと。
+- 既知の残課題: `http://biz.soulmen.net`(port 80)は、引き続き既存の別サイト(`default_server`)が応答する(ホスト名で振り分けていないため)。必要になれば、`server_name biz.soulmen.net`のnginx vhostを別ファイルで追加して`/.well-known/acme-challenge/`以外を`https://`へリダイレクトする方針が考えられる(既存のdefault設定は変更しない)。
+
+### camera-inventory-app: 「送料設定早見表」の改善(`ShippingRateLookupPanel.tsx`)
+- 絞り込み(プルダウン)を大文字・小文字非区別に変更: 元データが"Canon"/"CANON"のように表記ゆれしているため。選択肢は小文字キーで重複排除(表示は最初に見つかった表記)し、一致判定も小文字比較(数値列は対象外)。
+- 「データの追加・編集」の新規行追加・編集時、テキスト列を`<datalist>`の候補プルダウンから選べるように(自由入力も可)。`<datalist>`は行ごとではなくフィールドごとに1回だけ描画する(DOMのid重複を避けるため)。
+- ブランド+機種名の2つを選んだ時点で、該当N件の上に「寸法1×2×3(cm) / 重量(kg)」を表示(ラベル太字・寸法`var(--accent)`青・`/`黒・重量`var(--danger-text)`赤、同一ブランド・機種名で組み合わせが複数あれば重複排除して全列挙)。
+- 該当N件リスト: 支払額の右に「実質送料(円)」(=支払額−関税VAT等、関税未登録は0扱い)、続けて関税VAT等・寸法・重量・Shipping Service・Package Type・Incoterms・配送先国を表示(該当1件時はインライン、複数件時はテーブル列)。**支払額の昇順**で表示(未登録は末尾)、10件分の高さでスクロール(ヘッダー固定)。
+
+### camera-inventory-app: 出品タブのItem Specificsに「Soulcamera Item Info」追加ボタン(`ListingTab.tsx`)
+- 表示中のItem Specificsに「Soulcamera Item Info」が無い場合のみ、未設定の警告・追加ボタン・追加される値のプレビューを表示(自動追加ではなくボタン方式)。値は検品タブの「生成データ保存」で下書きに保存済みの`soulcamera_item_info`を優先し、無ければ`generateSoulcameraItemInfo(item)`(管理番号 今日の日付YYMMDD 仕入高)で生成。
+- 用語メモ: ユーザーが言う「すっぴん画面」はコード内に出てこない呼称。確認の結果、出品タブのことだった(不明な呼称は推測せず、候補を挙げて確認すること)。
+
+### ebay-automation: 「終了品バックアップ」関連の修正・機能追加
+- **「バックアップ済み」なのに一覧が「バックアップなし」になる不具合**: 前回(10-01)追加したInventory API版(`do_action_v2()`)のバックアップ結果`backup_id`が、呼び出し元4箇所(`run_v2`/`run_execute_approved_v2`の成功・失敗)で`record_history`のdetailに埋め込まれていなかったため。4箇所を修正。修正前の履歴向けに、一覧画面で`old_item_id`一致かつ実行日時より前で最新のバックアップを補完して引き当てる処理も追加(日時はdatetimeとして比較)。
+- 詳細画面: 説明文(HTML)が空だった原因は、`raw_item_xml`が`GetItemResponse`全体のため`Description`が直下ではなく`Item/Description`にあるのに直下を探していたこと(Item Specificsは`.iter()`で再帰検索していたため取得できていた)。XML表示が読めなかった原因は、グローバルの`pre`が「濃紺背景+薄い文字」なのにこの画面だけ背景を薄いグレーに上書きしていたこと(文字色`#1f2937`を明示)。
+- 説明文(HTML)の上に「出品内容」表を追加: Item title / Condition description / Item price(`StartPrice`) / Shipping policy(`SellerShippingProfile/ShippingProfileName`)、およびPromoted listing General(入札率%または未登録)・Priority(ON/OFF)。**Promoted Listingsの設定はGetItemのXMLに含まれずEndItemで出品が終了すると取れなくなる**ため、`ebay_end_listing_backups`に列`promoted_general_bid_percentage`(text)・`promoted_priority_enabled`(boolean)を追加(NULL許可)し、`backup_listing_before_end()`がEndItem直前に取得済みの値(`do_action`/`do_action_v2`の`promotion`/`priority_status`)を記録する。記録開始前の既存バックアップ(51件)は、承認キューのスキャン時点の値で補完して表示し、画面に「直近スキャン時点の値」と注記する(`promoted_priority_enabled`が非NULLなら記録済み、NULLなら補完、という判定)。
+- 画像のZIPダウンロード: 詳細画面の画像見出し横のボタン、ルート`/end-listing-backups/<id>/images.zip`(Storage上の画像をサーバー側で並列取得し、`01.jpg`…の連番で格納、ZIP名は`<管理番号>_images.zip`)。1枚でも取得に失敗したらエラーにして欠けたZIPは渡さない。
+- **7日で自動削除**: `scripts/cleanup_end_listing_backups.py`+systemd `ebay-automation-cleanup-backups.timer`(毎日04:10 JST)。作成日時(`created_at`)から7日超の行について、**Storageの画像を先に削除→成功した場合のみDB行を削除**(失敗した行は残して次回再試行、画像だけが残る孤児を作らない)。`--dry-run`(対象のみ表示)・`--days N`あり、1回100件上限、ログは`webapp/logs/cleanup_backups.log`。**再出品に失敗した(`failed`)バックアップも7日で削除される**点に注意(復旧用の唯一の控えになり得るため、必要なら除外条件を追加する)。削除直後でも公開URLが200を返すことがあるが、CDNキャッシュ(`cf-cache-status: HIT`)で、Storage自体からは削除済み(Storageの一覧API・認証付き取得で確認)。
+
+### ebay-automation: ダッシュボード/オファの改善
+- 「Send offers」(オファ)画面の並び順を、新しく対象になった順(`first_seen_at`降順)に変更(従来は古い順)。
+- **一括承認(Best Match順位/経過日数)で、編集した価格・送料・General入札率・Priorityが元に戻る不具合**: 一括承認は`status`をPATCHするだけで、行ごとの入力欄(別フォーム`form-<id>`に属する)の編集内容を一切送信・保存していなかったため、再読込でDBの値に戻っていた。修正: 一括承認フォームの送信直前に、現在値から変更のあった項目だけを`ov_price__<行id>`等の隠しフィールドとして添付(JS `bulkAttachOverrides()`)、サーバー側`_apply_bulk_overrides()`が承認された行にだけ上書き値として保存する。**承認されなかった行(条件に合わない行)の編集値は保存しない**(従来どおり戻る)。
+
+### ebay-automation: eBay売上の自動登録で、his50sへの「売れた」通知が漏れていた(重要)
+- 症状: 「出品チェック」に「売却済みなのにhis50sで公開中のまま(通知の取りこぼし)」が3件(260531-04/260614-10/260616-03)。ユーザー報告は「eBayで売れたのに同期されていません」。
+- 原因: `scripts/ebay_sales_sync.py`(20分おきの売上自動登録、2026-09-07〜)の`_mark_item_sold_best_effort()`は、`createSale()`の副作用(商品を`sold`に更新・Driveフォルダ移動)を再現していたが、`createSale()`に9/15に追加された`notify-his50s-sold`の呼び出しが抜けていた。9/28の対応(`createSale()`のawait化等)は手動登録経路のみで、この自動登録経路は未対応だった。見分け方: 該当`sales`の`created_at`が同期の実行時刻ちょうど(:00/:20/:40の07〜08秒)で、`ebay_transaction_line_id`が付いている。
+- 修正: 自動登録時に同じ順序(sold更新で`management_no`を取得 → Drive移動 → `notify-his50s-sold`呼び出し、`_notify_his50s_sold_best_effort()`)で通知。失敗しても売上登録は成功扱い(取りこぼしは「出品チェック」の再送信で復旧可能)。HTTP呼び出しをモックして呼び出し順・失敗時に例外が出ないこと・管理番号が取れない場合のスキップを検証。再起動不要(次回の自動同期から有効)。
+- 3件は「再送信」と同じ処理(同Edge Functionを呼び出し)で救済、3件とも`notified`、再チェックで取りこぼし0件(his50s公開中129→126件)。
+- 教訓: 副作用を「再現」している別経路は、元の処理に副作用を足したときに追従漏れが起きる。`createSale()`に副作用を追加するときは`ebay_sales_sync.py`側も確認すること。
+
+### 調査メモ: 再出品直後の商品が「対象を再スキャン」前の一覧に出ない(不具合ではない)
+- ユーザー報告「再スキャンで[Near MINT++] Pentax Espio 120SW…が表示されない」。調査の結果、再出品でItemIDが変わる(旧287620273773→新287622268231)ため、再出品後に一度もスキャンされていない新ItemIDは承認キューに行が無く、ダッシュボードに出ないだけだった。直近のスキャン(20:00 JSTの定期スキャン)は再出品(00:26 JST)より前に終了していた。再出品された28件がまとめて未表示だった(ダッシュボードの30件との差が一致)。
+- 確認方法: `webapp/jobs.db`の`jobs`テーブルで、再出品ジョブ(`execute_approved_v2`)より後に`scan`/`scan_v3`が開始されているか(実行中ジョブも含めて)。読み取り専用で`ss.fetch_targets_fast(auth, force_item_ids=[])`を呼べば、再スキャンで拾われるかを書き込み無しで確認できる(今回は58件、対象に含まれた)。対応は「対象を再スキャン(高速版)」の実行。スキャンは既存の承認待ち・失敗の行を承認待ちに戻す仕様。
+
+### 運用メモ(このセッションで判明)
+- Windows側SSH鍵ACLの`CodexSandboxUsers`問題は、このセッションでも再発(合計3回)。Claudeの`PowerShell`ツールで鍵ファイルのACLを確認した後に再付与される傾向があるため、`icacls`で修正した直後は、同じツールで鍵ファイルに触れずにユーザーへ実行を依頼すること。
+- `ssh-vps-manager`の`run_command`は、`sleep`を長めに含む(目安として数十秒以上の)コマンドや、出力が空で終了コードが非0になるコマンド(`grep -v`で全行が除外された場合など)が、`Error:`だけを返すことがある。数十秒以上かかる処理は`nohup ... > /tmp/x.out &`でバックグラウンド実行し、短いコマンドで出力ファイルを読む方式にすること。
