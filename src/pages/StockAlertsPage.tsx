@@ -12,8 +12,15 @@ import {
   upsertStockThreshold,
   type ModelStockRow,
 } from "../lib/api/stockAlerts";
+import ArrivalAlertPanel from "../components/ArrivalAlertPanel";
+import type { ItemListFilters } from "../lib/types";
 
-export default function StockAlertsPage() {
+interface StockAlertsPageProps {
+  /** 入荷アラートの「仕入・在庫・販売画面で見る」ボタン押下時に呼ばれる(2026-10-02追加)。 */
+  onNavigateToInventoryWithFilter?: (filters: ItemListFilters) => void;
+}
+
+export default function StockAlertsPage({ onNavigateToInventoryWithFilter }: StockAlertsPageProps = {}) {
   const [rows, setRows] = useState<ModelStockRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -353,6 +360,10 @@ export default function StockAlertsPage() {
 
   return (
     <div style={{ height: "100%", overflowY: "auto", padding: "1.5rem", paddingBottom: "3rem", boxSizing: "border-box" }}>
+      <ArrivalAlertPanel
+        onViewInInventory={() => onNavigateToInventoryWithFilter?.({ status: "awaiting_arrival" })}
+      />
+
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 4 }}>
         在庫数は、Google Driveの「@撮影済み・出品待ち」フォルダ配下にある機種名フォルダの中に、実際にいくつフォルダ(商品ごとの個別フォルダ)があるかをGoogle Drive APIで数えた実数です。下の「Google Driveから最新の在庫数を取得」ボタンで再取得できます。
       </p>

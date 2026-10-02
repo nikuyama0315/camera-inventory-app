@@ -260,3 +260,73 @@ export async function savePurchaseMemo(memoText: string): Promise<void> {
     .upsert({ id: "default", memo_text: memoText, updated_at: new Date().toISOString() });
   if (error) throw error;
 }
+
+/** 入荷アラート(2026-10-02新規、ユーザー要望)の1行分。ステータスが「入荷待ち」の商品のうち、
+ *  アイテム登録日(items.created_at)からn日以上経過しているものを表示する。 */
+export interface ArrivalAlertItem {
+  id: string;
+  management_no: string;
+  account: string | null;
+  /** 仕入品名(items.title) */
+  title: string | null;
+  created_at: string;
+  daysElapsed: number;
+  /** 仕入先・出品者名(purchases.source_name) */
+  source_name: string | null;
+  /** 購入元URL(purchases.source_url) */
+  source_url: string | null;
+  /** 仕入高(purchases.purchase_price) */
+  purchase_price: number | null;
+}
+
+/** 入荷アラートのn日しきい値を取得する(単一行、id="default")。未登録の場合はデフォルト5を返す。 */
+export async function fetchArrivalAlertThresholdDays(): Promise<number> {
+  const { data, error } = await supabase
+    .from("arrival_alert_settings")
+    .select("threshold_days")
+    .eq("id", "default")
+    .maybeSingle();
+  if (error) throw error;
+  return data?.threshold_days ?? 5;
+}
+
+/** 入荷アラートのn日しきい値を保存する。 */
+export async function saveArrivalAlertThresholdDays(days: number): Promise<void> {
+  const { error } = await supabase
+    .from("arrival_alert_settings")
+    .upsert({ id: "default", threshold_days: days, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+/** ステータスが「入荷待ち」(awaiting_arrival)で、アイテム登録日からthresholdDays日以上
+ *  経過している商品の一覧を取得する(入荷アラート、2026-10-02追加)。 */
+export async function fetchArrivalAlertItems(thresholdDays: number): Promise<ArrivalAlertItem[]> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - thresholdDays);
+
+  const { data, error } = await supabase
+    .from("items")
+    .select("id, management_no, account, title, created_at, purchases(source_name, source_url, purchase_price)")
+    .eq("status", "awaiting_arrival")
+    .lte("created_at", cutoff.toISOString())
+    .order("created_at");
+  if (error) throw error;
+
+  const now = Date.now();
+  return (data ?? []).map((row: any) => {
+    const purchase = Array.isArray(row.purchases) ? row.purchases[0] : row.purchases;
+    const createdAt = new Date(row.created_at).getTime();
+    const daysElapsed = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+    return {
+      id: row.id,
+      management_no: row.management_no,
+      account: row.account,
+      title: row.title,
+      created_at: row.created_at,
+      daysElapsed,
+      source_name: purchase?.source_name ?? null,
+      source_url: purchase?.source_url ?? null,
+      purchase_price: purchase?.purchase_price ?? null,
+    };
+  });
+}

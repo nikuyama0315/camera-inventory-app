@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
+import type { ItemListFilters } from "./lib/types";
 import InventoryPage from "./pages/InventoryPage";
 import LoginPage from "./pages/LoginPage";
 import ExpensesPage from "./pages/ExpensesPage";
@@ -28,7 +29,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "sales", label: "売上・粗利" },
   { key: "expenses", label: "経費" },
   { key: "skuLookup", label: "SKU検索" },
-  { key: "stockAlerts", label: "在庫アラート" },
+  { key: "stockAlerts", label: "入荷・在庫アラート" },
   { key: "import", label: "レポート取込" },
   { key: "export", label: "データ作成" },
   { key: "exchangeRate", label: "為替" },
@@ -77,6 +78,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
   const [tab, setTab] = useState<Tab>(loadInitialTab);
+  /** 入荷アラート(StockAlertsPage)から「仕入・在庫・販売画面で見る」で遷移する際の
+   *  プリセットフィルタ(2026-10-02追加)。InventoryPage側で消費後nullに戻す。 */
+  const [pendingInventoryFilters, setPendingInventoryFilters] = useState<ItemListFilters | null>(null);
   const [belowThresholdRows, setBelowThresholdRows] = useState<ModelStockRow[]>([]);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
@@ -434,9 +438,21 @@ export default function App() {
           <AccountSecurityPage onBack={() => setShowAccountSecurity(false)} />
         ) : (
           <>
-            {tab === "inventory" && <InventoryPage />}
+            {tab === "inventory" && (
+              <InventoryPage
+                initialFilters={pendingInventoryFilters}
+                onInitialFiltersConsumed={() => setPendingInventoryFilters(null)}
+              />
+            )}
             {tab === "sales" && <SalesPage />}
-            {tab === "stockAlerts" && <StockAlertsPage />}
+            {tab === "stockAlerts" && (
+              <StockAlertsPage
+                onNavigateToInventoryWithFilter={(filters) => {
+                  setPendingInventoryFilters(filters);
+                  setTab("inventory");
+                }}
+              />
+            )}
             {tab === "expenses" && <ExpensesPage />}
             {tab === "exchangeRate" && <ExchangeRatePage />}
             {tab === "skuLookup" && <SkuLookupPage />}

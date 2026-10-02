@@ -17,10 +17,17 @@ import type { ItemListFilters } from "../lib/types";
 
 type ViewMode = "split" | "table" | "shippingRegister" | "listingCheck" | "invoiceNumbers" | "backup";
 
+interface InventoryPageProps {
+  /** 他画面(入荷アラート等)から「このフィルタで詳細編集を開く」形で遷移してきた場合の初期フィルタ
+   *  (2026-10-02追加)。適用後はonInitialFiltersConsumedで親に通知し、再適用を防ぐ。 */
+  initialFilters?: ItemListFilters | null;
+  onInitialFiltersConsumed?: () => void;
+}
+
 // 在庫マスター・ディテール画面(要件定義書v4 §6 / ワイヤーフレーム案A)
 // 左ペイン: 一覧+検索。右ペイン: 選択した商品の詳細(基本情報/仕入/検品タブ)。
 // 「一覧表示」モードでは、売上・粗利タブと同様の全幅テーブルで絞り込み結果を確認できる。
-export default function InventoryPage() {
+export default function InventoryPage({ initialFilters, onInitialFiltersConsumed }: InventoryPageProps = {}) {
   const [items, setItems] = useState<ItemWithPurchase[]>([]);
   const [filters, setFilters] = useState<ItemListFilters>({});
   const [sort, setSort] = useState<ItemSortOption>("created_desc");
@@ -73,6 +80,16 @@ export default function InventoryPage() {
   useEffect(() => {
     void reloadList();
   }, [reloadList]);
+
+  // 他画面(入荷アラート等)からの初期フィルタ指定を反映する(2026-10-02追加)。
+  useEffect(() => {
+    if (initialFilters) {
+      setFilters(initialFilters);
+      setViewMode("split");
+      onInitialFiltersConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFilters]);
 
   function handleSelectItem(itemId: string) {
     setIsCreatingNew(false);
