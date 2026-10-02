@@ -5,6 +5,7 @@ import {
   type ShippingImportResult,
 } from "../../lib/api/cpassShipping";
 import ShippingRateLookupPanel from "./ShippingRateLookupPanel";
+import ShippingReconcilePanel from "./ShippingReconcilePanel";
 
 const STATUS_LABELS: Record<ShippingImportResult["status"], string> = {
   success: "登録しました",
@@ -165,6 +166,8 @@ export default function ShippingRegisterPanel() {
           )}
         </div>
       )}
+
+      <ShippingReconcilePanel />
     </div>
   );
 }
