@@ -427,8 +427,9 @@ export default function ShippingRateLookupPanel() {
                   )}
                 </div>
                 {finalMatches.length > 1 && (
+                  <div style={{ maxHeight: 246, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 4 }}>
                   <table style={{ fontSize: 12, borderCollapse: "collapse" }}>
-                    <thead>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--surface-2)" }}>
                       <tr>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>支払額(円)</th>
                         <th style={{ textAlign: "left", padding: "2px 8px" }}>関税VAT等(円)</th>
@@ -449,6 +450,7 @@ export default function ShippingRateLookupPanel() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             )}
