@@ -83,7 +83,7 @@ export default function FreeeTemplatePanel() {
 
   return (
     <div
-      style={{ background: "var(--surface-1)", borderRadius: 8, padding: "1rem", border: "0.5px solid var(--border)" }}
+      style={{ borderRadius: 8, padding: "1rem", border: "0.5px solid var(--border)" }}
     >
       <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 8px" }}>Freee取引テンプレート用データ作成</p>
       <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 10px" }}>

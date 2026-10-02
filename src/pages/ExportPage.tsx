@@ -178,7 +178,6 @@ export default function ExportPage() {
           padding: "10px 12px",
           border: "0.5px solid var(--border)",
           borderRadius: 8,
-          background: "var(--surface-1)",
         }}
       >
         <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
@@ -255,7 +254,7 @@ function ExportCard({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: "var(--surface-1)", borderRadius: 8, padding: "1rem", border: "0.5px solid var(--border)" }}>
+    <div style={{ borderRadius: 8, padding: "1rem", border: "0.5px solid var(--border)" }}>
       <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 8px" }}>{title}</p>
       <div style={{ marginBottom: 10 }}>{children}</div>
       <p style={{ fontSize: 10, color: "var(--text-muted)", margin: "0 0 8px" }}>

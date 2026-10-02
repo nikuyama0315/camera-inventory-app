@@ -155,7 +155,6 @@ export default function DirectSalesCsvPanel() {
   return (
     <div
       style={{
-        background: "var(--surface-1)",
         borderRadius: 8,
         padding: "1rem",
         border: "0.5px solid var(--border)",
