@@ -76,9 +76,10 @@ export default function ShippingRegisterPanel() {
       <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 8 }}>送料登録</h3>
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面の内容をコピーして下のテキストボックスに貼り付け、
-        「CPaSS送料登録」を押してください。または、eLogiの発送済一覧CSVを「eLogiファイル選択」から取り込むこともできます。
+        「CPaSS送料登録」を押してください。または、eLogiの発送済一覧/発送を完了する一覧のCSVを「eLogiファイル選択」から取り込むこともできます。
         CPaSSはeBayオーダー番号、eLogiは購入者ID(eBayのusername)でeBay取引明細と突合し、販売済みステータスの商品について追跡番号・送料支払額(円)を一括登録します。
-        eLogiで同じ購入者が複数の商品に一致する場合は、CSVのeBayオーダー番号で絞り込み、それでも1件に決まらない行は登録せずスキップします。
+        eLogiのCSVは「発送済一覧」「発送を完了する一覧」のどちらも取り込めます。同じ購入者が複数の商品に一致する場合は、
+        オーダー番号(発送済一覧のみ)・販売済み・追跡番号の未登録の順に絞り込み、それでも1件に決まらない行は登録せずスキップします。
       </p>
 
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
