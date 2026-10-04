@@ -4,10 +4,12 @@ export interface ShippingImportRecord {
   orderNo: string;
   trackingNumber: string;
   shippingFeeJpy: number;
+  /** eLogiの「購入者ID」(eBayのusername)。設定されているレコードは、オーダー番号ではなくこの値で取引明細と突合する */
+  buyerId?: string;
 }
 
 export interface ShippingImportResult extends ShippingImportRecord {
-  status: "success" | "not_found" | "not_sold" | "no_sale" | "error";
+  status: "success" | "not_found" | "not_sold" | "no_sale" | "ambiguous" | "error";
   managementNo?: string;
   message: string;
 }
@@ -130,10 +132,11 @@ function parseCsv(text: string): string[][] {
 /**
  * eLogi(送料支払CSVエクスポート)の「発送済一覧」CSVを解析する(送料登録タブ、2026-09-14新規)。
  * 「eBayオーダー番号」列が空の行(複数商品まとめ発送等)は対象外とする。
+ * 「購入者ID」列(eBayのusername)は、送料登録の突合キーとして各レコードのbuyerIdに保持する。
  * 追跡番号はCSVの「追跡番号」列の値をそのまま使用し(CPaSSの抽出値とは別物)、
  * 送料支払額(円)は「初回請求金額」+「追加請求/返金金額」の合計とする。
  */
-export function parseElogiCsv(text: string): ShippingImportRecord[] {
+export function parseElogiCsv(text: string, options: { requireBuyerId?: boolean } = {}): ShippingImportRecord[] {
   const rows = parseCsv(text.replace(/^﻿/, ""));
   if (rows.length === 0) return [];
   const header = rows[0];
@@ -143,11 +146,16 @@ export function parseElogiCsv(text: string): ShippingImportRecord[] {
   const orderNoIdx = idx("eBayオーダー番号");
   const firstFeeIdx = idx("初回請求金額");
   const extraFeeIdx = idx("追加請求/返金金額");
+  const buyerIdIdx = idx("購入者ID");
 
   if (trackingIdx === -1 || orderNoIdx === -1 || firstFeeIdx === -1 || extraFeeIdx === -1) {
     throw new Error(
       "CSVのヘッダーに「追跡番号」「eBayオーダー番号」「初回請求金額」「追加請求/返金金額」のいずれかが見つかりません",
     );
+  }
+  // 送料登録(2026-10-04〜)は購入者IDで取引明細と突合するため、この列が必須。突合差分レポート側は不要なので任意。
+  if (options.requireBuyerId && buyerIdIdx === -1) {
+    throw new Error("CSVのヘッダーに「購入者ID」が見つかりません(購入者IDで取引明細と突合します)");
   }
 
   const records: ShippingImportRecord[] = [];
@@ -160,38 +168,104 @@ export function parseElogiCsv(text: string): ShippingImportRecord[] {
     const extraFee = Number((row[extraFeeIdx] ?? "0").replace(/,/g, "").trim() || "0");
     if (Number.isNaN(firstFee) || Number.isNaN(extraFee)) continue;
 
-    records.push({ orderNo, trackingNumber, shippingFeeJpy: firstFee + extraFee });
+    const buyerId = buyerIdIdx === -1 ? "" : (row[buyerIdIdx] ?? "").trim();
+    records.push({
+      orderNo,
+      trackingNumber,
+      shippingFeeJpy: firstFee + extraFee,
+      ...(buyerId ? { buyerId } : {}),
+    });
   }
   return records;
 }
 
-/** 解析結果を、eBay取引明細(ebay_transaction_lines.order_number)経由で販売済み商品と突合し、
+type MatchedItem =
+  | { kind: "found"; itemId: string }
+  | { kind: "not_found"; message: string }
+  | { kind: "ambiguous"; message: string }
+  | { kind: "error"; message: string };
+
+/** eBayオーダー番号が一致し、商品に突合済みの取引明細を探す(CPaSS用)。 */
+async function findMatchedItemIdByOrderNo(record: ShippingImportRecord): Promise<MatchedItem> {
+  const { data: line, error } = await supabase
+    .from("ebay_transaction_lines")
+    .select("matched_item_id")
+    .eq("order_number", record.orderNo)
+    .not("matched_item_id", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (error) return { kind: "error", message: `照会に失敗しました: ${error.message}` };
+  if (!line?.matched_item_id) {
+    return { kind: "not_found", message: "対応する商品が見つかりません(eBay取引未突合)" };
+  }
+  return { kind: "found", itemId: line.matched_item_id };
+}
+
+/** LIKEの特殊文字(% _ \\)をエスケープする。usernameには「_」が含まれることが多く、そのままだと任意の1文字に一致してしまうため。 */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * 購入者ID(eBayのusername、大文字小文字は区別しない)が一致し、商品に突合済みの取引明細を探す(eLogi用、2026-10-04変更)。
+ * 同じ購入者が複数の商品を買っている場合は、誤った商品に送料を書き込まないよう、
+ * (1) CSVのeBayオーダー番号が一致する明細の商品に絞り込み、(2) それでも1つに決まらなければ自動登録せずスキップする。
+ */
+async function findMatchedItemIdByBuyer(record: ShippingImportRecord): Promise<MatchedItem> {
+  const buyerId = record.buyerId ?? "";
+  const { data: lines, error } = await supabase
+    .from("ebay_transaction_lines")
+    .select("matched_item_id, order_number")
+    .ilike("buyer_username", escapeLike(buyerId))
+    .not("matched_item_id", "is", null);
+  if (error) return { kind: "error", message: `照会に失敗しました: ${error.message}` };
+
+  const distinctIds = [...new Set((lines ?? []).map((l) => l.matched_item_id as string))];
+  if (distinctIds.length === 0) {
+    return {
+      kind: "not_found",
+      message: `購入者ID「${buyerId}」に一致し、商品に突合済みの取引明細が見つかりません`,
+    };
+  }
+  if (distinctIds.length === 1) return { kind: "found", itemId: distinctIds[0] };
+
+  const byOrder = [
+    ...new Set(
+      (lines ?? []).filter((l) => l.order_number === record.orderNo).map((l) => l.matched_item_id as string),
+    ),
+  ];
+  if (byOrder.length === 1) return { kind: "found", itemId: byOrder[0] };
+  return {
+    kind: "ambiguous",
+    message: `購入者ID「${buyerId}」が複数の商品(${distinctIds.length}件)に一致し、オーダー番号でも1件に絞れないため登録しませんでした`,
+  };
+}
+
+/** 解析結果を、eBay取引明細(CPaSSはebay_transaction_lines.order_number、eLogiは購入者ID=buyer_username)経由で販売済み商品と突合し、
  *  該当するsalesレコードのtracking_info・shipping_cost_paidを更新する(CPaSS・eLogi共通処理)。 */
 export async function applyShippingRecords(records: ShippingImportRecord[]): Promise<ShippingImportResult[]> {
   const results: ShippingImportResult[] = [];
 
   for (const record of records) {
-    const { data: line, error: lineError } = await supabase
-      .from("ebay_transaction_lines")
-      .select("matched_item_id")
-      .eq("order_number", record.orderNo)
-      .not("matched_item_id", "is", null)
-      .limit(1)
-      .maybeSingle();
-
-    if (lineError) {
-      results.push({ ...record, status: "error", message: `照会に失敗しました: ${lineError.message}` });
+    const matched = record.buyerId ? await findMatchedItemIdByBuyer(record) : await findMatchedItemIdByOrderNo(record);
+    if (matched.kind === "error") {
+      results.push({ ...record, status: "error", message: matched.message });
       continue;
     }
-    if (!line?.matched_item_id) {
-      results.push({ ...record, status: "not_found", message: "対応する商品が見つかりません(eBay取引未突合)" });
+    if (matched.kind === "not_found") {
+      results.push({ ...record, status: "not_found", message: matched.message });
       continue;
     }
+    if (matched.kind === "ambiguous") {
+      results.push({ ...record, status: "ambiguous", message: matched.message });
+      continue;
+    }
+    const matchedItemId = matched.itemId;
 
     const { data: item, error: itemError } = await supabase
       .from("items")
       .select("management_no, status")
-      .eq("id", line.matched_item_id)
+      .eq("id", matchedItemId)
       .single();
 
     if (itemError || !item) {
@@ -211,7 +285,7 @@ export async function applyShippingRecords(records: ShippingImportRecord[]): Pro
     const { data: sales, error: saleError } = await supabase
       .from("sales")
       .select("id")
-      .eq("item_id", line.matched_item_id)
+      .eq("item_id", matchedItemId)
       .order("created_at", { ascending: false })
       .limit(1);
 
@@ -241,5 +315,5 @@ export async function registerCpassShipping(text: string): Promise<ShippingImpor
 }
 
 export async function registerElogiShipping(text: string): Promise<ShippingImportResult[]> {
-  return applyShippingRecords(parseElogiCsv(text));
+  return applyShippingRecords(parseElogiCsv(text, { requireBuyerId: true }));
 }

@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<ShippingImportResult["status"], string> = {
   not_found: "商品が見つかりません",
   not_sold: "販売済みではありません",
   no_sale: "売上レコードなし",
+  ambiguous: "商品を特定できません",
   error: "エラー",
 };
 
@@ -19,7 +20,8 @@ const STATUS_LABELS: Record<ShippingImportResult["status"], string> = {
  * ①CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面をコピー&ペーストすると、ORDER NO.単位で
  *   eBay取引明細(ebay_transaction_lines)経由で販売済み商品と突合し、追跡番号(sales.tracking_info)・
  *   送料支払額(sales.shipping_cost_paid)を一括登録する。
- * ②eLogiの「発送済一覧」CSVを選択すると、同様にeBayオーダー番号列で突合し、CSVの「追跡番号」列を
+ * ②eLogiの「発送済一覧」CSVを選択すると、CSVの「購入者ID」列(eBayのusername)で取引明細と突合し(2026-10-04に
+ *   eBayオーダー番号から変更。複数商品に一致する場合はオーダー番号で絞り込み、決まらなければスキップ)、CSVの「追跡番号」列を
  *   tracking_infoに、「初回請求金額」+「追加請求/返金金額」の合計をshipping_cost_paidに登録する
  *   (2026-09-14追加)。
  */
@@ -75,7 +77,8 @@ export default function ShippingRegisterPanel() {
       <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 16 }}>
         CPaSS(eBay公式クロスボーダー配送ツール)の出荷画面の内容をコピーして下のテキストボックスに貼り付け、
         「CPaSS送料登録」を押してください。または、eLogiの発送済一覧CSVを「eLogiファイル選択」から取り込むこともできます。
-        いずれもeBayオーダー番号でeBay取引明細と突合し、販売済みステータスの商品について追跡番号・送料支払額(円)を一括登録します。
+        CPaSSはeBayオーダー番号、eLogiは購入者ID(eBayのusername)でeBay取引明細と突合し、販売済みステータスの商品について追跡番号・送料支払額(円)を一括登録します。
+        eLogiで同じ購入者が複数の商品に一致する場合は、CSVのeBayオーダー番号で絞り込み、それでも1件に決まらない行は登録せずスキップします。
       </p>
 
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
@@ -131,6 +134,7 @@ export default function ShippingRegisterPanel() {
               <thead>
                 <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
                   <th style={{ padding: "4px 6px" }}>ORDER NO.</th>
+                  <th style={{ padding: "4px 6px" }}>購入者ID</th>
                   <th style={{ padding: "4px 6px" }}>管理番号</th>
                   <th style={{ padding: "4px 6px" }}>追跡番号</th>
                   <th style={{ padding: "4px 6px", textAlign: "right" }}>送料(円)</th>
@@ -143,6 +147,7 @@ export default function ShippingRegisterPanel() {
                   return (
                     <tr key={`${r.orderNo}-${i}`} style={{ borderTop: "0.5px solid var(--border)", background: zebraBackground }}>
                       <td style={{ padding: "4px 6px", whiteSpace: "nowrap" }}>{r.orderNo}</td>
+                      <td style={{ padding: "4px 6px", whiteSpace: "nowrap" }}>{r.buyerId ?? "-"}</td>
                       <td style={{ padding: "4px 6px", whiteSpace: "nowrap" }}>{r.managementNo ?? "-"}</td>
                       <td style={{ padding: "4px 6px", fontFamily: "monospace", whiteSpace: "nowrap" }}>{r.trackingNumber}</td>
                       <td style={{ padding: "4px 6px", textAlign: "right", whiteSpace: "nowrap" }}>
