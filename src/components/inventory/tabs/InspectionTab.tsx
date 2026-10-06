@@ -45,9 +45,6 @@ function CopyIcon() {
 interface Props {
   detail: ItemDetail;
   onChanged: () => void;
-  /** 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたときの、
-   *  Description生成セクションへのスクロールトリガー。親(ItemDetailPane)が押すたびインクリメントする。 */
-  scrollToDescriptionTrigger?: number;
   /** 2026-09-27追加: 「出品」ボタン用。押すと生成データを保存した上で出品タブへ切り替える。 */
   onGoToListing?: () => void;
 }
@@ -161,7 +158,7 @@ function buildInitialValues(detail: ItemDetail): FormValues {
   return values;
 }
 
-export default function InspectionTab({ detail, onChanged, scrollToDescriptionTrigger, onGoToListing }: Props) {
+export default function InspectionTab({ detail, onChanged, onGoToListing }: Props) {
   const [values, setValues] = useState<FormValues>(() => buildInitialValues(detail));
   const [translating, setTranslating] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -193,12 +190,11 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
   const [autofillBusy, setAutofillBusy] = useState(false);
   const [autofillFeedback, setAutofillFeedback] = useState<string | null>(null);
 
-  // 2026-09-23追加: タブ行の「Description生成へ」ボタンから遷移してきたとき、
-  // このセクションまで自動スクロールする(0=初期値のときは何もしない)。
-  useEffect(() => {
-    if (!scrollToDescriptionTrigger) return;
+  // 2026-10-06変更(ユーザー指示): 「Description生成へ」ボタンをタブ行から、オートフィル行の右端へ移動。
+  // 押すとDescription生成セクションまでスクロールする。
+  function handleGoToDescriptionGenerator() {
     descriptionSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [scrollToDescriptionTrigger]);
+  }
 
   function handleGenerateDescription() {
     setDescriptionHtml(generateDescriptionHtml(detail, values));
@@ -536,7 +532,18 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
       {/* 2026-09-25追加(ユーザー指示): 登録済みアイテムからオートフィル。管理番号・ブランド/機種の
           部分一致で検索し、選択した商品の検品内容(FIELDS・状態ランク・各チェック表)をこの画面の
           入力エリアへ丸ごとセットする。 */}
-      <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "0.5px solid var(--border)" }}>
+      <div
+        style={{
+          marginBottom: 16,
+          paddingBottom: 12,
+          borderBottom: "0.5px solid var(--border)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          gap: 12,
+        }}
+      >
+        <div>
         <label style={{ fontSize: 13, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
           登録済みアイテムからオートフィル(管理番号またはブランド/機種で検索)
         </label>
@@ -562,6 +569,14 @@ export default function InspectionTab({ detail, onChanged, scrollToDescriptionTr
         {autofillFeedback && (
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>{autofillFeedback}</p>
         )}
+        </div>
+        <button
+          type="button"
+          onClick={handleGoToDescriptionGenerator}
+          style={{ fontSize: 12, padding: "4px 10px", flexShrink: 0 }}
+        >
+          Description生成へ
+        </button>
       </div>
 
       {FIELDS.map((field) => (

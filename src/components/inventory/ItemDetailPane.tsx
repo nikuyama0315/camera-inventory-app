@@ -40,15 +40,6 @@ export default function ItemDetailPane({
   onItemDeleted,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("purchase");
-  /** 2026-09-23追加(ユーザー指示): タブ行右端の「Description生成へ」ボタン用。押すたびインクリメントし、
-   *  検品タブ側でDescription生成セクションへスクロールするトリガーとして渡す。 */
-  const [descriptionScrollTrigger, setDescriptionScrollTrigger] = useState(0);
-
-  function handleGoToDescriptionGenerator() {
-    setActiveTab("inspection");
-    setDescriptionScrollTrigger((v) => v + 1);
-  }
-
   /** 2026-09-27追加(ユーザー指示): 検品タブ「出品」ボタン用。出品タブへ切り替える。 */
   function handleGoToListing() {
     setActiveTab("listing");
@@ -235,14 +226,6 @@ export default function ItemDetailPane({
             {tab.label}
           </button>
         ))}
-        {detail && !isCreatingNew && (
-          <button
-            onClick={handleGoToDescriptionGenerator}
-            style={{ marginLeft: "auto", fontSize: 12, padding: "4px 10px" }}
-          >
-            Description生成へ
-          </button>
-        )}
       </div>
 
       {activeTab === "basic" && detail && (
@@ -269,7 +252,6 @@ export default function ItemDetailPane({
         <InspectionTab
           detail={detail}
           onChanged={handleAfterChange}
-          scrollToDescriptionTrigger={descriptionScrollTrigger}
           onGoToListing={handleGoToListing}
         />
       )}

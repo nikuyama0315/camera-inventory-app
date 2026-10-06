@@ -112,6 +112,8 @@ export default function ListingTab({ item, onChanged }: Props) {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const dragPhotoIndexRef = useRef<number | null>(null);
+  // 2026-10-06追加(ユーザー指示): 写真行右端の「出品へ」ボタン用。画面最後(出品ボタン・結果表示)までスクロールする。
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const [itemTitle, setItemTitle] = useState("");
   const [customLabel, setCustomLabel] = useState("");
@@ -526,6 +528,13 @@ export default function ListingTab({ item, onChanged }: Props) {
           >
             画像保管フォルダを開く
           </button>
+          <button
+            type="button"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
+            style={{ marginLeft: "auto", width: "fit-content" }}
+          >
+            出品へ
+          </button>
         </div>
         <div
           onDragOver={(e) => {
@@ -939,6 +948,7 @@ export default function ListingTab({ item, onChanged }: Props) {
         onClose={() => setProfitModalOpen(false)}
         onApply={handleApplyProfitCalc}
       />
+      <div ref={bottomRef} />
     </div>
   );
 }
