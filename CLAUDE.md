@@ -287,3 +287,48 @@ git push origin master   # GitHubリモート: github-camera-inventory:nikuyama0
 - Windows側SSH鍵のACL問題(`LENOVO-L13\CodexSandboxUsers`)はさらに再発(累計5回前後)。`PowerShell`ツールの`cmd /c icacls`で直した後は、同じツールで鍵に触れずにユーザーへ実行を依頼する。
 - VPSでの確認コマンド: `sqlite3`のCLIは無い(`python3`の`sqlite3`モジュールを使う)。`node`は`/usr/bin/node`(`python3`のsubprocess経由のbashではPATHに無いことがある)。DDLやマイグレーションはMCPではなく、`.env`の`SUPABASE_DB_*`+`psql`で実行できる。
 - eBay/Analyticsの日次枠や`getRateLimits`のように「呼び出し直後に反映されない残り回数」を判定に使う場合は、開始時に1回だけ読んで自前でカウントする。
+
+## セッション要点(2026-10-05〜10-07)
+
+### camera-inventory-app(コミット 8503fb4)
+- **検品タブ**: 「Description生成へ」ボタンを、タブ行右端(`ItemDetailPane.tsx`)から、検品タブの「登録済みアイテムからオートフィル」行の右端(`InspectionTab.tsx`)へ移動。押すとDescription生成セクションへスクロールするのは同じだが、`InspectionTab`内で`descriptionSectionRef.scrollIntoView`を直接呼ぶ形にし、親の`descriptionScrollTrigger`state・`scrollToDescriptionTrigger`propは削除した。**副作用: ボタンは検品タブでしか押せなくなった**(以前は他タブからも検品タブへ飛べた)。
+- **出品タブ**: 「写真(n/24)」「画像保管フォルダを開く」の行の右端に「出品へ」ボタンを追加。押すと画面の最後(出品ボタン・結果表示)へスクロール(ルート要素末尾の`bottomRef`に`scrollIntoView`)。
+
+### ebay-automation(いずれもユーザーから直接名指しで依頼された例外対応、commit運用なし、変更前は`.bak-pre-<スラッグ>-2026100x`)
+- **ダッシュボード(/v2)**: 画面下部の「直近のジョブ実行履歴」カードを、「対象を再スキャン(高速版)」の横の「直近のジョブ実行履歴」ボタンから開くモーダル(`jobHistoryModal`、閉じる/背景クリック/Escで閉じる)へ移設。モーダル最大幅は既存の順位推移モーダルの1224pxを基準に140%の1714px(ユーザー指定「120%」→「140%」、基準は常に元の1224px)。**旧ダッシュボード(`/`、`dashboard.html`)は未変更**。ナビの「ダッシュボード」は`/v2`。
+- **一括承認「Send Offerの除外」をプルダウン化し、基準を「残り時間」に変更**: 当初は「Send Offerから96時間以内を除外」の96をプルダウン(96〜16、10刻み)にしたが、ユーザーの意図は「Offerの残り時間」基準だった。最終仕様は**「Send Offerの残り時間が[N]時間以上のアイテムは除外する」**(Nは96,86,…,16)。残り時間=96−送信後の経過時間(96=`SEND_OFFER_VALID_HOURS`=`SEND_OFFER_DURATION_DAYS`4日)。残りがN時間未満(送っていない・期限切れを含む)は承認対象、N以上は対象外(ちょうどNも対象外)。実装は`_send_offer_exclude_hours()`が選択値Nを「経過時間の窓=96−N」へ換算して`_fetch_send_offer_valid_target_ids(..., hours=窓)`へ渡す(フォームに値が無い旧画面・選択肢外はNone=従来どおり96時間以内をすべて除外)。**注意**: `hours or 既定値`と書くと窓0(N=96)が既定の96に化けるため、`is None`で判定すること。N=96は実質「除外なし」、N=16が従来の「全部除外」に最も近い。チェックボックス「除外する」を外すとプルダウンは使われない。
+- **Views/Watches更新ボタンの移設**: 「View数(30日間)・Watch数を更新」ボタンを、一覧表題行の「表示回数(30日間)」の下へ移し、表記を「Views/Watches更新」に変更(ダッシュボード/v2と「出品情報更新」の両方)。ダッシュボードはヘッダー内に独立した`<form>`、「出品情報更新」は一覧全体が1つの`<form id="update-form">`のためネスト不可で、既存の「相場を更新」と同じ`formaction`+`name="return_to"`方式(`window.__liuSkipConfirm`で確認ダイアログを抑止)。上部カードの説明文も書き換え、貼り付け取得(別方法)はカードに残した。
+- **View/Watchの取得タイミング**: 通常版・高速版のどちらのスキャンでも、`run_scan()`末尾(承認キューの整理後)の`refresh_queue_traffic_metrics()`で一括取得・保存する(高速版は`run_scan(use_fast_scan=True)`を呼ぶだけ)。失敗してもスキャンは継続、画面の値は前回のまま。画面のボタンでスキャン無しにも更新できる。
+- **View/Watch更新メッセージに1日の残り回数を表示**: 「GetMyeBaySelling n回(1日の残りx回)・Analytics m回(1日の残りy回)」。`get_quota_snapshot()`が`getRateLimits`1回でTradingAPI `GetMyeBaySelling`(5000回/日、他のTrading API呼び出しと共通のカウンタ)と`sell.analytics.traffic_report`(100回/日)の残りを取得。値は**呼び出し前の残り−今回の呼び出し回数**を表示(`getRateLimits`は呼び出し直後に減らないため)。取得不能は「不明」。枠のリセットは07:00Z=16:00 JST。
+- **調査メモ**: (1)ユーザーから、実際の商品カードを貼って「効いていない」と報告された件が複数あったが、2件とも「一括承認の方式(Best Match順位=指定順位**以下**だけが対象)」や選択値の勘違いで、コードは正常だった。商品の`send_offer_eligible_items.offer_sent_at`・`ebay_sell_similar_queue.status`・`search_rank`をDBで確認すると原因が分かる。症状だけで修正せず、まず該当商品のデータを確認し、仕様の解釈(基準が経過時間か残り時間か等)は選択肢を示して確認すること。(2)「終了品バックアップ」の警告(新規出品の公開に失敗)は、オファーが`UNPUBLISHED`のままで正確だった(約23時間出品ゼロ)。eBayのエラー本文は`str(e)`しか記録しておらず原因不明。**未対応の改善案**: `do_action_v2()`のpublishOffer失敗時に`e.response.text`をログ・エラーメッセージに残す。(3)Send Offerの実際の有効期間は4日=96時間(eBayは4 DAYのみ受け付ける)。(4)ユーザーからVercel移行の可否を問われた。メリット=git pushで自動デプロイ(SSH鍵・手動`cp`の手間が消える)・HTTPS/CDN/プレビュー/ロールバック、デメリット=公開URL化(現状は`biz.soulmen.net`のHTTPSで公開済みだが、機微な業務データのため追加のアクセス制限設計が前提)・環境変数移行・アカウント管理増・現行の「ユーザーが目視してからデプロイ」の2段階フローの再設計。実施はしていない。
+
+### 運用メモ(このセッションで判明)
+- ebay-automationの動作確認用curlは**`http://127.0.0.1:8443`(httpsではない)**。gunicornが直接プレーンHTTPで待ち受けており(`ebay-automation-webapp.service`の`--bind 127.0.0.1:8443`、TLS無し)、`https://`だと`000`が返る。未ログインのログイン必須ページは`302`が正常。
+- Windows側SSH鍵のACL問題(`GRAM2\CodexSandboxUsers`)は10-06にも再発。`PowerShell`ツールの`cmd /c icacls`で直し、直後の確認で同ツールを鍵ファイルに使わずユーザーへ再実行を依頼する運用が有効だった。なお`ssh-vps-manager`の`run_command`では`sudo -n systemctl restart ebay-automation-webapp`が**パスワード不要で実行できる**(鍵問題で詰まったときの代替手段。ただし再起動はユーザーに依頼する運用が基本)。
+- PowerShellから`ssh ... "curl ... \"%{http_code}\""`のようにバックスラッシュでエスケープしたダブルクォートを渡すと引数が壊れる。シングルクォート(`'%{http_code}\n'`)を使うこと。
+- ブラウザに古いHTMLが残っていて「反映されていない」ことがあった。サーバー側の更新時刻・再起動時刻・レンダリング結果を確認したうえで、まず`Ctrl+F5`を依頼する。
+- 不明瞭・途中で切れたユーザー入力(「た」「ん」等)は推測で作業せず、内容を聞き返す。
+
+## セッション要点(2026-10-07〜10-08)
+
+### 購入品の一括登録(メルカリ/ヤフオク/ヤフーフリマ)の実施記録と手順上の注意
+- 流れ: G:ドライブの`1.メルカリ…txt`/`2.ヤフオク…txt`/`3.ヤフーフリマ…txt`(いずれもShift-JIS。cp932でUTF-8へ変換して読む)から商品名を取り出し→各サイトの購入履歴をブラウザで開いて仕入高・出品者・購入日・URLを取得→Supabase RPC `create_item_with_purchase`で登録(UIの「+新規登録」ではなくRPC直接)。登録前に`purchases.source_url`で重複確認、管理番号は`generate_management_no(日付)`の続きから連番。
+- 登録実績: **メルカリ**=261006-01〜08・261005-01(Chromeの購入履歴、アカウント「にくやま」)と261005-02(Edgeの購入履歴、アカウント「うおかわ」)。**ヤフオク**=261007-01〜03(支払い済み)と261006-09〜13(まとめ取引・支払い前)。**ヤフーフリマ**=261007-04。
+- **要フォローアップ**: 261006-09〜13(出品者okubocamera、まとめ取引の依頼中で支払い前。仕入高は落札価格のみ=4,800/3,300/3,300/7,300/6,700、仕入日は落札日10/6)。出品者の請求確定・支払い後に、仕入高を送料込みの支払い額(5件合算の可能性があり按分が必要)・仕入日を支払い日へ修正する。
+- RPCの注意: `items.category`はNOT NULL(ブランド・機種名はNULL可)。登録時は既存と同じ`カメラ関連品`を入れた。`source_type`は`mercari`/`yahoo_auction`/`yahoo_furima`、取引相手は`consumer`。**`account`はRPCでは設定されない**ため登録後に`update items set account='soulcamera'`が必要(1トランザクションにまとめた)。出品者名に`®️`(U+00AE+U+FE0F)や`☺︎`(U+263A+U+FE0E)等の不可視文字が入ることがあるため、SQLは日本語を直接ssh経由で渡さず、`\uXXXX`のASCIIエスケープをPythonの`json.loads`で戻して生成する(転記ミス防止)。
+- ブラウザ操作の注意: Claude in Chromeは複数のブラウザが同時に接続されうる(`list_connected_browsers`)。**使用中のBrowserがChromeかEdgeかは`navigator.userAgentData.brands`で判定**し、ユーザーがEdgeを指定したら`select_browser`で切り替える。ChromeとEdgeでサイトのログインアカウントが別だった。メルカリの購入履歴の商品名は通常のDOMに無い(座標クリックが必要)。**ページ遷移直後の最初のクリックは無視される**ことがあり、直前に縮小スクリーンショット(`scale: 0.1`)を挟むと効く。メルカリShopsの注文は`mercari-shops.com/orders/<id>`(取引情報の商品行をクリックすると`jp.mercari.com/shops/product/<id>`)。
+- ヤフオク: 落札一覧のタイトル→商品ページ(`/jp/auction/<id>`)→「取引ナビ」→**「情報」タブ**に支払い金額(落札金額+送料)・出品者・取引の状況(「支払い完了の連絡を行いました。」の日付)がある。指定どおりの「お届け情報・お支払い情報などを確認する」リンクは無かった。「支払い明細」リンクはYahoo!の再認証(ログイン)画面に飛ぶため使えない(取引ナビのURL`contact.auctions.yahoo.co.jp/trade/top?aid=…&oid=…`で代用)。「まとめて取引を依頼中」の商品は支払い金額・支払い完了日がまだ無い。ヤフーフリマ: 取引画面`paypayfleamarket-sec.yahoo.co.jp/item/<id>/trade/buyer`から取得、商品画像のクリックで`paypayfleamarket.yahoo.co.jp/item/<id>`。
+
+### 売上の自動突合: 旧形式SKUが突合できない(調査のみ、未修正・ユーザー回答待ち)
+- 症状: 送料登録(CPaSS)で注文`08-15260-54449`が「eBay取引未突合」。取引明細はあるが`match_status='unmatched'`。
+- 原因: Edge Function `ebay-sync-orders`の`skuMatchKey()`が、SKUの**先頭9文字**を`items.management_no`と完全一致で比較している。旧形式SKU(例`20260504-03 0616 4111-V2R…`、先頭に「20」が付く)は先頭が`20260504-`になり、管理番号`260504-03`と一致しない。
+- 規模: 未突合のSALE明細152件中148件が旧形式。先頭の「20」を外せば124件が1商品に決まるが、**うち118件は商品がすでに`sold`で売上もある**(売上が明細に紐付いていない)。突合ロジックだけを直してデプロイすると、`ebay_sales_sync.py`(20分おきの自動登録)が二重売上・his50s通知・Drive移動を実行してしまう(二重登録の防止は「同一line_idの売上が既にあるか」だけ)。修正する場合は、「商品がすでにsold」「同じorder_number/sales_record_referenceの売上あり」を除外する条件と、履歴の整理が前提。対応案は(1)手動処理、(2)この1件だけ紐付け、(3)安全条件付きの全体修正、をユーザーに提示済み。
+- `260504-03`は8/2に売上済み(売上は明細に未紐付け)のあとステータスが「出品中」に戻っており、10/5の注文は新しい売上(未登録)。送料登録は「販売済みではありません」で止まるため、先に売上登録が要る。
+
+### camera-inventory-app: 詳細編集の左ペイン一覧
+- `ItemListPane.tsx`: 各アイテムの1行目末尾に「・ 仕入高 ¥n,nnn」を追加(`purchases.purchase_price`、未仕入は非表示)。コミット a8a5684。
+
+### 運用メモ(このセッションで判明)
+- Windows側SSH鍵のACL問題(`CodexSandboxUsers`)はさらに再発。`PowerShell`の`cmd /c icacls`で直し、直後に同ツールで鍵に触れずユーザーへ再実行を依頼する運用を継続。
+- **CLAUDE.mdは、別セッションが同じファイルを更新していることがある**。VPS上に別セッション追記の未コミットのセクション(2026-10-05〜10-07)があった。更新前に、ローカルとVPSのmd5と`git status`(VPS側の未コミット変更)を比べること。
+- 報告の訂正: 261005-02を登録した際の説明で「同じ日付のヤフオク分(261005-01)の続き」と書いたが、261005-01はメルカリ(Autoboy 2、出品者daiki camera)の登録だった(ヤフオクではない)。
