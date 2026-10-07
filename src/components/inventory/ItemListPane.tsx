@@ -284,6 +284,8 @@ export default function ItemListPane({
                   : ""}
                 {` ・ ${ITEM_STATUS_LABELS[item.status]}`}
                 {item.condition_grade ? ` ・ ${item.condition_grade}` : ""}
+                {/* 2026-10-07追加(ユーザー指示): 1行目の末尾に仕入高(purchases.purchase_price)を表示。未仕入(null)は表示しない。 */}
+                {item.purchase_price != null ? ` ・ 仕入高 ¥${Number(item.purchase_price).toLocaleString("ja-JP")}` : ""}
               </p>
               {/* 2026-09-25追加(ユーザー指示): ITEM TITLEが登録されている場合、2行目に表示。 */}
               {item.item_title && (
