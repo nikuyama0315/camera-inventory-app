@@ -332,3 +332,11 @@ git push origin master   # GitHubリモート: github-camera-inventory:nikuyama0
 - Windows側SSH鍵のACL問題(`CodexSandboxUsers`)はさらに再発。`PowerShell`の`cmd /c icacls`で直し、直後に同ツールで鍵に触れずユーザーへ再実行を依頼する運用を継続。
 - **CLAUDE.mdは、別セッションが同じファイルを更新していることがある**。VPS上に別セッション追記の未コミットのセクション(2026-10-05〜10-07)があった。更新前に、ローカルとVPSのmd5と`git status`(VPS側の未コミット変更)を比べること。
 - 報告の訂正: 261005-02を登録した際の説明で「同じ日付のヤフオク分(261005-01)の続き」と書いたが、261005-01はメルカリ(Autoboy 2、出品者daiki camera)の登録だった(ヤフオクではない)。
+
+## セッション要点(2026-10-09)
+
+### データ作成画面: datetime-local入力の時刻ピッカーが表示されない件を調査(コード変更なし)
+- ユーザー報告: 「利益管理票更新用データの作成」の「この日時以降に売れたアイテムを自動取得」欄で、カレンダーに時刻指定パネルが出ない。以前は日時両方を選べるパネルだった。
+- 調査: 該当欄(`EbayXlsxFillPanel.tsx`)はライブラリ不使用のブラウザ標準`<input type="datetime-local">`で、2026-09-23の実装以来この属性行は変更されていない(git logで確認)。ユーザーのブラウザは**Firefox**と判明。
+- 原因: Firefoxのdatetime-local統合ピッカー(日付+時刻)はFirefox 144で実装されたが、**`about:config`の`dom.forms.datetime.timepicker`(および`dom.forms.datetime`)が`true`になっていないと時刻パネルが表示されない**(実験的機能扱い)。Firefoxのアップデートやプロファイルのリセット等でこの設定が既定値(無効)に戻った可能性が高い。
+- 対応: アプリ側の修正ではなく、ユーザー自身に`about:config`で`dom.forms.datetime.timepicker`を`true`にするよう案内した(実行結果は未確認)。再発した場合はまずこの設定を確認する。
