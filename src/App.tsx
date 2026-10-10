@@ -19,7 +19,6 @@ import { checkStockAlertsAndNotify, fetchModelStockOverview, type ModelStockRow 
 import { establishMarketingSession } from "./lib/api/auth";
 import { fetchMonthlyImportStatus, reportImportRowHasAlert } from "./lib/api/reportImports";
 import { checkTodoDueAlertsAndNotify, fetchOverdueTodoCount } from "./lib/api/todos";
-import { fetchSendOfferPendingCount } from "./lib/api/sendOffers";
 import logo from "./assets/logo.png";
 
 type Tab = "inventory" | "sales" | "stockAlerts" | "skuLookup" | "expenses" | "exchangeRate" | "import" | "export" | "eventLog" | "ledgerImport";
@@ -82,13 +81,9 @@ export default function App() {
    *  プリセットフィルタ(2026-10-02追加)。InventoryPage側で消費後nullに戻す。 */
   const [pendingInventoryFilters, setPendingInventoryFilters] = useState<ItemListFilters | null>(null);
   const [belowThresholdRows, setBelowThresholdRows] = useState<ModelStockRow[]>([]);
-  const [alertDismissed, setAlertDismissed] = useState(false);
   const [reportImportAlertCount, setReportImportAlertCount] = useState(0);
-  const [reportImportAlertDismissed, setReportImportAlertDismissed] = useState(false);
   const [overdueTodoCount, setOverdueTodoCount] = useState(0);
   const [overdueTodoDismissed, setOverdueTodoDismissed] = useState(false);
-  const [sendOfferPendingCount, setSendOfferPendingCount] = useState(0);
-  const [sendOfferAlertDismissed, setSendOfferAlertDismissed] = useState(false);
   // ?view=account-security でこの画面を直接開けるようにする(2026-09-11追加、
   // マーケティング側「ログイン情報再設定」リンクからの誘導先。ユーザー指示「販売管理の
   // ほうと同じにすべき」により、マーケティング固有の自己サービス型パスワード変更画面を
@@ -173,14 +168,16 @@ export default function App() {
     checkTodoDueAlertsAndNotify().catch(() => {
       /* メール送信設定が未完了の場合は静かに失敗させる */
     });
-    // eBay Negotiation APIで検知したSend Offer対象商品(マーケティング側のcronが
-    // 30分おきに更新)の件数を取得し、バナー表示する(2026-09-28追加、在庫アラート等と同じ方式)。
-    fetchSendOfferPendingCount()
-      .then(setSendOfferPendingCount)
-      .catch(() => {
-        /* バナー表示のための取得失敗は致命的でないため無視 */
-      });
+    // (2026-10-10) Send Offer対象商品の件数は、画面上部バナーを廃止し、マーケティング側メニュー「オファ」の
+    // チップ表示に変更したため、この画面では取得しない。
   }, [session]);
+
+  /** メニュー項目ごとの通知チップの件数(0なら非表示)。 */
+  function chipCountFor(key: Tab): number {
+    if (key === "stockAlerts") return belowThresholdRows.length;
+    if (key === "import") return reportImportAlertCount;
+    return 0;
+  }
 
   if (!checked) {
     return null;
@@ -272,6 +269,7 @@ export default function App() {
                   setTab(t.key);
                 }}
                 style={{
+                  position: "relative",
                   border: "none",
                   borderBottom: tab === t.key ? "2px solid var(--accent)" : "2px solid transparent",
                   borderRadius: 0,
@@ -282,18 +280,30 @@ export default function App() {
                 }}
               >
                 {t.label}
-                {t.key === "stockAlerts" && belowThresholdRows.length > 0 && (
+                {/* 2026-10-10(ユーザー指示): 画面上部のバナーを廃止し、メニュー項目の右上に赤いチップ(件数)を表示。
+                    入荷・在庫アラート=しきい値を下回る機種数、レポート取込=未取込みの月次レポート数。 */}
+                {chipCountFor(t.key) > 0 && (
                   <span
+                    aria-label={`${chipCountFor(t.key)}件の通知`}
                     style={{
-                      marginLeft: 6,
-                      fontSize: 11,
-                      padding: "1px 6px",
+                      position: "absolute",
+                      top: -4,
+                      right: -2,
+                      minWidth: 16,
+                      height: 16,
+                      padding: "0 5px",
+                      boxSizing: "border-box",
                       borderRadius: 999,
-                      background: "var(--danger-bg)",
-                      color: "var(--danger-text)",
+                      background: "#dc2626",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      lineHeight: "16px",
+                      textAlign: "center",
+                      pointerEvents: "none",
                     }}
                   >
-                    {belowThresholdRows.length}
+                    {chipCountFor(t.key) > 99 ? "99+" : chipCountFor(t.key)}
                   </span>
                 )}
               </button>
@@ -329,58 +339,6 @@ export default function App() {
         </div>
       </div>
 
-      {belowThresholdRows.length > 0 && tab !== "stockAlerts" && !alertDismissed && (
-        <div
-          style={{
-            padding: "8px 16px",
-            background: "var(--danger-bg)",
-            borderBottom: "0.5px solid var(--danger-text)",
-            fontSize: 12,
-            color: "var(--danger-text)",
-          }}
-        >
-          {belowThresholdRows.length}機種の在庫数がしきい値を下回っています
-          <button
-            onClick={() => setTab("stockAlerts")}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
-          >
-            確認する
-          </button>
-          <button
-            onClick={() => setAlertDismissed(true)}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
-          >
-            隠す
-          </button>
-        </div>
-      )}
-
-      {reportImportAlertCount > 0 && tab !== "import" && !reportImportAlertDismissed && (
-        <div
-          style={{
-            padding: "8px 16px",
-            background: "var(--danger-bg)",
-            borderBottom: "0.5px solid var(--danger-text)",
-            fontSize: 12,
-            color: "var(--danger-text)",
-          }}
-        >
-          未取込みの月次レポートがあります
-          <button
-            onClick={() => setTab("import")}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8 }}
-          >
-            確認する
-          </button>
-          <button
-            onClick={() => setReportImportAlertDismissed(true)}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
-          >
-            隠す
-          </button>
-        </div>
-      )}
-
       {overdueTodoCount > 0 && !overdueTodoDismissed && (
         <div
           style={{
@@ -400,32 +358,6 @@ export default function App() {
           </button>
           <button
             onClick={() => setOverdueTodoDismissed(true)}
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
-          >
-            隠す
-          </button>
-        </div>
-      )}
-
-      {sendOfferPendingCount > 0 && !sendOfferAlertDismissed && (
-        <div
-          style={{
-            padding: "8px 16px",
-            background: "var(--danger-bg)",
-            borderBottom: "0.5px solid var(--danger-text)",
-            fontSize: 12,
-            color: "var(--danger-text)",
-          }}
-        >
-          {sendOfferPendingCount}件のSend Offer対象商品があります
-          <a
-            href="/marketing/send-offers"
-            style={{ fontSize: 11, padding: "1px 8px", marginLeft: 8, color: "var(--danger-text)" }}
-          >
-            確認する
-          </a>
-          <button
-            onClick={() => setSendOfferAlertDismissed(true)}
             style={{ fontSize: 11, padding: "1px 8px", marginLeft: 4 }}
           >
             隠す
