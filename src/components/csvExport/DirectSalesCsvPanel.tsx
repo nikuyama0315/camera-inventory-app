@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ITEM_STATUS_LABELS, type ItemStatus } from "../../lib/types";
+import { runHis50sListingCheck } from "../../lib/api/ebaySync";
 import {
   buildDirectSalesCsv,
   fetchPlatformExportItems,
@@ -43,6 +44,50 @@ export default function DirectSalesCsvPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   /** 一覧テーブルの折りたたみ表示(2026-09-03追加、2026-09-10デフォルトを折りたたみ済みに変更)。 */
   const [isTableCollapsed, setIsTableCollapsed] = useState(true);
+  /**
+   * 2026-10-10追加(ユーザー指示): 「出品中のアイテムは除外する」チェックボックス。ONのとき、直販プラットフォーム
+   * (his50s.com)で現在公開中(status='published')の出品と管理番号(=his50s側のexternal_id)で突合し、
+   * 一致するアイテムを一覧・CSV出力の対象から除外する。ONにした時点でhis50sから最新の公開中一覧を取得する。
+   */
+  const [excludeListed, setExcludeListed] = useState(false);
+  const [listedManagementNos, setListedManagementNos] = useState<Set<string>>(new Set());
+  const [listedLoading, setListedLoading] = useState(false);
+  const [listedError, setListedError] = useState<string | null>(null);
+  const [listedFetchedAt, setListedFetchedAt] = useState<Date | null>(null);
+
+  /** his50sの公開中の出品の管理番号一覧を取得する(既存の「直販PF-アプリ同期チェック」と同じEdge Functionを利用)。 */
+  async function fetchListedManagementNos(): Promise<boolean> {
+    setListedLoading(true);
+    setListedError(null);
+    try {
+      // his50s側の公開中一覧はshopIdに依存しない(shopIdはアプリ側の突合対象を絞るだけ)。公開中の出品は
+      // 「アプリ側と一致したもの(matched)」か「一致しなかったもの(his50sOnly)」のどちらかに必ず入るため、
+      // 両方の管理番号を合わせると公開中の全件になる。
+      const result = await runHis50sListingCheck("soulcamera");
+      const nos = new Set<string>();
+      for (const row of result.matched) nos.add(row.managementNo);
+      for (const row of result.his50sOnly) nos.add(row.externalId);
+      setListedManagementNos(nos);
+      setListedFetchedAt(new Date());
+      return true;
+    } catch (err) {
+      setListedError(err instanceof Error ? err.message : "his50sの公開中一覧の取得に失敗しました");
+      return false;
+    } finally {
+      setListedLoading(false);
+    }
+  }
+
+  async function handleExcludeListedChange(checked: boolean) {
+    if (!checked) {
+      setExcludeListed(false);
+      setListedError(null);
+      return;
+    }
+    // 取得に失敗した状態でONのままにすると「除外されていないのに除外したつもり」になるため、失敗時はONにしない。
+    const ok = await fetchListedManagementNos();
+    setExcludeListed(ok);
+  }
 
   async function reload() {
     setLoading(true);
@@ -101,11 +146,18 @@ export default function DirectSalesCsvPanel() {
       if (filters.purchaseDateTo && (!item.purchase_date || item.purchase_date > filters.purchaseDateTo)) {
         return false;
       }
+      if (excludeListed && item.management_no && listedManagementNos.has(item.management_no)) return false;
       return true;
     });
-  }, [items, filters]);
+  }, [items, filters, excludeListed, listedManagementNos]);
 
-  const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+  /** 「出品中は除外」がONのとき、他の絞り込み条件には合うが出品中のため除外された件数(表示用)。 */
+  const excludedListedCount = useMemo(() => {
+    if (!excludeListed) return 0;
+    return items.filter((item) => item.management_no && listedManagementNos.has(item.management_no)).length;
+  }, [items, excludeListed, listedManagementNos]);
+
+  const hasActiveFilters = Object.values(filters).some((v) => v !== "") || excludeListed;
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -135,11 +187,21 @@ export default function DirectSalesCsvPanel() {
     });
   }
 
-  const selectedCount = selectedIds.size;
+  // 「出品中は除外」がONのとき、選択済みでも出品中のアイテムはCSV対象に含めない(チェック後にONにした場合の保険)。
+  const exportTargetItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          selectedIds.has(item.id) &&
+          !(excludeListed && item.management_no && listedManagementNos.has(item.management_no)),
+      ),
+    [items, selectedIds, excludeListed, listedManagementNos],
+  );
+  const selectedCount = exportTargetItems.length;
   const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedIds.has(item.id));
 
   function handleExportCsv() {
-    const selectedItems = items.filter((item) => selectedIds.has(item.id));
+    const selectedItems = exportTargetItems;
     if (selectedItems.length === 0) return;
     const csv = buildDirectSalesCsv(selectedItems);
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -261,8 +323,27 @@ export default function DirectSalesCsvPanel() {
             style={{ width: 160 }}
           />
         </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)" }}>直販プラットフォーム</label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={excludeListed}
+              disabled={listedLoading}
+              onChange={(e) => void handleExcludeListedChange(e.target.checked)}
+            />
+            出品中のアイテムは除外する
+          </label>
+        </div>
         {hasActiveFilters && (
-          <button onClick={() => setFilters(EMPTY_FILTERS)} style={{ fontSize: 12, padding: "4px 10px" }}>
+          <button
+            onClick={() => {
+              setFilters(EMPTY_FILTERS);
+              setExcludeListed(false);
+              setListedError(null);
+            }}
+            style={{ fontSize: 12, padding: "4px 10px" }}
+          >
             絞り込みをクリア
           </button>
         )}
@@ -270,6 +351,22 @@ export default function DirectSalesCsvPanel() {
           {filteredItems.length}件 / 全{items.length}件
         </span>
       </div>
+      {(listedLoading || listedError || excludeListed) && (
+        <p
+          style={{
+            fontSize: 12,
+            margin: "0 0 8px",
+            color: listedError ? "var(--danger-text)" : "var(--text-secondary)",
+          }}
+        >
+          {listedLoading
+            ? "his50sの公開中の出品を取得中です…"
+            : listedError
+              ? `${listedError}(「出品中のアイテムは除外する」はOFFのままです)`
+              : `his50sで公開中の出品を管理番号で突合し、${excludedListedCount}件を除外しています` +
+                `(公開中${listedManagementNos.size}件、取得: ${listedFetchedAt ? listedFetchedAt.toLocaleTimeString("ja-JP") : "-"})`}
+        </p>
+      )}
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
         <button onClick={allFilteredSelected ? deselectAllFiltered : selectAllFiltered} style={{ fontSize: 12, padding: "4px 10px" }}>
@@ -287,7 +384,7 @@ export default function DirectSalesCsvPanel() {
         </button>
         <button
           onClick={handleExportCsv}
-          disabled={selectedCount === 0}
+          disabled={selectedCount === 0 || listedLoading}
           style={{ fontSize: 12, padding: "5px 12px", fontWeight: 500 }}
         >
           選択した{selectedCount}件をCSVに出力
