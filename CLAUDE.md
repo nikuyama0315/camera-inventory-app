@@ -340,3 +340,30 @@ git push origin master   # GitHubリモート: github-camera-inventory:nikuyama0
 - 調査: 該当欄(`EbayXlsxFillPanel.tsx`)はライブラリ不使用のブラウザ標準`<input type="datetime-local">`で、2026-09-23の実装以来この属性行は変更されていない(git logで確認)。ユーザーのブラウザは**Firefox**と判明。
 - 原因: Firefoxのdatetime-local統合ピッカー(日付+時刻)はFirefox 144で実装されたが、**`about:config`の`dom.forms.datetime.timepicker`(および`dom.forms.datetime`)が`true`になっていないと時刻パネルが表示されない**(実験的機能扱い)。Firefoxのアップデートやプロファイルのリセット等でこの設定が既定値(無効)に戻った可能性が高い。
 - 対応: アプリ側の修正ではなく、ユーザー自身に`about:config`で`dom.forms.datetime.timepicker`を`true`にするよう案内した(実行結果は未確認)。再発した場合はまずこの設定を確認する。
+
+## セッション要点(2026-10-10)
+
+### camera-inventory-app
+- **直販プラットフォーム登録用CSV作成**(`DirectSalesCsvPanel.tsx`): 「出品中のアイテムは除外する」チェックボックスを追加(コミット 4a6a662)。ONのとき、`runHis50sListingCheck("soulcamera")`(`lib/api/ebaySync.ts`)の結果から、his50sで公開中の管理番号(`matched[].managementNo` ∪ `his50sOnly[].externalId`)を集めて除外する。取得に失敗した場合はチェックがOFFのまま。
+- **画面上部のバナー3種を廃止し、メニューの赤い通知チップに変更**(`App.tsx`、コミット d5722db): 在庫しきい値超過→「入荷・在庫アラート」、未取込レポート→「レポート取込」。件数入りの赤チップ(99件超は`99+`)。To Doバナーは従来どおり。Send Offer対象のバナーも廃止し、`/opt/ebay-automation`側のナビ「オファ」のチップ(`base.html`の`.nav-chip`)に移した。
+- 詳細編集の左ペイン一覧に仕入高を表示(a8a5684)、送料登録のeLogi突合を購入者ID(username)基準に変更(b747e5c・ec6744b)は前回までに記録済み。
+
+### ebay-automation(いずれもユーザーから直接名指しで依頼された例外対応、commit運用なし、変更前は`.bak-pre-<スラッグ>-20261010`)
+- **Best Match順位だけの再取得**: Browse APIを1行1回(1日5,000回、Analyticsとは別枠)で順位のみ更新する`refresh_queue_ranks()`(`sell_similar.py`)。ダッシュボード(/v2)と「出品情報更新」に、全件ボタン(`/queue/refresh-ranks`)と行ごとの「順位を更新」(`/queue/<id>/refresh-rank`)を追加。手動更新も`record_rank_history`で履歴に1点追加する(1日に複数点)。取得に失敗した行は既存値のまま。ボタン配置は「順位推移|順位を更新」「相場を更新|利益簡易計算」の左右2列。
+- **相場の表記**: 「相場(上位N件): 平均$X 中央$Y」(一覧とモーダル共通)。
+- **順位推移グラフが1日分しか出ない不具合(根本原因あり)**: `_fetch_relisting_predecessor_map()`が`ebay_sell_similar_history`を無ページングで取得しており、**PostgRESTの1000行上限**で古い再出品の連鎖が欠けていた。`Range`ヘッダでページング(`order=action_at.asc`)に修正。なお`ebay_rank_history`の記録開始は2026-09-02で、それ以前の順位は存在しない。
+- **「旧出品の終了自体に失敗: The auction has already been closed.」が実状と異なる件**(原因: 終了済みの出品が承認キューに残り、再実行のたびにバックアップと下書きOfferを作ってからEndItemが「すでに終了」で失敗していた)。修正は3層:
+  1. `do_action()`/`do_action_v2()`の最初(GetItem直後)で`old_listing_not_active_message()`が`ListingStatus`がActive以外なら、バックアップ・終了・新規出品を一切行わず中止(dry-runも同様)。
+  2. それでもEndItemが`already been closed`等を返した場合は`is_already_ended_error()`/`ALREADY_ENDED_MESSAGE`で「すでに終了済みでした」と記録。
+  3. 保存済みの古い記録は書き換えず、表示時にJinjaフィルタ`friendly_relist_error`で置換(終了品バックアップの詳細・一覧)。`job_detail.html`にも説明文を追加。
+- **失敗行の自動整理**: `cleanup_ended_queue_rows()`の対象に`failed`を追加(スキャン末尾と「承認済みを実行」完了直後に実行)。元出品がActiveでない失敗行を削除(履歴・バックアップは残る)。ただし「旧出品は終了済みで新規出品の公開に失敗」した行は、同じ商品(管理番号)に数量1以上のActive出品が無い場合に限り最新1行を残す。判定に失敗したときは削除しない。
+- **失敗メッセージの点検結果(履歴の失敗53件)**: 終了済み13件(修正済)/終了後の公開失敗29件/売却の可能性で中止5件/その他6件。公開失敗29商品のうち20件は後の再出品で復旧済み、8件はシステム上売却済み、**1件(260614-11 オリンパスXA2)は購入可能な出品が無い**(10/10 03:15の再出品で旧出品を終了後、publishが400)。ユーザーがバックアップから再出品する。同SKUの数量0の「Active」7件は他国サイト向けで実質出品なし。**「Active出品がある」判定は数量1以上で見ること**(数量0のActiveは出品していないのと同じ)。
+- **未対応の改善案**: `do_action_v2()`のpublishOffer失敗時に`e.response.text`をログ・エラーメッセージに残す(現状はステータス行のみで400の原因が特定できない)。`scheduled_scan.py`の`_running_job()`が実行中のまま残ったジョブで翌日の自動実行を見送る潜在リスク(10-04記載)。スキャン時の在庫数・売却数の保存。
+
+### 未解決・要フォロー
+- 旧形式SKU(先頭に「20」付き)の売上突合の修正(10-07〜10-08記載)は、ユーザーが対応案(1)手動/(2)1件のみ紐付け/(3)安全条件付き全体修正のどれにするか未回答。
+- ヤフオク261006-09〜13(okubocamera)は落札価格のみで登録済み。支払い確定後に仕入高(送料込み、按分)と仕入日を修正する。
+
+### 運用メモ(このセッションで判明)
+- 調査時に「他の失敗も同じ型か」を見るときは、履歴を全件ページングして原因別に集計し、現状(eBayのActive一覧・DBのstatus)と突き合わせると、表示上の「失敗」が実害かどうか判別できる。
+- `fetch_active_item_skus()`はSKUのみを返し数量は含まない。購入可能かの判定には`fetch_active_listing_summary()`の`quantity_available`と組み合わせる。
