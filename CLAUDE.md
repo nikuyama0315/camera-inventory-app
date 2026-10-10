@@ -367,3 +367,12 @@ git push origin master   # GitHubリモート: github-camera-inventory:nikuyama0
 ### 運用メモ(このセッションで判明)
 - 調査時に「他の失敗も同じ型か」を見るときは、履歴を全件ページングして原因別に集計し、現状(eBayのActive一覧・DBのstatus)と突き合わせると、表示上の「失敗」が実害かどうか判別できる。
 - `fetch_active_item_skus()`はSKUのみを返し数量は含まない。購入可能かの判定には`fetch_active_listing_summary()`の`quantity_available`と組み合わせる。
+
+### 旧形式SKUの売上突合: 全体修正を実施(2026-10-10、上記10-07〜10-08の未解決事項の解決)
+- 方針は「安全条件付きの全体修正」。順序は(1)自動登録に安全条件→(2)過去分の紐付け→(3)突合ロジック修正。
+- **(1) `/opt/ebay-automation/scripts/ebay_sales_sync.py`(変更前は`.bak-pre-dupguard-20261010`)**: `register_sale_for_line()`に3つの安全条件を追加。①同じ商品・同じオーダー番号/SRRの売上が既にあれば新規登録せず既存売上に紐付けのみ(`linked_existing_sale`、売上が複数/紐付け済みなら`skipped_needs_review_existing_sales`)。②商品が既に`sold`で該当売上が無ければ登録しない(`skipped_item_already_sold`)。③注文日が7日より古い明細は登録しない(`skipped_old_order`、`AUTO_REGISTER_MAX_AGE_DAYS`)。スキップした明細は`matched_pending`のまま残る。SRRは複数商品の注文で共通になるため、判定は必ず「同じ商品」に限定している。
+- **(2) 過去分122件を売上に紐付け(SQL)**: A=管理番号の「20」を外して商品が決まり、同商品・同SRR/オーダー番号の未紐付き売上が1件(100件)、B=商品は違う(管理番号の振り直し等)がSRRが一意で日付差1日以内(22件)。金額が換算後8%超ずれるものは除外。`sales.ebay_transaction_line_id`を埋め、明細を`registered`+`matched_item_id`=売上の商品に更新。売上・商品・Drive・his50sには触れていない。**更新前の状態は`/home/ubuntu/link_backup/link_backup_20261010.csv`(VPS)**、候補抽出SQLは同フォルダの`cand.sql`。戻す場合はCSVのsale_idの`ebay_transaction_line_id`をNULL、line_idの明細を`unmatched`/`matched_item_id`=NULLに戻す。
+- **(3) Edge Function `ebay-sync-orders`(version 14)**: `skuMatchKey()`で`/^20(\d{6}-\d{2})/`に一致する旧形式は先頭の「20」を外して比較。取得期間(自動2日/手動90日)内の明細だけが再突合される(それより古い明細はEdge Functionからは二度と触られない)。このFunctionのソースはSupabaseにのみ存在し、デプロイは全文再送が必要。
+- 結果: 未突合のSALE明細152件→30件。送料登録で止まっていた`08-15260-54449`は、すでに売上登録・紐付け済みで解決。
+- **残り(要手動確認)**: SRR 856(1売上に6商品が合算登録、按分不可)、SRR 881(同一SRRの売上が2件=二重登録の疑い)、金額不一致3件(SRR 797・848・856)、売上が見当たらない約15件(260215-03の3件・260616-02はシステム上「出品中」でキャンセル/返金の可能性)。
+- 注意: Edge Functionのupsertは同期のたびに対象期間の明細の`match_status`を`matched_pending`/`unmatched`に上書きする(登録済みも一時的に戻る)。`ebay_sales_sync.py`が`healed_existing_sale`で`registered`に戻すので、売上の`ebay_transaction_line_id`の紐付けが前提。
